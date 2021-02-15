@@ -42,10 +42,17 @@ export default class ParserState {
     /**
      * Возвращает *code point* текущего символа парсера и смещает указатель
      */
-    next(): number | undefined {
-        if (this.hasNext()) {
-            return this.inc(this.peek());
-        }
+    next(): number {
+        return this.hasNext() ? this.inc(this.peek()) : NaN;
+    }
+
+    /**
+     * Возвращает код предыдущего символа без смещения указателя
+     */
+    peekPrev(): number {
+        // XXX в идеале надо учитывать code points, но пока для текущих требований
+        // парсера это не надо
+        return this.string.charCodeAt(this.pos - 1);
     }
 
     /**

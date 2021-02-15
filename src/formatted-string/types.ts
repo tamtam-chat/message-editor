@@ -84,7 +84,7 @@ export interface TokenEmoji extends TokenBase {
 export interface TokenTextEmoji extends TokenBase {
     type: TokenType.TextEmoji;
     /** Эмоджи-представление токена */
-    value: string;
+    emoji: string;
 }
 
 export interface TokenUserSticker extends TokenBase {
