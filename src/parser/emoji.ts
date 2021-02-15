@@ -18,17 +18,20 @@ const enum EmojiCodes {
 }
 
 /**
- * Вернёт токен с эмоджи, если его можно поглотить из текущей позиции
+ * Вернёт `true`, если удалось прочитать эмоджи из текущей позиции потока
  */
-export default function parseEmoji(state: ParserState): TokenEmoji | undefined {
+export default function parseEmoji(state: ParserState): boolean {
     const { pos } = state;
     if (keycap(state) || flag(state) || emoji(state) || forcedEmoji(state)) {
-        return {
+        state.push({
             type: TokenType.Emoji,
             format: state.format,
             value: state.substring(pos)
-        };
+        });
+        return true;
     }
+
+    return false;
 }
 
 /**

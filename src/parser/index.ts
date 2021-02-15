@@ -15,15 +15,9 @@ const defaultOptions: ParserOptions = {
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
     const options: ParserOptions = { ...defaultOptions, ...opt };
     const state = new ParserState(text);
-    let token: Token;
 
     while (state.hasNext()) {
-        token = emoji(state) || textEmoji(state, options);
-        if (token) {
-            state.push(token);
-        } else {
-            state.consumeText();
-        }
+        emoji(state) || textEmoji(state, options) || state.consumeText();
     }
 
     state.flushText();

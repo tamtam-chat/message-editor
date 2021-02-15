@@ -142,7 +142,7 @@ const aliases = {
 
 const lookup: Tree = createLookupTree(aliases);
 
-export default function parseTextEmoji(state: ParserState, options: ParserOptions): TokenTextEmoji | undefined {
+export default function parseTextEmoji(state: ParserState, options: ParserOptions): boolean {
     if (options.textEmoji && !state.hasFormat(TokenFormat.MONOSPACE) && isDelimiter(state.peekPrev())) {
         const { pos } = state;
         let tree = lookup;
@@ -152,16 +152,17 @@ export default function parseTextEmoji(state: ParserState, options: ParserOption
             if (entry === true) {
                 // Нашли совпадение, убедимся, что оно на границе слов
                 if (!isDelimiter(state.peek())) {
-                    return;
+                    return false;
                 }
 
                 const value = state.substring(pos);
-                return {
+                state.push({
                     type: TokenType.TextEmoji,
                     format: state.format,
                     value,
                     emoji: aliases[value] || value
-                };
+                });
+                return true;
             }
 
             if (entry === undefined) {
@@ -173,6 +174,8 @@ export default function parseTextEmoji(state: ParserState, options: ParserOption
 
         state.pos = pos;
     }
+
+    return false;
 }
 
 function collectTree(tree: Tree, text: string, i = 0): void {
