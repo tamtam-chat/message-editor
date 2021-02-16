@@ -1,8 +1,7 @@
-import { TokenFormat } from '../formatted-string';
-import { TokenTextEmoji, TokenType } from '../formatted-string/types';
+import { TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { ParserOptions } from './types';
-import { isDelimiter } from './utils';
+import { isDelimiter, isCodeBlock } from './utils';
 
 type Tree = Map<number, true | Tree>;
 
@@ -143,7 +142,7 @@ const aliases = {
 const lookup: Tree = createLookupTree(aliases);
 
 export default function parseTextEmoji(state: ParserState, options: ParserOptions): boolean {
-    if (options.textEmoji && !state.hasFormat(TokenFormat.MONOSPACE) && isDelimiter(state.peekPrev())) {
+    if (options.textEmoji && !isCodeBlock(state) && isDelimiter(state.peekPrev())) {
         const { pos } = state;
         let tree = lookup;
         while (state.hasNext()) {

@@ -1,4 +1,4 @@
-import { TokenEmoji, TokenType } from '../formatted-string/types';
+import { TokenType } from '../formatted-string/types';
 import ParserState from './state';
 
 const enum EmojiCodes {

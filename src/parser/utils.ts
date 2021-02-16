@@ -1,3 +1,6 @@
+import { TokenFormat } from '../formatted-string';
+import ParserState from './state';
+
 export const enum Codes {
     // Formatting
     /** * */
@@ -119,4 +122,49 @@ export function isDelimiter(ch?: number): boolean {
         || isWhitespace(ch)
         || isPunctuation(ch)
         || isSimpleFormatting(ch);
+}
+
+/**
+ * Вернёт `true`, если все коды из `arr` были поглощены из текущей позиции потока
+ */
+export function consumeArray(state: ParserState, arr: number[]): boolean {
+    const { pos } = state;
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i] !== state.next()) {
+            state.pos = pos;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Проверяет, находимся ли мы сейчас в контексте блока кода: для некоторых случаев
+ * это влияет на возможность парсинга
+ */
+export function isCodeBlock(state: ParserState): boolean {
+    return state.hasFormat(TokenFormat.MONOSPACE);
+}
+
+/**
+ * Вернёт `true` если указанный код соответствует числу
+ */
+export function isNumber(code: number): boolean {
+    return code > 47 && code < 58;
+}
+
+/**
+ * Вернёт `true` если указанный код соответствует латинским символам от A до Z
+ */
+export function isAlpha(code: number): boolean {
+    code &= ~32; // quick hack to convert any char code to uppercase char code
+    return code >= 65 && code <= 90;
+}
+
+/**
+ * Вернёт `true` если указанный код соответствует числу или символам A-Z
+ */
+export function isAlphaNumeric(code: number): boolean {
+    return isNumber(code) || isAlpha(code);
 }

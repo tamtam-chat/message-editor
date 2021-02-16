@@ -13,4 +13,7 @@ export interface ParserOptions {
 
     /** Находить команды для ботов: `/command` */
     command: boolean;
+
+    /** Находить ОК-специфические стикеры: #u9b3c2d1af7s# */
+    userSticker: boolean;
 }

@@ -3,6 +3,7 @@ import ParserState from './state';
 import { ParserOptions } from './types';
 import emoji from './emoji';
 import textEmoji from './text-emoji';
+import userSticker from './user-sticker';
 
 const defaultOptions: ParserOptions = {
     formatting: false,
@@ -10,6 +11,7 @@ const defaultOptions: ParserOptions = {
     hashtag: false,
     mention: false,
     command: false,
+    userSticker: false,
 }
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
@@ -17,7 +19,8 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     const state = new ParserState(text);
 
     while (state.hasNext()) {
-        emoji(state) || textEmoji(state, options) || state.consumeText();
+        emoji(state) || textEmoji(state, options) || userSticker(state, options)
+        || state.consumeText();
     }
 
     state.flushText();

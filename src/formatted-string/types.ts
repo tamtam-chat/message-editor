@@ -90,25 +90,25 @@ export interface TokenTextEmoji extends TokenBase {
 export interface TokenUserSticker extends TokenBase {
     type: TokenType.UserSticker;
     /** ID стикера */
-    value: string;
+    stickerId: string;
 }
 
 export interface TokenMention extends TokenBase {
     type: TokenType.Mention;
     /** Значение упоминания */
-    value: string;
+    mention: string;
 }
 
 export interface TokenCommand extends TokenBase {
     type: TokenType.Command;
     /** Команда */
-    value: string;
+    command: string;
 }
 
 export interface TokenHashTag extends TokenBase {
     type: TokenType.HashTag;
     /** Значение хэштэга */
-    value: string;
+    hashtag: string;
 }
 
 export interface TokenMarkdown extends TokenBase {
