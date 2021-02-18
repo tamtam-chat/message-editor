@@ -1,5 +1,6 @@
 import { Token, TokenFormat } from '../formatted-string';
 import { TokenType } from '../formatted-string/types';
+import { isDelimiter } from './utils';
 
 type MatchFn = (ch: number) => boolean;
 
@@ -21,6 +22,9 @@ export default class ParserState {
 
     /** Позиция конца накапливаемого текстового фрагмента */
     private textEnd = -1;
+
+    /** Аккумулированная длина всех токенов в `.tokens` */
+    private tokenLength = 0;
 
     /**
      * Возвращает *code point* текущего символа парсера без смещения указателя
@@ -61,6 +65,13 @@ export default class ParserState {
      */
     hasNext(): boolean {
         return this.pos < this.string.length;
+    }
+
+    /**
+     * Проверяет, есть ли аккумулированный текст в состоянии
+     */
+    hasPendingText(): boolean {
+        return this.textStart !== this.textEnd;
     }
 
     /**
@@ -150,7 +161,7 @@ export default class ParserState {
      * Записывает накопленный текстовый токен в вывод
      */
     flushText(): void {
-        if (this.textStart !== this.textEnd) {
+        if (this.hasPendingText()) {
             // TODO использовать функцию-фабрику для сохранения шэйпа
             this.tokens.push({
                 type: TokenType.Text,
@@ -160,6 +171,30 @@ export default class ParserState {
             });
             this.textStart = this.textEnd = -1;
         }
+    }
+
+    /**
+     * Проверяет, находимся ли мы сейчас на границе слов
+     */
+    atWordBound(): boolean {
+        // Для указанной позиции нам нужно проверить, что предыдущий символ или токен
+        // является границей слов
+        const { pos } = this;
+        if (pos === 0) {
+            // Находимся в самом начале
+            return true;
+        }
+
+        if (this.hasPendingText()) {
+            return isDelimiter(this.peekPrev());
+        }
+
+        const lastToken = this.tokens[this.tokens.length - 1];
+        if (lastToken) {
+            return lastToken.type === TokenType.Emoji;
+        }
+
+        return false;
     }
 
     /**

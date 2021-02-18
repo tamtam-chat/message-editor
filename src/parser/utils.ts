@@ -75,7 +75,9 @@ export const enum Codes {
     /** & */
     Ampersand = 38,
     /** + */
-    PLUS = 43,
+    Plus = 43,
+    /** @ */
+    At = 64,
 }
 
 const punctuation = new Set<number>([
@@ -122,6 +124,29 @@ export function isDelimiter(ch?: number): boolean {
         || isWhitespace(ch)
         || isPunctuation(ch)
         || isSimpleFormatting(ch);
+}
+
+/**
+ * Проверяет, является ли указанный символ стандартным идентификатором: латинские
+ * символы, цифры подчёркивание и дефис
+ */
+export function isIdentifier(ch: number): boolean {
+    return ch === Codes.Underscore
+        || ch === Codes.Hyphen
+        || isAlphaNumeric(ch);
+}
+
+/**
+ * Вернёт `true` если из текущей позиции удалось поглотить правильный идентификатор
+ */
+export function consumeIdentifier(state: ParserState): boolean {
+    // Идентификатор обязательно должен начинаться с латинского символа
+    if (state.consume(isAlpha)) {
+        state.consumeWhile(isIdentifier);
+        return true;
+    }
+
+    return false;
 }
 
 /**

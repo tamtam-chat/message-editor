@@ -142,7 +142,7 @@ const aliases = {
 const lookup: Tree = createLookupTree(aliases);
 
 export default function parseTextEmoji(state: ParserState, options: ParserOptions): boolean {
-    if (options.textEmoji && !isCodeBlock(state) && isDelimiter(state.peekPrev())) {
+    if (options.textEmoji && !isCodeBlock(state) && state.atWordBound()) {
         const { pos } = state;
         let tree = lookup;
         while (state.hasNext()) {
