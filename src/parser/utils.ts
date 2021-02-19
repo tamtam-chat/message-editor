@@ -64,6 +64,8 @@ export const enum Codes {
     // Special
     /** = */
     Equal = 61,
+    /** / */
+    Slash = 47,
     /** \ */
     BackSlash = 92,
     /** | */
@@ -192,4 +194,19 @@ export function isAlpha(code: number): boolean {
  */
 export function isAlphaNumeric(code: number): boolean {
     return isNumber(code) || isAlpha(code);
+}
+
+/**
+ * Check if given character code is simple letter of supported alphabets
+ */
+export function isMultiAlpha(code: number): boolean {
+    return isAlpha(code) || // a-zA-Z
+        code === 1105 || code === 1025 || // Ёё
+        code >= 1040 && code <= 1103 || // Аа-Яя
+        code >= 1568 && code <= 1599 || // Arabic and Farsi letters
+        code >= 1601 && code <= 1610 || // Arabic letters
+        code === 1662 || code === 1670 || code === 1688 || code === 1703 || code === 1705 || code === 1711 || // arabic letters
+        code >= 1729 && code <= 1731 || // Arabic letters
+        code === 1740 || // Arabic letters
+        code >= 1641 && code <= 1776; // Arabic and Persian numbers
 }

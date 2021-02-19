@@ -5,6 +5,7 @@ import emoji from './emoji';
 import textEmoji from './text-emoji';
 import userSticker from './user-sticker';
 import mention from './mention';
+import command from './command';
 
 const defaultOptions: ParserOptions = {
     formatting: false,
@@ -21,7 +22,8 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
 
     while (state.hasNext()) {
         emoji(state) || textEmoji(state, options) || userSticker(state, options)
-            || mention(state, options) || state.consumeText();
+            || mention(state, options) || command(state, options)
+            || state.consumeText();
     }
 
     state.flushText();
