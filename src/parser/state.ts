@@ -1,6 +1,6 @@
 import { Token, TokenFormat } from '../formatted-string';
 import { TokenType } from '../formatted-string/types';
-import { isDelimiter } from './utils';
+import { isDelimiter, last } from './utils';
 
 type MatchFn = (ch: number) => boolean;
 
@@ -189,7 +189,7 @@ export default class ParserState {
             return isDelimiter(this.peekPrev());
         }
 
-        const lastToken = this.tokens[this.tokens.length - 1];
+        const lastToken = last(this.tokens);
         if (lastToken) {
             return lastToken.type === TokenType.Emoji;
         }

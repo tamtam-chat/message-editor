@@ -80,6 +80,8 @@ export const enum Codes {
     Plus = 43,
     /** @ */
     At = 64,
+    /** # */
+    Hash = 35,
 }
 
 const punctuation = new Set<number>([
@@ -119,11 +121,15 @@ export function isSimpleFormatting(ch: number): boolean {
         || ch === Codes.Tilde;
 }
 
-export function isDelimiter(ch?: number): boolean {
+export function isBound(ch?: number): boolean {
     return ch === undefined
         || ch !== ch /* NaN */
         || isNewLine(ch)
         || isWhitespace(ch)
+}
+
+export function isDelimiter(ch?: number): boolean {
+    return isBound(ch)
         || isPunctuation(ch)
         || isSimpleFormatting(ch);
 }
@@ -164,6 +170,12 @@ export function consumeArray(state: ParserState, arr: number[]): boolean {
     }
 
     return true;
+}
+
+export function last<T>(arr: T[]): T | undefined {
+    if (arr.length > 0) {
+        return arr[arr.length - 1];
+    }
 }
 
 /**
@@ -209,4 +221,8 @@ export function isMultiAlpha(code: number): boolean {
         code >= 1729 && code <= 1731 || // Arabic letters
         code === 1740 || // Arabic letters
         code >= 1641 && code <= 1776; // Arabic and Persian numbers
+}
+
+export function isCommandName(ch: number): boolean {
+    return ch === Codes.Underscore || isNumber(ch) || isMultiAlpha(ch);
 }

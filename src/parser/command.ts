@@ -1,7 +1,7 @@
 import { TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { ParserOptions } from './types';
-import { Codes, isCodeBlock, isDelimiter, isMultiAlpha, isNumber } from './utils';
+import { Codes, isCodeBlock, isCommandName, isDelimiter } from './utils';
 
 export default function parseCommand(state: ParserState, options: ParserOptions): boolean {
     if (options.command && !isCodeBlock(state) && state.atWordBound()) {
@@ -25,8 +25,4 @@ export default function parseCommand(state: ParserState, options: ParserOptions)
     }
 
     return false;
-}
-
-function isCommandName(ch: number): boolean {
-    return ch === Codes.Underscore || isNumber(ch) || isMultiAlpha(ch);
 }
