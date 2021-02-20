@@ -1,9 +1,8 @@
 import { TokenType } from '../formatted-string/types';
 import ParserState from './state';
+import { consumeTree, createTree } from './tree';
 import { ParserOptions } from './types';
 import { isDelimiter, isCodeBlock } from './utils';
-
-type Tree = Map<number, true | Tree>;
 
 const aliases = {
     ':C': '☹️',
@@ -139,59 +138,26 @@ const aliases = {
     '(facepalm)': '🤦‍'
 };
 
-const lookup: Tree = createLookupTree(aliases);
+const lookup = createTree(Object.keys(aliases));
 
 export default function parseTextEmoji(state: ParserState, options: ParserOptions): boolean {
     if (options.textEmoji && !isCodeBlock(state) && state.atWordBound()) {
         const { pos } = state;
-        let tree = lookup;
-        while (state.hasNext()) {
-            const entry = tree.get(state.next());
 
-            if (entry === true) {
-                // Нашли совпадение, убедимся, что оно на границе слов
-                if (!isDelimiter(state.peek())) {
-                    return false;
-                }
-
-                const value = state.substring(pos);
-                state.push({
-                    type: TokenType.TextEmoji,
-                    format: state.format,
-                    value,
-                    emoji: aliases[value] || value
-                });
-                return true;
-            }
-
-            if (entry === undefined) {
-                break;
-            }
-
-            tree = entry;
+        // Если нашли совпадение, то убедимся, что оно на границе слов
+        if (consumeTree(state, lookup) && isDelimiter(state.peek())) {
+            const value = state.substring(pos);
+            state.push({
+                type: TokenType.TextEmoji,
+                format: state.format,
+                value,
+                emoji: aliases[value] || value
+            });
+            return true;
         }
 
         state.pos = pos;
     }
 
     return false;
-}
-
-function collectTree(tree: Tree, text: string, i = 0): void {
-    const ch = text.charCodeAt(i++);
-
-    if (i === text.length) {
-        tree.set(ch, true);
-    } else {
-        if (!tree.has(ch)) {
-            tree.set(ch, new Map());
-        }
-        collectTree(tree.get(ch) as Tree, text, i);
-    }
-}
-
-function createLookupTree(dict: Record<string, string>): Tree {
-    const root = new Map();
-    Object.keys(dict).forEach(key => collectTree(root, key));
-    return root;
 }

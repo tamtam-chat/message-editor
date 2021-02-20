@@ -22,7 +22,7 @@ export const enum Codes {
     /** , */
     Comma = 44,
     /** . */
-    Period = 46,
+    Dot = 46,
     /** : */
     Colon = 58,
     /** : */
@@ -86,13 +86,13 @@ export const enum Codes {
 
 const punctuation = new Set<number>([
     Codes.Exclamation, Codes.DoubleQuote, Codes.SingleQuote, Codes.RoundBracketOpen,
-    Codes.RoundBracketClose, Codes.Comma, Codes.Period, Codes.Colon, Codes.SemiColon,
+    Codes.RoundBracketClose, Codes.Comma, Codes.Dot, Codes.Colon, Codes.SemiColon,
     Codes.Question, Codes.SquareBracketOpen, Codes.SquareBracketClose, Codes.CurlyBracketOpen, Codes.CurlyBracketClose,
     Codes.Hyphen, Codes.EnDash, Codes.EmDash
 ]);
 
 const delimiterPunctuation = new Set<number>([
-    Codes.Exclamation, Codes.Comma, Codes.Period, Codes.SemiColon, Codes.Question
+    Codes.Exclamation, Codes.Comma, Codes.Dot, Codes.SemiColon, Codes.Question
 ]);
 
 export function isPunctuation(ch: number): boolean {
@@ -179,6 +179,18 @@ export function last<T>(arr: T[]): T | undefined {
 }
 
 /**
+ * Конвертация указанной стоки в список кодов символов
+ */
+export function toCode(str: string): number[] {
+    const result: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+        result.push(str.charCodeAt(i));
+    }
+
+    return result;
+}
+
+/**
  * Проверяет, находимся ли мы сейчас в контексте блока кода: для некоторых случаев
  * это влияет на возможность парсинга
  */
@@ -221,6 +233,51 @@ export function isMultiAlpha(code: number): boolean {
         code >= 1729 && code <= 1731 || // Arabic letters
         code === 1740 || // Arabic letters
         code >= 1641 && code <= 1776; // Arabic and Persian numbers
+}
+
+/**
+ * All unicode character set alpha like
+ */
+export function isUnicodeAlpha(code: number): boolean {
+    return isAlpha(code)
+        || code >= 880 && code <= 1023   // Greek and Coptic
+        || code >= 1024 && code <= 1279  // Cyrillic
+        || code >= 1280 && code <= 1327  // Cyrillic Supplementary
+        || code >= 1328 && code <= 1423  // Armenian
+        || code >= 1424 && code <= 1535  // Hebrew
+        || code >= 1536 && code <= 1791  // Arabic
+        || code >= 19968 && code <= 40959 // Chinese
+        || code >= 1792 && code <= 1871  // Syriac
+        || code >= 1920 && code <= 1983  // Thaana
+        || code >= 2304 && code <= 2431  // Devanagari
+        || code >= 2432 && code <= 2559  // Bengali
+        || code >= 2560 && code <= 2687  // Gurmukhi
+        || code >= 2688 && code <= 2815  // Gujarati
+        || code >= 2816 && code <= 2943  // Oriya
+        || code >= 2944 && code <= 3071  // Tamil
+        || code >= 3072 && code <= 3199  // Telugu
+        || code >= 3200 && code <= 3327  // Kannada
+        || code >= 3328 && code <= 3455  // Malayalam
+        || code >= 3456 && code <= 3583  // Sinhala
+        || code >= 3584 && code <= 3711  // Thai
+        || code >= 3712 && code <= 3839  // Lao
+        || code >= 3840 && code <= 4095  // Tibetan
+        || code >= 4096 && code <= 4255  // Myanmar
+        || code >= 4256 && code <= 4351  // Georgian
+        || code >= 4352 && code <= 4607  // Hangul Jamo
+        || code >= 4608 && code <= 4991  // Ethiopic
+        || code >= 5024 && code <= 5119  // Cherokee
+        || code >= 5120 && code <= 5759  // Unified
+        || code >= 5760 && code <= 5791  // Ogham
+        || code >= 5792 && code <= 5887  // Runic
+        || code >= 5888 && code <= 5919  // Tagalog
+        || code >= 5920 && code <= 5951  // Hanunoo
+        || code >= 5952 && code <= 5983  // Buhid
+        || code >= 5984 && code <= 6015  // Tagbanwa
+        || code >= 6016 && code <= 6143  // Khmer
+        || code >= 6144 && code <= 6319  // Mongolian
+        || code >= 6400 && code <= 6479  // Limbu
+        || code >= 6480 && code <= 6527; // Tai Le
 }
 
 export function isCommandName(ch: number): boolean {

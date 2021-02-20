@@ -18,13 +18,10 @@ export default class ParserState {
     public tokens: Token[] = [];
 
     /** Позиция начала накапливаемого текстового фрагмента */
-    private textStart = -1;
+    public textStart = -1;
 
     /** Позиция конца накапливаемого текстового фрагмента */
-    private textEnd = -1;
-
-    /** Аккумулированная длина всех токенов в `.tokens` */
-    private tokenLength = 0;
+    public textEnd = -1;
 
     /**
      * Возвращает *code point* текущего символа парсера без смещения указателя

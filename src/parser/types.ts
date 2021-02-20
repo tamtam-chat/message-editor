@@ -16,4 +16,7 @@ export interface ParserOptions {
 
     /** Находить ОК-специфические стикеры: #u9b3c2d1af7s# */
     userSticker: boolean;
+
+    /** Находить ссылки в тексте */
+    link: boolean;
 }

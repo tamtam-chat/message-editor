@@ -1,5 +1,6 @@
 import { TokenType } from '../formatted-string/types';
 import ParserState from './state';
+import { Codes, isNumber } from './utils';
 
 const enum EmojiCodes {
     /** Zero-width joiner */
@@ -22,7 +23,7 @@ const enum EmojiCodes {
  */
 export default function parseEmoji(state: ParserState): boolean {
     const { pos } = state;
-    if (keycap(state) || flag(state) || emoji(state) || forcedEmoji(state)) {
+    if (consumeEmoji(state)) {
         state.push({
             type: TokenType.Emoji,
             format: state.format,
@@ -35,10 +36,21 @@ export default function parseEmoji(state: ParserState): boolean {
 }
 
 /**
- * Поглощает keycap-последовательность
+ * Вспомогательный консьюмер для всех эмоджи
+ * @param state
  */
-function keycap(state: ParserState): boolean {
-    const pos = state.pos;
+export function consumeEmoji(state: ParserState): boolean {
+    return keycap(state) || flag(state) || emoji(state) || forcedEmoji(state);
+}
+
+/**
+ * Поглощает keycap-последовательность.
+ * Особенностью keycap-последовательности является то, что она может начинаться
+ * с базовых символов, например, цифр, которые после себя содержат специальные
+ * коды, указывающие, что символ нужно показать как эмоджи
+ */
+export function keycap(state: ParserState): boolean {
+    const { pos } = state;
     if (state.consume(isKeycapStart)) {
         // Этого символа может не быть
         state.consume(EmojiCodes.Presentation);
@@ -86,7 +98,7 @@ function emoji(state: ParserState): boolean {
 
     // Одно изображение эмоджи может быть представлено как несколько самостоятельных
     // эмоджи, соединённых zero-width joiner (ZWJ)
-    while (consumeEmoji(state)) {
+    while (consumeEmojiItem(state)) {
         if (!state.consume(EmojiCodes.ZWJ)) {
             break;
         }
@@ -117,7 +129,7 @@ function forcedEmoji(state: ParserState) {
 /**
  * Поглощает самостоятельный символ эмоджи в потоке
  */
-function consumeEmoji(state: ParserState): boolean {
+function consumeEmojiItem(state: ParserState): boolean {
     const pos = state.pos;
 
     if (state.consume(isEmoji)) {
@@ -141,9 +153,9 @@ function consumeEmoji(state: ParserState): boolean {
 }
 
 function isKeycapStart(cp: number): boolean {
-    return cp === 35 /* # */
-        || cp === 42 /* * */
-        || cp >= 48 && cp <= 57 /* 0-9 */;
+    return cp === Codes.Hash
+        || cp === Codes.Asterisk
+        || isNumber(cp);
 }
 
 function isRegionalIndicator(cp: number): boolean {

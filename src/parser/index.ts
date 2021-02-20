@@ -7,6 +7,7 @@ import userSticker from './user-sticker';
 import mention from './mention';
 import command from './command';
 import hashtag from './hashtag';
+import link from './link';
 
 const defaultOptions: ParserOptions = {
     formatting: false,
@@ -15,7 +16,8 @@ const defaultOptions: ParserOptions = {
     mention: false,
     command: false,
     userSticker: false,
-}
+    link: true,
+};
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
     const options: ParserOptions = { ...defaultOptions, ...opt };
@@ -24,6 +26,7 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     while (state.hasNext()) {
         emoji(state) || textEmoji(state, options) || userSticker(state, options)
             || mention(state, options) || command(state, options) || hashtag(state, options)
+            || link(state, options)
             || state.consumeText();
     }
 
