@@ -13,7 +13,7 @@ import { consumeTree, createTree } from './tree';
 import { ParserOptions } from './types';
 import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, toCode } from './utils';
 import { keycap } from './emoji';
-import tld from './tld';
+import tld from '../data/tld';
 import { TokenType } from '../formatted-string/types';
 
 const enum FragmentMatch {
@@ -227,7 +227,7 @@ function address(state: ParserState, prefix: FragmentMatch, start: number): bool
 
         const value = state.substring(start);
         let link = value;
-        if (!/^[a-z0-9+-.]+/i.test(link)) {
+        if (!/^[a-z0-9+-.]+:/i.test(link)) {
             link = `http://${link}`;
         }
 
