@@ -1,4 +1,4 @@
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { ParserOptions } from './types';
 import { Codes, consumeIdentifier, isCodeBlock, isDelimiter } from './utils';
@@ -13,7 +13,7 @@ export default function parseMention(state: ParserState, options: ParserOptions)
                 const value = state.substring(pos);
                 state.push({
                     type: TokenType.Mention,
-                    format: state.format,
+                    format: TokenFormat.None,
                     value,
                     mention: value.slice(1)
                 });

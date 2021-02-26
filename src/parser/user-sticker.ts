@@ -1,4 +1,4 @@
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { ParserOptions } from './types';
 import { consumeArray, isAlphaNumeric, isCodeBlock } from './utils';
@@ -15,7 +15,7 @@ export default function parseUserSticker(state: ParserState, options: ParserOpti
                     const value = state.substring(pos);
                     state.push({
                         type: TokenType.UserSticker,
-                        format: state.format,
+                        format: TokenFormat.None,
                         value,
                         stickerId: value.slice(begin.length, -end.length)
                     });

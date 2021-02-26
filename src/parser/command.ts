@@ -1,4 +1,4 @@
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { ParserOptions } from './types';
 import { Codes, isCodeBlock, isCommandName, isDelimiter } from './utils';
@@ -13,7 +13,7 @@ export default function parseCommand(state: ParserState, options: ParserOptions)
                 const value = state.substring(pos);
                 state.push({
                     type: TokenType.Command,
-                    format: state.format,
+                    format: TokenFormat.None,
                     value,
                     command: value.slice(1)
                 });

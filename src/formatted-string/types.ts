@@ -31,20 +31,22 @@ export const enum TokenType {
 }
 
 export const enum TokenFormat {
+    None = 0,
+
     /** Жирный текст */
-    BOLD = 1 << 0,
+    Bold = 1 << 0,
 
     /** Курсивный текст */
-    ITALIC = 1 << 1,
+    Italic = 1 << 1,
 
     /** Подчёркнутый текст */
-    UNDERLINE = 1 << 2,
+    Underline = 1 << 2,
 
     /** Перечёркнутый текст */
-    STRIKE = 1 << 3,
+    Strike = 1 << 3,
 
     /** Моноширинный текст */
-    MONOSPACE = 1 << 4,
+    Monospace = 1 << 4,
 }
 
 export type Token = TokenText | TokenLink | TokenEmoji | TokenTextEmoji

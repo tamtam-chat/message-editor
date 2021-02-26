@@ -17,6 +17,9 @@ export default class ParserState {
     /** Список распаршенных токенов */
     public tokens: Token[] = [];
 
+    /** Стэк открытых токенов форматирования */
+    public formatStack: TokenFormat[] = [];
+
     /** Позиция начала накапливаемого текстового фрагмента */
     public textStart = -1;
 

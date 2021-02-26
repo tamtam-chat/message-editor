@@ -1,4 +1,4 @@
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { ParserOptions } from './types';
 import { Codes, isBound, isCodeBlock, isCommandName, last } from './utils';
@@ -11,7 +11,7 @@ export default function parseHashtag(state: ParserState, options: ParserOptions)
                 const value = state.substring(pos);
                 state.push({
                     type: TokenType.HashTag,
-                    format: state.format,
+                    format: TokenFormat.None,
                     value,
                     hashtag: value.slice(1)
                 });

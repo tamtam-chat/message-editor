@@ -14,7 +14,7 @@ import { ParserOptions } from './types';
 import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, toCode } from './utils';
 import { keycap } from './emoji';
 import tld from '../data/tld';
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenLink, TokenType } from '../formatted-string/types';
 
 const enum FragmentMatch {
     /** Фрагмент не найден */
@@ -167,12 +167,7 @@ function strictAddress(state: ParserState): ConsumeResult {
             consumeHash(state);
 
             const value = state.substring(start);
-            state.push({
-                type: TokenType.Link,
-                format: state.format,
-                link: /^\/\//.test(value) ? `http:${value}` : value,
-                value
-            });
+            state.push(linkToken(value, /^\/\//.test(value) ? `http:${value}` : value));
             return ConsumeResult.Yes;
         } else if (!hasLogin) {
             return ConsumeResult.Skip;
@@ -227,12 +222,7 @@ function magnet(state: ParserState): ConsumeResult {
     if (consumeArray(state, magnetChars, true)) {
         consumeQueryString(state);
         const value = state.substring(pos);
-        state.push({
-            type: TokenType.Link,
-            format: state.format,
-            link: value,
-            value
-        });
+        state.push(linkToken(value, value));
         return ConsumeResult.Yes;
     }
 
@@ -249,12 +239,7 @@ function email(state: ParserState, prefix: FragmentMatch, start: number): boolea
         if (isDomain(domain)) {
             consumeQueryString(state);
             const value = state.substring(start);
-            state.push({
-                type: TokenType.Link,
-                format: state.format,
-                link: /^mailto:/i.test(value) ? value : `mailto:${value}`,
-                value
-            });
+            state.push(linkToken(value, /^mailto:/i.test(value) ? value : `mailto:${value}`));
             return true;
         }
 
@@ -277,17 +262,7 @@ function address(state: ParserState, prefix: FragmentMatch, start: number): bool
         consumeHash(state);
 
         const value = state.substring(start);
-        let link = value;
-        if (!/^[a-z0-9+-.]+:/i.test(link)) {
-            link = `http://${link}`;
-        }
-
-        state.push({
-            type: TokenType.Link,
-            format: state.format,
-            link,
-            value
-        });
+        state.push(linkToken(value, !/^[a-z0-9+-.]+:/i.test(value) ? `http://${value}` : value));
         return true;
     }
 
@@ -649,4 +624,13 @@ function isOpenBracket(ch: number): boolean {
 
 function isLogin(ch: number) {
     return loginChars.has(ch);
+}
+
+function linkToken(value: string, link: string): TokenLink {
+    return {
+        type: TokenType.Link,
+        format: TokenFormat.None,
+        value,
+        link
+    };
 }

@@ -8,11 +8,11 @@ import { TokenText } from '../src/formatted-string/types';
 type StringFormat = [TokenFormat, string];
 
 const formats: StringFormat[] = [
-    [TokenFormat.BOLD, 'b'],
-    [TokenFormat.ITALIC, 'i'],
-    [TokenFormat.UNDERLINE, 'u'],
-    [TokenFormat.STRIKE, 's'],
-    [TokenFormat.MONOSPACE, 'm'],
+    [TokenFormat.Bold, 'b'],
+    [TokenFormat.Italic, 'i'],
+    [TokenFormat.Underline, 'u'],
+    [TokenFormat.Strike, 's'],
+    [TokenFormat.Monospace, 'm'],
 ];
 
 /** Возвращает строковое представление формата */
@@ -43,9 +43,9 @@ function text(tokens: Token[]): string {
 describe.skip('Formatted String', () => {
     it('should insert text', () => {
         const tokens = [
-            token('hello', TokenFormat.ITALIC),
+            token('hello', TokenFormat.Italic),
             token(' '),
-            token('world', TokenFormat.BOLD)
+            token('world', TokenFormat.Bold)
         ];
 
         const t1 = insertText(tokens, 0, 'aaa');
@@ -78,34 +78,34 @@ describe.skip('Formatted String', () => {
 
     it('should insert formatted text', () => {
         const tokens = [
-            token('aa', TokenFormat.ITALIC),
+            token('aa', TokenFormat.Italic),
             token('bb'),
-            token('cc', TokenFormat.BOLD)
+            token('cc', TokenFormat.Bold)
         ];
 
         const t1 = insertText(tokens, 3, [
-            token('11', TokenFormat.UNDERLINE)
+            token('11', TokenFormat.Underline)
         ]);
         equal(repr(t1), '<i>aa</i>b<u>11</u>b<b>cc</b>');
 
         const t2 = insertText(tokens, 1, [
-            token('11', TokenFormat.UNDERLINE)
+            token('11', TokenFormat.Underline)
         ]);
         equal(repr(t2), '<i>a</i><iu>11</iu><i>a</i>bb<b>cc</b>');
 
         const t3 = insertText(tokens, 6, [
-            token('11', TokenFormat.BOLD)
+            token('11', TokenFormat.Bold)
         ]);
         equal(repr(t3), '<i>aa</i>bb<b>cc11</b>');
     });
 
     it('should remove text', () => {
         const tokens = [
-            token('aaa', TokenFormat.ITALIC),
+            token('aaa', TokenFormat.Italic),
             token(' '),
-            token('bbb', TokenFormat.BOLD),
+            token('bbb', TokenFormat.Bold),
             token(' ccc '),
-            token('ddd', TokenFormat.UNDERLINE),
+            token('ddd', TokenFormat.Underline),
         ];
 
         const t1 = removeText(tokens, 0, 4);
@@ -131,19 +131,19 @@ describe.skip('Formatted String', () => {
         const tokens = [token('aa bb cc dd')];
         equal(text(tokens), 'aa bb cc dd');
 
-        const t1 = setFormat(tokens, { add: TokenFormat.BOLD }, 3, 5);
+        const t1 = setFormat(tokens, { add: TokenFormat.Bold }, 3, 5);
         equal(t1.length, 3);
         equal(repr(t1), 'aa <b>bb cc</b> dd');
 
-        const t2 = setFormat(t1, { add: TokenFormat.ITALIC }, 0, 5);
+        const t2 = setFormat(t1, { add: TokenFormat.Italic }, 0, 5);
         equal(t2.length, 4);
         equal(repr(t2), '<i>aa </i><bi>bb</bi><b> cc</b> dd');
 
-        const t3 = setFormat(t2, { remove: TokenFormat.ITALIC }, 0, 9);
+        const t3 = setFormat(t2, { remove: TokenFormat.Italic }, 0, 9);
         equal(t3.length, 3);
         equal(repr(t3), 'aa <b>bb cc</b> dd');
 
-        const t4 = setFormat(t3, { remove: TokenFormat.BOLD }, 0, 9);
+        const t4 = setFormat(t3, { remove: TokenFormat.Bold }, 0, 9);
         equal(t4.length, 1);
         equal(repr(t4), 'aa bb cc dd');
     });
@@ -152,7 +152,7 @@ describe.skip('Formatted String', () => {
         const tokens = [token('aa bb cc dd')];
 
         // Insert sticky mark inside plain text
-        const t1 = setFormat(tokens, { add: TokenFormat.BOLD }, 3);
+        const t1 = setFormat(tokens, { add: TokenFormat.Bold }, 3);
         equal(text(t1), 'aa bb cc dd');
         equal(t1.length, 3);
         equal((t1[1] as TokenText).sticky, true);
@@ -166,10 +166,10 @@ describe.skip('Formatted String', () => {
         equal(t3.length, 1);
 
         // Insert sticky mark before another format
-        const t4 = setFormat(tokens, { add: TokenFormat.BOLD }, 3, 2);
+        const t4 = setFormat(tokens, { add: TokenFormat.Bold }, 3, 2);
         equal(repr(t4), 'aa <b>bb</b> cc dd');
 
-        const t5 = setFormat(t4, { add: TokenFormat.ITALIC }, 3);
+        const t5 = setFormat(t4, { add: TokenFormat.Italic }, 3);
         const t6 = insertText(t5, 3, '123');
         equal(repr(t6), 'aa <i>123</i><b>bb</b> cc dd');
 
@@ -178,18 +178,18 @@ describe.skip('Formatted String', () => {
         equal(t7.length, 3);
 
         // Insert sticky mark inside existing format
-        const t8 = setFormat(tokens, { add: TokenFormat.ITALIC }, 0, 5);
+        const t8 = setFormat(tokens, { add: TokenFormat.Italic }, 0, 5);
         equal(repr(t8), '<i>aa bb</i> cc dd');
 
-        const t9 = insertText(setFormat(t8, { add: TokenFormat.BOLD }, 3), 3, '123');
+        const t9 = insertText(setFormat(t8, { add: TokenFormat.Bold }, 3), 3, '123');
         equal(repr(t9), '<i>aa </i><bi>123</bi><i>bb</i> cc dd');
     });
 
     it('should slice tokens', () => {
         const tokens = [
             token('12'),
-            token('34', TokenFormat.BOLD),
-            token('56', TokenFormat.ITALIC),
+            token('34', TokenFormat.Bold),
+            token('56', TokenFormat.Italic),
             token('78')
         ];
 
@@ -214,8 +214,8 @@ describe.skip('Formatted String', () => {
     it('should cut text', () => {
         const tokens = [
             token('12'),
-            token('34', TokenFormat.BOLD),
-            token('56', TokenFormat.ITALIC),
+            token('34', TokenFormat.Bold),
+            token('56', TokenFormat.Italic),
             token('78')
         ];
 

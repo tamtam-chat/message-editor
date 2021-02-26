@@ -197,7 +197,7 @@ export function toCode(str: string, ignoreCase?: boolean): number[] {
  * это влияет на возможность парсинга
  */
 export function isCodeBlock(state: ParserState): boolean {
-    return state.hasFormat(TokenFormat.MONOSPACE);
+    return state.hasFormat(TokenFormat.Monospace);
 }
 
 /**

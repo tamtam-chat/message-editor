@@ -1,4 +1,4 @@
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { Codes, isNumber } from './utils';
 
@@ -26,7 +26,7 @@ export default function parseEmoji(state: ParserState): boolean {
     if (consumeEmoji(state)) {
         state.push({
             type: TokenType.Emoji,
-            format: state.format,
+            format: TokenFormat.None,
             value: state.substring(pos)
         });
         return true;

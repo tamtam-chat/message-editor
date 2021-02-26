@@ -1,4 +1,4 @@
-import { TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { consumeTree, createTree } from './tree';
 import { ParserOptions } from './types';
@@ -149,7 +149,7 @@ export default function parseTextEmoji(state: ParserState, options: ParserOption
             const value = state.substring(pos);
             state.push({
                 type: TokenType.TextEmoji,
-                format: state.format,
+                format: TokenFormat.None,
                 value,
                 emoji: aliases[value] || value
             });
