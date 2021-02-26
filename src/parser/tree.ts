@@ -5,15 +5,16 @@
  */
 
 import ParserState from './state';
+import { asciiToUpper } from './utils';
 
 export type Tree = Map<number, true | Tree>;
 
 /**
  * Создаёт дерево из указанного списка строк
  */
-export function createTree(items: string[]): Tree {
+export function createTree(items: string[], ignoreCase = false): Tree {
     const root = new Map();
-    items.forEach(key => collectTree(root, key));
+    items.forEach(key => collectTree(root, key, ignoreCase));
     return root;
 }
 
@@ -21,12 +22,19 @@ export function createTree(items: string[]): Tree {
  * Пытается поглотить узел указанного дерева. Вернёт `true`, если удалось поглотить
  * узел: в `state.pos` будет записан конец узла
  */
-export function consumeTree(state: ParserState, tree: Tree): boolean {
+export function consumeTree(state: ParserState, tree: Tree, ignoreCase = false): boolean {
     const { pos } = state;
     let node = tree;
+    let ch: number;
+    let entry: Tree | true;
 
     while (state.hasNext()) {
-        const entry = node.get(state.next());
+        ch = state.next();
+        if (ignoreCase) {
+            ch = asciiToUpper(ch);
+        }
+
+        entry = node.get(ch);
         if (entry === true) {
             return true;
         }
@@ -42,8 +50,11 @@ export function consumeTree(state: ParserState, tree: Tree): boolean {
     return false;
 }
 
-function collectTree(tree: Tree, text: string, i = 0): void {
-    const ch = text.charCodeAt(i++);
+function collectTree(tree: Tree, text: string, ignoreCase: boolean, i = 0): void {
+    let ch = text.charCodeAt(i++);
+    if (ignoreCase) {
+        ch = asciiToUpper(ch);
+    }
 
     if (i === text.length) {
         tree.set(ch, true);
@@ -51,6 +62,6 @@ function collectTree(tree: Tree, text: string, i = 0): void {
         if (!tree.has(ch)) {
             tree.set(ch, new Map());
         }
-        collectTree(tree.get(ch) as Tree, text, i);
+        collectTree(tree.get(ch) as Tree, text, ignoreCase, i);
     }
 }

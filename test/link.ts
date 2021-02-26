@@ -23,6 +23,15 @@ function testLink(link: string, isEmail = false) {
         const linkToken = tokens[ix] as TokenLink;
         if (isEmail) {
             equal(linkToken.link, `mailto:${link}`);
+        } else {
+            let linkValue = link;
+            if (/^\/\//.test(linkValue)) {
+                linkValue = `http:${linkValue}`;
+            } else if (!/^[a-z0-9+-.]+:/i.test(linkValue)) {
+                linkValue = `http://${linkValue}`;
+            }
+
+            equal(linkToken.link, linkValue);
         }
     };
 
@@ -84,7 +93,7 @@ function testLink(link: string, isEmail = false) {
     validate(1);
 }
 
-describe.only('Link', () => {
+describe('Link', () => {
     it('valid email', () => {
         const emails = [
             'serge.che@gmail.com',
@@ -139,8 +148,48 @@ describe.only('Link', () => {
         tokens = parse('1234567890123456789012345678901234567890123456789012345678901234+x@example.com');
         deepEqual(types(tokens), [TokenType.Text]);
 
-        // Подчёркивания нельзя
-        tokens = parse('i_like_underscore@but_its_not_allowed_in_this_part.example.com');
-        deepEqual(types(tokens), [TokenType.Text]);
+        // Подчёркивания -нельзя-/пока можно
+        // tokens = parse('i_like_underscore@but_its_not_allowed_in_this_part.example.com');
+        // deepEqual(types(tokens), [TokenType.Text]);
+    });
+
+    it('valid url', () => {
+        const urls = [
+            'http://vk.co.uk',
+            'https://jira.odkl.ru/browse/DWH-10584',
+            'https://incrussia.ru/news/fake-zoom/',
+            'group_calls2.messenger.okdev.mail.msk',
+            'https://zen.yandex.ru/media/id/5ce506fd81f64200b4db5a94/navalnyi-snial-s-bitkoinkoshelka-dlia-pojertvovanii-bolee-800-tys-rublei-na-semeinyi-otdyh-v-tailande-5e1d4fc4dddaf400b1f70a9e',
+            'http://s9500ebtc04.sk.roskazna.local/viewLog.html?buildTypeId=id12skiao_LibCades&buildId=130',
+            'https://tc.odkl.ru/viewType.html?buildTypeId=NewWeb_MainSh_Messenger&branch_NewWeb_MainSh=%3Cdefault%3E',
+            '//tc.odkl.ru',
+            'ftp://tc.odkl.ru:80',
+            'skype://raquelmota1977?chat',
+            'magnet:?xt=urn:btih5dee65101db281ac9c46344cd6b175cdcad53426&dn=name',
+            'дом.рф',
+            'www.google.com',
+            'www.google.com:8000',
+            'www.google.com/?key=value',
+            'github.io',
+            'https://127.0.0.1:8000/somethinghere',
+            'http://dummyimage.com/50',
+            'FTP://GOOGLE.COM',
+            'WWW.ДОМ.РФ',
+            'youtube.com/watch?v=pS-gbqbVd8c',
+            'en.c.org/a_(b)',
+            'https://ka.wikipedia.org/wiki/მთავარი_გვერდი',
+            'http://username:password@example.com',
+            'github.com/minimaxir/big-list-of-naughty-strings/blob/master/blns.txt',
+            'http://a/%%30%30',
+            'http://ok.ru/#myanchor',
+            '中国.中国',
+            'xn--90adear.xn--p1ai',
+        ];
+
+        // console.log(parse('Have you seen group_calls2.messenger.okdev.mail.msk?'));
+        // console.log(parse('xn--90adear.xn--p1ai'));
+        for (const url of urls) {
+            testLink(url, false);
+        }
     });
 });

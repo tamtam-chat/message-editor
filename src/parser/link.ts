@@ -37,6 +37,12 @@ const enum FragmentMatch {
 
     /** Результат заканчивается на валидный TLD */
     ValidTLD = 1 << 5,
+
+    /** Печатные спецсимволы находятся в конце */
+    TrailingPrintable = 1 << 6,
+
+    /** Печатные спецсимволы находятся в середине */
+    MiddlePrintable = 1 << 7,
 }
 
 const enum ConsumeResult {
@@ -50,21 +56,30 @@ type Bracket = 'curly' | 'square' | 'round';
 const maxLabelSize = 63;
 /** Маска для парсинга доменного имени */
 const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
-const safe = new Set(toCode('$-_.+'));
-const extra = new Set(toCode('!*\'()[],'));
-const search = new Set(toCode(';:@&='));
-const punct = new Set(toCode('!,.;?'));
-const mailto = toCode('mailto:');
+const safeChars = new Set(toCode('$-_.+'));
+const extraChars = new Set(toCode('!*\'()[],'));
+const searchChars = new Set(toCode(';:@&='));
+const punctChars = new Set(toCode('!,.;?'));
+const mailtoChars = toCode('mailto:', true);
+const magnetChars = toCode('magnet:', true);
+
+/**
+ * Символы, допустимые в логине. Тут расходимся с RFC: разрешаем `:` для менее строгой
+ * валидации
+ */
+const loginChars = new Set(toCode(';?&=:'));
 
 /**
  * Спецсимволы, допустимые в локальной части email. По спеке там допустимы
  * произвольные значения в кавычках (например, "john doe"@gmail.com), но мы пока
- * такое нее будем обрабатывать
+ * такое нее будем обрабатывать.
+ * Отличие от RFC:
+ * – символы `-` и `_` относим к ASCII, а не printable
+ * – исключаем `?`, '#' и `/` из набора, так как неправильно захватятся ссылки
  */
-const printable = new Set(toCode('!#$%&*+-/=?^_`{|}~'));
+const printableChars = new Set(toCode('!$%&*+=^`{|}~'));
 
 const supportedProtocols = createTree([
-    'magnet:',
     'skype://',
     'http://',
     'https://',
@@ -73,7 +88,7 @@ const supportedProtocols = createTree([
     'tg://',
     'ftp://',
     '//'
-]);
+], true);
 
 /*
  * Счётчик скобок. В данном случае поступаем немного некрасиво: используем
@@ -93,7 +108,7 @@ const brackets: Record<Bracket, number> = {
 export default function parseLink(state: ParserState, options: ParserOptions): boolean {
     if (options.link && state.atWordBound()) {
         const { pos } = state;
-        const handled = strictEmail(state) || strictAddress(state) || emailOrAddress(state);
+        const handled = magnet(state) || strictEmail(state) || strictAddress(state) || emailOrAddress(state);
 
         if (handled === ConsumeResult.No) {
             // Не смогли ничего внятного поглотить, сбросим позицию
@@ -122,7 +137,7 @@ export default function parseLink(state: ParserState, options: ParserOptions): b
  */
 function strictEmail(state: ParserState): ConsumeResult {
     const { pos } = state;
-    if (consumeArray(state, mailto)) {
+    if (consumeArray(state, mailtoChars, true)) {
         // Если поглотили протокол, то независимо от работы `email()`
         // вернём `true`, тем самым сохраним `mailto:` в качестве обычного текста,
         // если за ним не следует нормальный e-mail.
@@ -138,20 +153,15 @@ function strictAddress(state: ParserState): ConsumeResult {
     let { pos } = state;
     const start = pos;
 
-    if (consumeTree(state, supportedProtocols)) {
-        // Пробуем поглотить доменную часть
-        // Так как протокол явно указывает на адрес, доменная часть может быть менее
-        // строгой по сравнению с тем, что мы достаём из текста
-        pos = state.pos;
-        while (fragment(state)) {
-            if (!state.consume(isDomainPrefix)) {
-                break;
-            }
-        }
-
-        if (pos !== state.pos) {
-            // Как минимум один фрагмент должны поглотить.
+    if (consumeTree(state, supportedProtocols, true)) {
+        // Нашли протокол, далее поглощаем доменную часть.
+        // При наличии протокола правила для доменной части будут упрощённые:
+        // нам не нужно валидировать результат через `isDomain()`, достаточно
+        // получить результат по маске
+        const hasLogin = login(state);
+        if (fragment(state, domainMask)) {
             // Если нет — не сбрасываем позицию парсера, сохраним поглощённое как текст
+            consumePort(state);
             consumePath(state);
             consumeQueryString(state);
             consumeHash(state);
@@ -164,9 +174,11 @@ function strictAddress(state: ParserState): ConsumeResult {
                 value
             });
             return ConsumeResult.Yes;
+        } else if (!hasLogin) {
+            return ConsumeResult.Skip;
         }
 
-        return ConsumeResult.Skip;
+        pos = state.pos;
     }
 
     return ConsumeResult.No;
@@ -180,12 +192,51 @@ function strictAddress(state: ParserState): ConsumeResult {
  */
 function emailOrAddress(state: ParserState): ConsumeResult {
     const { pos } = state;
-    const prefix = fragment(state);
-    if (email(state, prefix, pos) || address(state, prefix, pos)) {
+
+    // Угадывание ссылки или email хитрое: локальная часть email может конфликтовать
+    // с доменом в конце предложения. Например, `ты заходил на ok.ru?`
+    // и `ты писал на ok.ru?test@mail.ru`: `ok.ru?` является допустимой локальной
+    // частью email, но в первом случае у нас домен, поэтому нужно поглотить только
+    // `ok.ru`. С другой стороны, если мы поглотим `ok.ru` для второго примера,
+    // мы не увидим оставшуюся часть, которая указывает на email.
+
+    let prefix = fragment(state);
+    if (email(state, prefix, pos)) {
+        return ConsumeResult.Yes;
+    }
+
+    // Разберём пограничный случай: если в префиксе содержатся printable-символы
+    // только в конце, то откатимся на них назад: есть шанс, что мы поглотили
+    // доменное имя со знаками препинания в конце
+    if (includes(prefix, FragmentMatch.TrailingPrintable) && excludes(prefix, FragmentMatch.MiddlePrintable)) {
+        while (isPrintable(state.peekPrev())) {
+            state.pos--;
+        }
+        prefix &= ~(FragmentMatch.TrailingPrintable | FragmentMatch.Printable);
+    }
+
+    if (address(state, prefix, pos)) {
         return ConsumeResult.Yes;
     }
 
     return prefix ? ConsumeResult.Skip : ConsumeResult.No;
+}
+
+function magnet(state: ParserState): ConsumeResult {
+    const { pos } = state;
+    if (consumeArray(state, magnetChars, true)) {
+        consumeQueryString(state);
+        const value = state.substring(pos);
+        state.push({
+            type: TokenType.Link,
+            format: state.format,
+            link: value,
+            value
+        });
+        return ConsumeResult.Yes;
+    }
+
+    return ConsumeResult.No;
 }
 
 /**
@@ -251,7 +302,9 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
     const start = state.pos;
     let result: FragmentMatch = 0;
     let labelStart = start;
+    let labelEnd = start;
     let pos: number;
+    let trailingPrintable = false;
 
     const _dot = mask & FragmentMatch.Dot;
     const _ascii = mask & FragmentMatch.ASCII;
@@ -268,22 +321,32 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
             break;
         }
 
-        if (_dot && state.consume(Codes.Dot)) {
-            if (pos === labelStart) {
-                // Лэйбл не может начинаться с точки
-                break;
-            }
-            labelStart = state.pos;
-            result |= FragmentMatch.Dot;
+        if (_printable && state.consume(isPrintable)) {
+            result |= FragmentMatch.Printable;
+            trailingPrintable = true;
         } else {
-            if (_ascii && state.consume(isASCII)) {
+            if (_dot && state.consume(Codes.Dot)) {
+                if (pos === labelStart) {
+                    // Лэйбл не может начинаться с точки
+                    state.pos = pos;
+                    break;
+                }
+                labelStart = state.pos;
+                result |= FragmentMatch.Dot;
+            } else if (_ascii && state.consume(isASCII)) {
                 result |= FragmentMatch.ASCII;
-            } else if (_printable && state.consume(isPrintable)) {
-                result |= FragmentMatch.Printable;
             } else if (_unicode && state.consume(isUnicodeAlpha)) {
                 result |= FragmentMatch.Unicode;
             } else {
                 break;
+            }
+
+            // Если не сработал `break` внутри текущего блока, значит, мы поглотили
+            // допустимый, не-printable символ
+            labelEnd = state.pos;
+            if (trailingPrintable === true) {
+                trailingPrintable = false;
+                result |= FragmentMatch.MiddlePrintable;
             }
 
             if (state.pos - labelStart > maxLabelSize) {
@@ -292,8 +355,12 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
         }
     }
 
-    if (_tld && labelStart !== start && tld.has(state.substring(labelStart).toLowerCase())) {
+    if (_tld && labelStart !== start && tld.has(state.substring(labelStart, labelEnd).toLowerCase())) {
         result |= FragmentMatch.ValidTLD;
+    }
+
+    if (trailingPrintable) {
+        result |= FragmentMatch.TrailingPrintable;
     }
 
     // Если что-то успешно поглотили, убедимся, что домен заканчивается на известный TLD
@@ -305,7 +372,22 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
  */
 function consumePort(state: ParserState): boolean {
     const { pos } = state;
-    if (state.consume(Codes.Colon) && state.consumeWhile(isNumber)) {
+    if (state.consume(Codes.Colon)) {
+        let start = 0;
+        while (state.hasNext()) {
+            start = state.pos;
+            if (keycap(state)) {
+                state.pos = start;
+                break;
+            }
+
+            if (!state.consume(isNumber)) {
+                break;
+            }
+        }
+    }
+
+    if (state.pos - pos > 1) {
         return true;
     }
 
@@ -320,8 +402,8 @@ function consumePath(state: ParserState): boolean {
     const { pos } = state;
 
     resetBrackets();
-    while (state.consume(Codes.Slash) && segment(state)) {
-        // empty
+    while (state.consume(Codes.Slash)) {
+        segment(state);
     }
 
     return state.pos !== pos;
@@ -360,6 +442,34 @@ function consumeHash(state: ParserState): boolean {
     return false;
 }
 
+/**
+ * Поглощает login-часть URL. Из-за того, что login может быть похож на домен,
+ * при этом содержать «проблемные» символы, из-за которых результат может быть
+ * двойственным, мы либо поглотим login-часть целиком, либо откатимся назад
+ */
+function login(state: ParserState): boolean {
+    // Пример проблемной ситуации:
+    // – ты заходил на http://foo?
+    // – ты заходил на http://foo?bar@domain.com
+    // В первом случае `foo` — это домен, а `?` — это вопросительный знак в предложении,
+    // поэтому его нужно проигнорировать и не добавлять в домен.
+    // Во втором случае `foo?bar` — это `username`, и `?` является допустимым
+    // значением, а не знаком препинания в предложении.
+    // `login` мы будем поглощать до тех пор, пока не встретим символ `@`.
+    // Если его не встретим, то откатываемся назад
+    const { pos } = state;
+    while (uchar(state) || state.consumeWhile(isLogin)) {
+        // pass
+    }
+
+    if (pos !== state.pos && state.consume(Codes.At)) {
+        return true;
+    }
+
+    state.pos = pos;
+    return false;
+}
+
 function segment(state: ParserState): boolean {
     let { pos } = state;
     const start = pos;
@@ -386,7 +496,7 @@ function segment(state: ParserState): boolean {
             if (bracketMatch === ConsumeResult.Skip) {
                 break;
             }
-        } else if (!(uchar(state) || state.consume(isSearch))) {
+        } else if (!(uchar(state) || state.consume(isSearch) || state.consume(Codes.Percent))) {
             break;
         }
     }
@@ -398,14 +508,7 @@ function segment(state: ParserState): boolean {
  * https://tools.ietf.org/html/rfc1738
  */
 function uchar(state: ParserState): boolean {
-    return unreserved(state) || hex(state);
-}
-
-/**
- * https://tools.ietf.org/html/rfc1738
- */
-function unreserved(state: ParserState): boolean {
-    return state.consume(isUnreserved);
+    return hex(state) || state.consume(isUnreserved);
 }
 
 /**
@@ -424,7 +527,7 @@ function hex(state: ParserState): boolean {
 }
 
 /**
- * Проверяет, содержи ли `result` биты из `test`
+ * Проверяет, содержи ли `result` все биты из `test`
  */
 function includes(result: FragmentMatch, test: FragmentMatch): boolean {
     return (result & test) === test;
@@ -449,18 +552,23 @@ function isEmailLocalPart(result: FragmentMatch): boolean {
 function isDomain(result: FragmentMatch): boolean {
     return excludes(result, FragmentMatch.Printable | FragmentMatch.OctetOverflow)
         && includes(result, FragmentMatch.Dot | FragmentMatch.ValidTLD)
-        && (includes(result, FragmentMatch.ASCII) || includes(result, FragmentMatch.Unicode));
+        && ((result & (FragmentMatch.ASCII | FragmentMatch.Unicode)) !== 0);
 }
 
 /**
  * Проверяет, что указанный символ является _допустимым_ ASCII-символом для домена
  */
 function isASCII(ch: number): boolean {
-    return ch === Codes.Hyphen || isAlpha(ch) || isNumber(ch);
+    return ch === Codes.Hyphen
+        // Согласно RFC подчёркивание не является допустимым ASCII, но по факту
+        // этот символ может использоваться в доменах третьего уровня
+        || ch === Codes.Underscore
+        || isAlpha(ch)
+        || isNumber(ch);
 }
 
 function isPrintable(ch: number): boolean {
-    return printable.has(ch);
+    return printableChars.has(ch);
 }
 
 /**
@@ -468,7 +576,7 @@ function isPrintable(ch: number): boolean {
  */
 function isUnreserved(ch: number): boolean {
     // Расхождение с RFC: разрешаем юникодные символы в URL для красоты
-    return isUnicodeAlpha(ch) || isNumber(ch) || safe.has(ch) || extra.has(ch);
+    return isUnicodeAlpha(ch) || isNumber(ch) || safeChars.has(ch) || extraChars.has(ch);
 }
 
 function isHex(ch: number): boolean {
@@ -481,15 +589,11 @@ function isHex(ch: number): boolean {
 }
 
 function isPunct(ch: number): boolean {
-    return punct.has(ch);
+    return punctChars.has(ch);
 }
 
 function isSearch(ch: number): boolean {
-    return search.has(ch);
-}
-
-function isDomainPrefix(ch: number): boolean {
-    return ch === Codes.At || ch === Codes.Colon;
+    return searchChars.has(ch);
 }
 
 function resetBrackets() {
@@ -541,4 +645,8 @@ function isOpenBracket(ch: number): boolean {
     return ch === Codes.CurlyBracketOpen
         || ch === Codes.RoundBracketOpen
         || ch === Codes.SquareBracketOpen;
+}
+
+function isLogin(ch: number) {
+    return loginChars.has(ch);
 }

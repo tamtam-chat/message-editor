@@ -160,10 +160,12 @@ export function consumeIdentifier(state: ParserState): boolean {
 /**
  * Вернёт `true`, если все коды из `arr` были поглощены из текущей позиции потока
  */
-export function consumeArray(state: ParserState, arr: number[]): boolean {
+export function consumeArray(state: ParserState, arr: number[], ignoreCase?: boolean): boolean {
     const { pos } = state;
+    let ch: number;
     for (let i = 0; i < arr.length; i++) {
-        if (arr[i] !== state.next()) {
+        ch = ignoreCase ? asciiToUpper(state.next()) : state.next();
+        if (arr[i] !== ch) {
             state.pos = pos;
             return false;
         }
@@ -181,10 +183,10 @@ export function last<T>(arr: T[]): T | undefined {
 /**
  * Конвертация указанной стоки в список кодов символов
  */
-export function toCode(str: string): number[] {
+export function toCode(str: string, ignoreCase?: boolean): number[] {
     const result: number[] = [];
     for (let i = 0; i < str.length; i++) {
-        result.push(str.charCodeAt(i));
+        result.push(ignoreCase ? asciiToUpper(str.charCodeAt(i)) : str.charCodeAt(i));
     }
 
     return result;
@@ -282,4 +284,11 @@ export function isUnicodeAlpha(code: number): boolean {
 
 export function isCommandName(ch: number): boolean {
     return ch === Codes.Underscore || isNumber(ch) || isMultiAlpha(ch);
+}
+
+/**
+ * Если указанный код является символом a-z, конвертирует его в верхний регистр
+ */
+export function asciiToUpper(ch: number): number {
+    return ch >= 97 && ch <= 122 ? ch & ~32 : ch;
 }
