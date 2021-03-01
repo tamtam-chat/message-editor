@@ -1,13 +1,12 @@
 import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
-import { ParserOptions } from './types';
-import { consumeArray, isAlphaNumeric, isCodeBlock } from './utils';
+import { consumeArray, isAlphaNumeric } from './utils';
 
 const begin = [35, 117]; // #u
 const end = [115, 35];  // s#
 
-export default function parseUserSticker(state: ParserState, options: ParserOptions): boolean {
-    if (options.userSticker && !isCodeBlock(state)) {
+export default function parseUserSticker(state: ParserState): boolean {
+    if (state.options.userSticker) {
         const { pos } = state;
         if (consumeArray(state, begin)) {
             while (state.hasNext()) {

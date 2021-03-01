@@ -10,11 +10,11 @@
 
 import ParserState from './state';
 import { consumeTree, createTree } from './tree';
-import { ParserOptions } from './types';
 import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, toCode } from './utils';
 import { keycap } from './emoji';
 import tld from '../data/tld';
 import { TokenFormat, TokenLink, TokenType } from '../formatted-string/types';
+import { formatForChar, peekClosingMarkdown } from './markdown';
 
 const enum FragmentMatch {
     /** Фрагмент не найден */
@@ -105,8 +105,8 @@ const brackets: Record<Bracket, number> = {
 /**
  * Парсинг ссылок с текущей позиции парсера
  */
-export default function parseLink(state: ParserState, options: ParserOptions): boolean {
-    if (options.link && state.atWordBound()) {
+export default function parseLink(state: ParserState): boolean {
+    if (state.options.link && state.atWordBound()) {
         const { pos } = state;
         const handled = magnet(state) || strictEmail(state) || strictAddress(state) || emailOrAddress(state);
 
@@ -120,10 +120,7 @@ export default function parseLink(state: ParserState, options: ParserOptions): b
             // Мы не смогли найти ссылку, но поглотили часть текста, похожего
             // на ссылку. Чтобы заново не парсить этот фрагмент, запишем его как
             // текст
-            if (!state.hasPendingText()) {
-                state.textStart = pos;
-            }
-            state.textEnd = state.pos;
+            state.markPending(pos);
         }
 
         return true;
@@ -290,8 +287,9 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
     while (state.hasNext()) {
         pos = state.pos;
 
-        if (keycap(state)) {
-            // Нарвались на keycap-эмоджи, прекращаем парсинг
+        if (keycap(state) || peekClosingMarkdown(state)) {
+            // Нарвались на keycap-эмоджи или на закрывающий MD-синтаксис,
+            // прекращаем парсинг
             state.pos = pos;
             break;
         }
@@ -329,6 +327,15 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
             }
         }
     }
+
+    // if (result && state.options.markdown) {
+    //     // Разбор пограничного случая: фрагмент может заканчиваться на символ
+    //     // MD-форматирования. Если так, то попробуем грамотно откатиться на эти символы
+    //     // FIXME в случае отката не учитывается, что парсер вернулся в начальное
+    //     // состояние, надо исключить данные отката из результата
+    //     // Либо не парсить их, если фрагмент заканчивается на эти символы
+    //     backOffFormat(state);
+    // }
 
     if (_tld && labelStart !== start && tld.has(state.substring(labelStart, labelEnd).toLowerCase())) {
         result |= FragmentMatch.ValidTLD;
@@ -624,6 +631,21 @@ function isOpenBracket(ch: number): boolean {
 
 function isLogin(ch: number) {
     return loginChars.has(ch);
+}
+
+/**
+ * Откатывает назад состояние на символы форматирования
+ */
+function backOffFormat(state: ParserState) {
+    let { format } = state;
+    let prev: TokenFormat;
+    // Двигаемся назад и смотрим, есть ли у нас в конце символы форматирования.
+    // если есть, то убедимся, что есть открытый формат для этих символов:
+    // только в этом случае откатываемся
+    while ((prev = formatForChar(state.peekPrev())) && (prev & format)) {
+        state.pos--;
+        format &= ~prev;
+    }
 }
 
 function linkToken(value: string, link: string): TokenLink {

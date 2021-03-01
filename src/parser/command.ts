@@ -1,10 +1,9 @@
 import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
-import { ParserOptions } from './types';
-import { Codes, isCodeBlock, isCommandName, isDelimiter } from './utils';
+import { Codes, isCommandName, isDelimiter } from './utils';
 
-export default function parseCommand(state: ParserState, options: ParserOptions): boolean {
-    if (options.command && !isCodeBlock(state) && state.atWordBound()) {
+export default function parseCommand(state: ParserState): boolean {
+    if (state.options.command && state.atWordBound()) {
         const { pos } = state;
         if (state.consume(Codes.Slash)) {
             // Разрешаем поглотить самостоятельный символ `/`, чтобы показывать

@@ -1,10 +1,9 @@
 import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
-import { ParserOptions } from './types';
-import { Codes, isBound, isCodeBlock, isCommandName, last } from './utils';
+import { Codes, isBound, isCommandName, last } from './utils';
 
-export default function parseHashtag(state: ParserState, options: ParserOptions): boolean {
-    if (options.hashtag && !isCodeBlock(state) && atHashtagBound(state)) {
+export default function parseHashtag(state: ParserState): boolean {
+    if (state.options.hashtag && atHashtagBound(state)) {
         const { pos } = state;
         if (state.consume(Codes.Hash)) {
             if (state.consumeWhile(isCommandName) || isBound(state.peek())) {

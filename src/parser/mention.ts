@@ -1,10 +1,9 @@
 import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
-import { ParserOptions } from './types';
-import { Codes, consumeIdentifier, isCodeBlock, isDelimiter } from './utils';
+import { Codes, consumeIdentifier, isDelimiter } from './utils';
 
-export default function parseMention(state: ParserState, options: ParserOptions): boolean {
-    if (options.mention && !isCodeBlock(state) && state.atWordBound()) {
+export default function parseMention(state: ParserState): boolean {
+    if (state.options.mention && state.atWordBound()) {
         const { pos } = state;
         if (state.consume(Codes.At)) {
             // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать

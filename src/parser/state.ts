@@ -1,10 +1,14 @@
 import { Token, TokenFormat } from '../formatted-string';
-import { TokenType } from '../formatted-string/types';
+import { TokenMarkdown, TokenType } from '../formatted-string/types';
+import { ParserOptions } from './types';
 import { isDelimiter, last } from './utils';
 
 type MatchFn = (ch: number) => boolean;
 
 export default class ParserState {
+    /** Опции, с которыми парсим текст */
+    public options: ParserOptions;
+
     /** Текущая позиция парсера */
     public pos: number;
 
@@ -18,7 +22,7 @@ export default class ParserState {
     public tokens: Token[] = [];
 
     /** Стэк открытых токенов форматирования */
-    public formatStack: TokenFormat[] = [];
+    public formatStack: TokenMarkdown[] = [];
 
     /** Позиция начала накапливаемого текстового фрагмента */
     public textStart = -1;
@@ -35,8 +39,9 @@ export default class ParserState {
      * @param text Строка, которую нужно распарсить
      * @param pos Позиция, с которой нужно начинать парсинг
      */
-    constructor(str: string, pos = 0) {
+    constructor(str: string, options: ParserOptions, pos = 0) {
         this.string = str;
+        this.options = options;
         this.pos = pos;
         this.peek = String.prototype.codePointAt
             ? () => nativeCodePointAt(this.string, this.pos)
@@ -115,13 +120,6 @@ export default class ParserState {
     push(token: Token): void {
         this.flushText();
         this.tokens.push(token);
-        if (token.type === TokenType.Markdown) {
-            if (token.start) {
-                this.addFormat(token.mdType);
-            } else {
-                this.removeFormat(token.mdType);
-            }
-        }
     }
 
     /**
@@ -165,7 +163,7 @@ export default class ParserState {
             // TODO использовать функцию-фабрику для сохранения шэйпа
             this.tokens.push({
                 type: TokenType.Text,
-                format: this.format,
+                format: TokenFormat.None,
                 sticky: false,
                 value: this.substring(this.textStart, this.textEnd)
             });
@@ -191,10 +189,17 @@ export default class ParserState {
 
         const lastToken = last(this.tokens);
         if (lastToken) {
-            return lastToken.type === TokenType.Emoji;
+            return lastToken.type === TokenType.Emoji || lastToken.type === TokenType.Markdown;
         }
 
         return false;
+    }
+
+    markPending(textStart: number): void {
+        if (!this.hasPendingText()) {
+            this.textStart = textStart;
+        }
+        this.textEnd = this.pos;
     }
 
     /**

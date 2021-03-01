@@ -115,10 +115,6 @@ export interface TokenHashTag extends TokenBase {
 
 export interface TokenMarkdown extends TokenBase {
     type: TokenType.Markdown;
-    /** Тип формата, к которому относится токен */
-    mdType: TokenFormat;
-    /** Токен начинает (true) или завершает (false) форматирование */
-    start: boolean;
 }
 
 /**

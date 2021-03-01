@@ -115,10 +115,11 @@ export function isNewLine(ch: number): boolean {
         || ch === Codes.LineFeed;
 }
 
-export function isSimpleFormatting(ch: number): boolean {
+export function isMarkdown(ch: number): boolean {
     return ch === Codes.Asterisk
         || ch === Codes.Underscore
-        || ch === Codes.Tilde;
+        || ch === Codes.Tilde
+        || ch === Codes.BackTick;
 }
 
 export function isBound(ch?: number): boolean {
@@ -131,7 +132,7 @@ export function isBound(ch?: number): boolean {
 export function isDelimiter(ch?: number): boolean {
     return isBound(ch)
         || isPunctuation(ch)
-        || isSimpleFormatting(ch);
+        || isMarkdown(ch);
 }
 
 /**
