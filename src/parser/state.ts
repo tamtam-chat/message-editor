@@ -4,6 +4,7 @@ import { ParserOptions } from './types';
 import { isDelimiter, last } from './utils';
 
 type MatchFn = (ch: number) => boolean;
+export type Bracket = 'curly' | 'square' | 'round';
 
 export default class ParserState {
     /** Опции, с которыми парсим текст */
@@ -32,6 +33,13 @@ export default class ParserState {
 
     /** Список эмоджи для текущего текстового токена */
     public emoji: Emoji[] = [];
+
+    /** Счётчик скобок */
+    public brackets: Record<Bracket, number> = {
+        round: 0,
+        square: 0,
+        curly: 0,
+    }
 
     /**
      * Возвращает *code point* текущего символа парсера без смещения указателя
@@ -241,6 +249,13 @@ export default class ParserState {
             this.textStart = textStart;
         }
         this.textEnd = this.pos;
+    }
+
+    /**
+     * Сброс счётчика скобок
+     */
+    resetBrackets(): void {
+        this.brackets.curly = this.brackets.round = this.brackets.square = 0;
     }
 
     /**

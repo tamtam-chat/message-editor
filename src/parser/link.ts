@@ -8,7 +8,7 @@
  * https://tools.ietf.org/html/rfc1738
  */
 
-import ParserState from './state';
+import ParserState, { Bracket } from './state';
 import { consumeTree, createTree } from './tree';
 import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, toCode } from './utils';
 import { keycap } from './emoji';
@@ -51,8 +51,6 @@ const enum ConsumeResult {
     Skip = 2
 }
 
-type Bracket = 'curly' | 'square' | 'round';
-
 const maxLabelSize = 63;
 /** Маска для парсинга доменного имени */
 const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
@@ -89,18 +87,6 @@ const supportedProtocols = createTree([
     'ftp://',
     '//'
 ], true);
-
-/*
- * Счётчик скобок. В данном случае поступаем немного некрасиво: используем
- * один объект на весь парсер, а не выделяем его контекстно. Но таким образом мы
- * сможем немного сэкономить на выделении памяти, так как парсер будет вызываться
- * довольно часто
- */
-const brackets: Record<Bracket, number> = {
-    round: 0,
-    square: 0,
-    curly: 0,
-};
 
 /**
  * Парсинг ссылок с текущей позиции парсера
@@ -374,7 +360,7 @@ function consumePort(state: ParserState): boolean {
 function consumePath(state: ParserState): boolean {
     const { pos } = state;
 
-    resetBrackets();
+    state.resetBrackets();
     while (state.consume(Codes.Slash)) {
         segment(state);
     }
@@ -393,7 +379,7 @@ function consumeQueryString(state: ParserState): boolean {
     // то принимаем его как знак вопроса, а не разделитель
     const { pos } = state;
     if (state.consume(Codes.Question) && !atWordEdge(state)) {
-        resetBrackets();
+        state.resetBrackets();
         segment(state);
         return true;
     }
@@ -407,7 +393,7 @@ function consumeQueryString(state: ParserState): boolean {
  */
 function consumeHash(state: ParserState): boolean {
     if (state.consume(Codes.Hash)) {
-        resetBrackets();
+        state.resetBrackets();
         segment(state);
         return true;
     }
@@ -569,10 +555,6 @@ function isSearch(ch: number): boolean {
     return searchChars.has(ch);
 }
 
-function resetBrackets() {
-    brackets.curly = brackets.round = brackets.square = 0;
-}
-
 function handleBracket(state: ParserState): ConsumeResult {
     const ch = state.peek();
     const bracketType = getBracket(ch);
@@ -580,10 +562,10 @@ function handleBracket(state: ParserState): ConsumeResult {
         const { pos } = state;
         state.pos++;
         if (isOpenBracket(ch)) {
-            brackets[bracketType]++;
+            state.brackets[bracketType]++;
             return ConsumeResult.Yes;
-        } else if (brackets[bracketType] > 0) {
-            brackets[bracketType]--;
+        } else if (state.brackets[bracketType] > 0) {
+            state.brackets[bracketType]--;
             return ConsumeResult.Yes;
         } else if (!atWordEdge(state)) {
             // Попали на незакрытую скобку, смотрим, что делать: если она на
