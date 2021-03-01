@@ -5,12 +5,6 @@ export const enum TokenType {
     /** Ссылка на внешний ресурс */
     Link = 'link',
 
-    /** Эмоджи: 😎 👍 */
-    Emoji = 'emoji',
-
-    /** Текстовый эмоджи: :) */
-    TextEmoji = 'text_emoji',
-
     /**
      * Специальный пользовательский стикер с древних времён OK:
      * #u123456789s#
@@ -49,8 +43,8 @@ export const enum TokenFormat {
     Monospace = 1 << 4,
 }
 
-export type Token = TokenText | TokenLink | TokenEmoji | TokenTextEmoji
-    | TokenUserSticker | TokenMention | TokenCommand | TokenHashTag | TokenMarkdown;
+export type Token = TokenText | TokenLink | TokenUserSticker | TokenMention
+    | TokenCommand | TokenHashTag | TokenMarkdown;
 
 export interface TokenBase {
     /** Тип токена */
@@ -72,21 +66,17 @@ export interface TokenText extends TokenBase {
      * предыдущий токен
      */
     sticky: boolean;
+
+    /** Список эмоджи токена */
+    emoji?: Emoji[];
 }
 
 export interface TokenLink extends TokenBase {
     type: TokenType.Link;
     link: string;
-}
 
-export interface TokenEmoji extends TokenBase {
-    type: TokenType.Emoji;
-}
-
-export interface TokenTextEmoji extends TokenBase {
-    type: TokenType.TextEmoji;
-    /** Эмоджи-представление токена */
-    emoji: string;
+    /** Список эмоджи токена */
+    emoji?: Emoji[];
 }
 
 export interface TokenUserSticker extends TokenBase {
@@ -125,4 +115,16 @@ export interface TokenFormatUpdate {
     add?: TokenFormat;
     /** Типы форматирования, которые надо удалить */
     remove?: TokenFormat;
+}
+
+export interface Emoji {
+    /** Начало эмоджи в родительском токене */
+    from: number;
+    /** Конец эмоджи в родительском токене */
+    to: number;
+    /**
+     * Фактический эмоджи для указанного диапазона.
+     * Используется для текстовых эмоджи (алиасов)
+     * */
+    emoji?: string;
 }

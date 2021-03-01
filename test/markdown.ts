@@ -71,8 +71,8 @@ describe('Markdown', () => {
         deepEqual(values(tokens), ['(', '_', 'italic', '_', ')']);
 
         tokens = parse('_italic😀)_');
-        deepEqual(types(tokens), [TokenType.Markdown, TokenType.Text, TokenType.Emoji, TokenType.Text, TokenType.Markdown]);
-        deepEqual(values(tokens), ['_', 'italic', '😀', ')', '_']);
+        deepEqual(types(tokens), [TokenType.Markdown, TokenType.Text, TokenType.Markdown]);
+        deepEqual(values(tokens), ['_', 'italic😀)', '_']);
 
         tokens = parse('test, *bold _italic_*, test');
         deepEqual(types(tokens), [TokenType.Text, TokenType.Markdown, TokenType.Text, TokenType.Markdown, TokenType.Text, TokenType.Markdown, TokenType.Markdown, TokenType.Text]);

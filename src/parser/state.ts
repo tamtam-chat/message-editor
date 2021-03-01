@@ -1,5 +1,5 @@
 import { Token, TokenFormat } from '../formatted-string';
-import { TokenMarkdown, TokenType } from '../formatted-string/types';
+import { Emoji, TokenMarkdown, TokenText, TokenType } from '../formatted-string/types';
 import { ParserOptions } from './types';
 import { isDelimiter, last } from './utils';
 
@@ -29,6 +29,9 @@ export default class ParserState {
 
     /** Позиция конца накапливаемого текстового фрагмента */
     public textEnd = -1;
+
+    /** Список эмоджи для текущего текстового токена */
+    public emoji: Emoji[] = [];
 
     /**
      * Возвращает *code point* текущего символа парсера без смещения указателя
@@ -123,6 +126,27 @@ export default class ParserState {
     }
 
     /**
+     * Добавляет эмоджи для текущего накапливаемого текста
+     * @param from Начала эмоджи _относительно всего потока_
+     * @param to Конец эмоджи _относительно всего потока_
+     * @param emoji Фактический эмоджи
+     */
+    pushEmoji(from: number, to: number, emoji?: string): void {
+        if (this.textStart === -1) {
+            this.textStart = from;
+        }
+
+        // Эмоджи добавляем с абсолютной адресацией, но храним с относительной,
+        // чтобы можно было доставать из самого токена
+        this.emoji.push({
+            from: from - this.textStart,
+            to: to - this.textStart,
+            emoji
+        });
+        this.textEnd = to;
+    }
+
+    /**
      * Проверяет, есть ли указанный формат в текущем состоянии
      */
     hasFormat(format: TokenFormat): boolean {
@@ -161,12 +185,18 @@ export default class ParserState {
     flushText(): void {
         if (this.hasPendingText()) {
             // TODO использовать функцию-фабрику для сохранения шэйпа
-            this.tokens.push({
+            const token: TokenText = {
                 type: TokenType.Text,
                 format: TokenFormat.None,
+                value: this.substring(this.textStart, this.textEnd),
                 sticky: false,
-                value: this.substring(this.textStart, this.textEnd)
-            });
+            };
+
+            if (this.emoji.length) {
+                token.emoji = this.emoji;
+                this.emoji = [];
+            }
+            this.tokens.push(token);
             this.textStart = this.textEnd = -1;
         }
     }
@@ -184,12 +214,23 @@ export default class ParserState {
         }
 
         if (this.hasPendingText()) {
+            if (this.emoji.length && last(this.emoji).to === (this.textEnd - this.textStart)) {
+                return true;
+            }
+
             return isDelimiter(this.peekPrev());
         }
 
         const lastToken = last(this.tokens);
         if (lastToken) {
-            return lastToken.type === TokenType.Emoji || lastToken.type === TokenType.Markdown;
+            if (lastToken.type === TokenType.Text && lastToken.emoji?.length) {
+                // Если в конце текстовый токен, проверим, чтобы он закачивался
+                // на эмоджи
+                const lastEmoji = last(lastToken.emoji);
+                return lastEmoji.to === lastToken.value.length;
+            }
+
+            return lastToken.type === TokenType.Markdown;
         }
 
         return false;

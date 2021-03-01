@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
 import parse from '../src/parser';
-import { Token, TokenType } from '../src/formatted-string/types';
+import { Token, TokenText, TokenType } from '../src/formatted-string/types';
 
 function read(file: string): string {
     return fs.readFileSync(path.resolve(__dirname, file), 'utf8');
@@ -10,6 +10,12 @@ function read(file: string): string {
 
 function types(tokens: Token[]): TokenType[] {
     return tokens.map(t => t.type);
+}
+
+function emoji(token: Token): string[] {
+    if (token.type === TokenType.Text && token.emoji) {
+        return token.emoji.map(e => token.value.substring(e.from, e.to));
+    }
 }
 
 function values(tokens: Token[]): string[] {
@@ -20,7 +26,11 @@ describe('Emoji', () => {
     describe('Unicode standard', () => {
         const parseEmoji = (text: string) => {
             const token = parse(text)[0];
-            return token.type === TokenType.Emoji ? token.value : null;
+            if (token.type === TokenType.Text && token.emoji) {
+                const emoji = token.emoji[0]!;
+                return token.value.substring(emoji.from, emoji.to);
+            }
+            return null;
         };
         const repr = (text: string) => {
             const chars = [];
@@ -61,45 +71,53 @@ describe('Emoji', () => {
 
     it('basic emoji in text', () => {
         let tokens = parse('a✊b');
-        deepEqual(types(tokens), [TokenType.Text, TokenType.Emoji, TokenType.Text]);
-        deepEqual(values(tokens), ['a', '✊', 'b']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['a✊b']);
+        deepEqual(emoji(tokens[0]), ['✊']);
 
         tokens = parse('a✊ba✊ba✊b');
-        deepEqual(types(tokens), [TokenType.Text, TokenType.Emoji, TokenType.Text, TokenType.Emoji, TokenType.Text, TokenType.Emoji, TokenType.Text]);
-        deepEqual(values(tokens), ['a', '✊', 'ba', '✊', 'ba', '✊', 'b']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['a✊ba✊ba✊b']);
+        deepEqual(emoji(tokens[0]), ['✊', '✊', '✊']);
 
         tokens = parse('😃✊😃');
-        deepEqual(types(tokens), [TokenType.Emoji, TokenType.Emoji, TokenType.Emoji], 'Emoji of different size');
-        deepEqual(values(tokens), ['😃', '✊', '😃'], 'Emoji of different size');
+        deepEqual(types(tokens), [TokenType.Text], 'Emoji of different size');
+        deepEqual(values(tokens), ['😃✊😃'], 'Emoji of different size');
+        deepEqual(emoji(tokens[0]), ['😃', '✊', '😃'], 'Emoji of different size');
     });
 
     it('keycaps', () => {
         const tokens = parse('12️⃣');
-        deepEqual(types(tokens), [TokenType.Text, TokenType.Emoji]);
-        deepEqual(values(tokens), ['1', '2️⃣']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['12️⃣']);
+        deepEqual(emoji(tokens[0]), ['2️⃣']);
     });
 
     it('dingbats', () => {
         const tokens = parse('♨*');
-        deepEqual(types(tokens), [TokenType.Emoji, TokenType.Text]);
-        deepEqual(values(tokens), ['♨', '*']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['♨*']);
+        deepEqual(emoji(tokens[0]), ['♨']);
     });
 
     it('flags', () => {
         const tokens = parse('a🇯🇵🇰🇷🇩🇪b');
-        deepEqual(types(tokens), [TokenType.Text, TokenType.Emoji, TokenType.Emoji, TokenType.Emoji, TokenType.Text]);
-        deepEqual(values(tokens), ['a', '🇯🇵', '🇰🇷', '🇩🇪', 'b']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['a🇯🇵🇰🇷🇩🇪b']);
+        deepEqual(emoji(tokens[0]), ['🇯🇵', '🇰🇷', '🇩🇪']);
     });
 
     it('skin tone', () => {
         const tokens = parse('👍🏽 🧒🏼');
-        deepEqual(types(tokens), [TokenType.Emoji, TokenType.Text, TokenType.Emoji]);
-        deepEqual(values(tokens), ['👍🏽', ' ', '🧒🏼']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['👍🏽 🧒🏼']);
+        deepEqual(emoji(tokens[0]), ['👍🏽', '🧒🏼']);
     });
 
     it('combined emoji', () => {
         const tokens = parse('👩🏼👩🏼‍🦰🤦🏼‍♀️');
-        deepEqual(types(tokens), [TokenType.Emoji, TokenType.Emoji, TokenType.Emoji]);
-        deepEqual(values(tokens), ['👩🏼', '👩🏼‍🦰', '🤦🏼‍♀️']);
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['👩🏼👩🏼‍🦰🤦🏼‍♀️']);
+        deepEqual(emoji(tokens[0]), ['👩🏼', '👩🏼‍🦰', '🤦🏼‍♀️']);
     });
 });

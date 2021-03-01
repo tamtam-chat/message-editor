@@ -1,4 +1,3 @@
-import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { Codes, isNumber } from './utils';
 
@@ -24,11 +23,7 @@ const enum EmojiCodes {
 export default function parseEmoji(state: ParserState): boolean {
     const { pos } = state;
     if (consumeEmoji(state)) {
-        state.push({
-            type: TokenType.Emoji,
-            format: TokenFormat.None,
-            value: state.substring(pos)
-        });
+        state.pushEmoji(pos, state.pos);
         return true;
     }
 

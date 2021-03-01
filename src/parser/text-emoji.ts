@@ -1,4 +1,3 @@
-import { TokenFormat, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { consumeTree, createTree } from './tree';
 import { isDelimiter } from './utils';
@@ -13,12 +12,7 @@ export default function parseTextEmoji(state: ParserState): boolean {
         // Если нашли совпадение, то убедимся, что оно на границе слов
         if (consumeTree(state, lookup) && isDelimiter(state.peek())) {
             const value = state.substring(pos);
-            state.push({
-                type: TokenType.TextEmoji,
-                format: TokenFormat.None,
-                value,
-                emoji: aliases[value] || value
-            });
+            state.pushEmoji(pos, state.pos, aliases[value] || value);
             return true;
         }
 

@@ -52,19 +52,19 @@ function testLink(link: string, isEmail = false) {
 
     // Сразу за эмоджи
     tokens = parse(`${link}😍`);
-    deepEqual(types(tokens), [TokenType.Link, TokenType.Emoji], `Types: "${link}" before emoji`);
+    deepEqual(types(tokens), [TokenType.Link, TokenType.Text], `Types: "${link}" before emoji`);
     deepEqual(values(tokens), [link, '😍'], `Values: "${link}" before emoji`);
     validate(0);
 
     // Перед эмоджи
     tokens = parse(`👌🏻${link}`);
-    deepEqual(types(tokens), [TokenType.Emoji, TokenType.Link], `Types: "${link}" after emoji`);
+    deepEqual(types(tokens), [TokenType.Text, TokenType.Link], `Types: "${link}" after emoji`);
     deepEqual(values(tokens), ['👌🏻', link], `Values: "${link}" after emoji`);
     validate(1);
 
     // Перед keycap-эмоджи
     tokens = parse(`${link}2️⃣`);
-    deepEqual(types(tokens), [TokenType.Link, TokenType.Emoji], `Types: "${link}" before keycap emoji`);
+    deepEqual(types(tokens), [TokenType.Link, TokenType.Text], `Types: "${link}" before keycap emoji`);
     deepEqual(values(tokens), [link, '2️⃣'], `Values: "${link}" before keycap emoji`);
     validate(0);
 
