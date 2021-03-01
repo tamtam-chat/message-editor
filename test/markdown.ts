@@ -1,4 +1,4 @@
-import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
+import { deepStrictEqual as deepEqual } from 'assert';
 import _parse from '../src/parser';
 import { Token, TokenFormat, TokenType } from '../src/formatted-string/types';
 
