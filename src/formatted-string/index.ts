@@ -1,4 +1,6 @@
-import { Token, TokenFormat, TokenFormatUpdate, TokenType } from './types';
+import parse from '../parser';
+import { ParserOptions } from '../parser/types';
+import { Emoji, Token, TokenFormat, TokenFormatUpdate, TokenLink, TokenType } from './types';
 
 export { Token, TokenFormat, TokenFormatUpdate };
 
@@ -18,130 +20,104 @@ interface TokenForPos {
     offset: number;
 }
 
-type AnyText = string | Token[];
-
 /**
  * Фабрика объекта-токена
  */
-export function createToken(text: string, format: TokenFormat = 0, sticky = false): Token {
-    return { type: TokenType.Text, value: text, format, sticky };
+export function createToken(text: string, format: TokenFormat = 0, sticky = false, emoji?: Emoji[]): Token {
+    return { type: TokenType.Text, format, value: text, emoji, sticky };
 }
 
 /**
  * Вставляет указанный текст `text` в текстовую позицию `pos` списка токенов
  * @return Обновлённый список токенов
  */
-export function insertText(tokens: Token[], pos: number, text: AnyText): Token[] {
-    const { offset, index } = tokenForPos(tokens, pos);
-
-    if (index !== -1) {
-        if (Array.isArray(text)) {
-            // Вставляем отформатированную строку (токены)
-            // Делим найденный токен на две части, между ними будем вставлять текст
-            const token = tokens[index];
-            const left = { ...token, text: token.value.slice(0, offset), sticky: false };
-            const right = { ...token, text: token.value.slice(offset), sticky: false };
-
-            // Добавляем всем вставляемым токенам тот же формат, что и в найденном
-            text = text.map(t => ({
-                ...t, format: t.format | token.format
-            }));
-
-            // Объединяем токены вместе и нормализуем
-            tokens = tokens.slice(0, index)
-                .concat(left, text, right, tokens.slice(index + 1));
-            tokens = normalize(tokens);
-        } else {
-            // Вставляем обычный текст
-            const prevText = tokens[index].value;
-            tokens = tokens.slice();
-
-            // TODO учесть другие типы токенов и sticky-форматирование
-
-            tokens.splice(index, 1, {
-                ...tokens[index],
-                value: prevText.slice(0, offset) + text + prevText.slice(offset),
-                // sticky: false
-            });
-        }
-    } else {
-        tokens = tokens.concat(Array.isArray(text) ? text : createToken(text));
-    }
-
-    return tokens;
+export function insertText(tokens: Token[], pos: number, text: string, options: ParserOptions): Token[] {
+    return updateTokens(tokens, text, pos, pos, options);
 }
 
 /**
  * Заменяет текст указанной длины в текстовой позиции `pos` на новый `text`
+ * @return Обновлённый список токенов
  */
-export function replaceText(tokens: Token[], pos: number, len: number, text: AnyText): Token[] {
-    return insertText(removeText(tokens, pos, len), pos, text);
+export function replaceText(tokens: Token[], pos: number, len: number, text: string, options: ParserOptions): Token[] {
+    return updateTokens(tokens, text, pos, pos + len, options);
 }
 
 /**
  * Удаляет текст указанной длины из списка токенов в указанной позиции
  */
-export function removeText(tokens: Token[], pos: number, len: number): Token[] {
-    const start = tokenForPos(tokens, pos);
-    const end = tokenForPos(tokens, pos + len);
-
-    if (start.index !== -1) {
-        const startToken = tokens[start.index];
-        tokens = tokens.slice();
-
-        if (start.index === end.index) {
-            // Удаляем текст внутри одного токена
-            tokens.splice(start.index, 1, {
-                ...startToken,
-                value: startToken.value.slice(0, start.offset) + startToken.value.slice(start.offset + len)
-            });
-        } else if (end.index !== -1) {
-            // Удаление приходится на диапазон токенов
-            const endToken = tokens[end.index];
-            tokens.splice(start.index, end.index - start.index + 1, {
-                ...startToken,
-                value: startToken.value.slice(0, start.offset)
-            }, {
-                ...endToken,
-                value: endToken.value.slice(end.offset)
-            });
-        } else {
-            // Не нашли конец: удаляем всё от `start` и до конца
-            tokens.splice(start.index, tokens.length - start.index, {
-                ...startToken,
-                value: startToken.value.slice(0, start.offset)
-            });
-        }
-
-        tokens = normalize(tokens);
-    }
-
-    return tokens;
-}
-
-/**
- * Объединяет две форматированный строки в одну
- */
-export function joinText(left: AnyText, right: AnyText): Token[] {
-    if (typeof left === 'string') {
-        left = [createToken(left)];
-    }
-
-    if (typeof right === 'string') {
-        right = [createToken(right)];
-    }
-
-    return normalize(left.concat(right));
+export function removeText(tokens: Token[], pos: number, len: number, options: ParserOptions): Token[] {
+    return updateTokens(tokens, '', pos, pos + len, options);
 }
 
 /**
  * Вырезает текст из диапазона `from:to` и возвращает его и изменённую строку
  */
-export function cutText(tokens: Token[], from: number, to: number): CutText {
+export function cutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
     return {
         cut: normalize(slice(tokens, from, to)),
-        tokens: removeText(tokens, from, to - from)
+        tokens: removeText(tokens, from, to - from, options)
     };
+}
+
+/**
+ * Универсальный метод для обновления списка токенов: добавление, удаление и замена
+ * текста в списке указанных токенов
+ */
+function updateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
+    if (!tokens.length) {
+        return parse(value, options);
+    }
+
+    const start = tokenForPos(tokens, from);
+    const end = tokenForPos(tokens, to);
+
+    if (start.index === -1 || end.index === -1) {
+        // Такого не должно быть
+        console.warn('Invalid location:', { from, to, start, end });
+        return tokens;
+    }
+
+    const startToken = tokens[start.index];
+    const endToken = tokens[end.index];
+    const nextValue = startToken.value.slice(0, start.offset)
+        + value + endToken.value.slice(end.offset);
+    let nextTokens = parse(nextValue, options);
+
+    if (nextTokens.length) {
+        // Вставляем/заменяем фрагмент
+        // Проверяем пограничные случаи:
+        // — начало изменяемого диапазона находится в пользовательской ссылке:
+        //   сохраним ссылку
+        // — меняем упоминание. Если результат не начинается с упоминания, то считаем,
+        //   что пользователь меняет подпись упоминания
+        const next = nextTokens[0];
+        if (isCustomLink(startToken) || (startToken.type === TokenType.Mention && next.type !== TokenType.Mention)) {
+            nextTokens[0] = {
+                ...startToken,
+                emoji: next.emoji,
+                value: next.value,
+            };
+        }
+
+        nextTokens.forEach(t => t.format = startToken.format);
+
+        // Применяем форматирование из концевых токенов, но только если можем
+        // сделать это безопасно: применяем только для текста
+        if (startToken.format !== endToken.format) {
+            const pos = start.offset + value.length;
+            const splitPoint = tokenForPos(nextTokens, pos);
+            if (splitPoint.index !== -1 && pos !== nextValue.length && nextTokens.slice(splitPoint.index).every(t => t.type === TokenType.Text)) {
+                nextTokens = setFormat(nextTokens, { set: endToken.format }, pos, nextValue.length - pos);
+            }
+        }
+    }
+
+    return normalize([
+        ...tokens.slice(0, start.index),
+        ...nextTokens,
+        ...tokens.slice(end.index + 1)
+    ]);
 }
 
 /**
@@ -176,7 +152,7 @@ export function setFormat(tokens: Token[], format: TokenFormatUpdate, pos: numbe
                 // Обновляем промежуточные токены, пока индексы точные
                 for (let i = start.index + 1, nextFormat: TokenFormat; i < end.index; i++) {
                     nextFormat = applyFormat(tokens[i].format, format);
-                    if (!equalFormat(tokens[i].format, nextFormat)) {
+                    if (tokens[i].format !== nextFormat) {
                         tokens[i] = {
                             ...tokens[i],
                             format: nextFormat
@@ -233,6 +209,10 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
         throw new Error(`Invalid range: ${from}:${to}`);
     }
 
+    if (from === to) {
+        return [];
+    }
+
     let fromIx = -1, toIx = -1;
 
     for (let i = 0, len: number; i < tokens.length; i++) {
@@ -257,26 +237,18 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
     }
 
     if (fromIx === toIx) {
-        return normalize([{
-            ...tokens[fromIx],
-            value: tokens[fromIx].value.slice(from, to)
-        }]);
+        // Получаем фрагмент в пределах одного токена: всегда делаем его текстом
+        const t = tokens[fromIx];
+        return normalize([createToken(t.value.slice(from, to), t.format, false, sliceEmoji(t.emoji, from, to))]);
     }
 
-    const fromToken: Token = {
-        ...tokens[fromIx],
-        value: tokens[fromIx].value.slice(from)
-    };
-
-    const toToken: Token = {
-        ...tokens[toIx],
-        value: tokens[toIx].value.slice(0, to)
-    };
+    const fromToken = tokens[fromIx];
+    const toToken = tokens[toIx];
 
     return normalize([
-        fromToken,
+        createToken(fromToken.value.slice(from), fromToken.format, false, sliceEmoji(fromToken.emoji, from, fromToken.value.length)),
         ...tokens.slice(fromIx + 1, toIx),
-        toToken
+        createToken(toToken.value.slice(0, to), toToken.format, false, sliceEmoji(toToken.emoji, 0, to))
     ]);
 }
 
@@ -287,15 +259,37 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
 function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatUpdate, pos: number, len: number): Token[] {
     const token = tokens[tokenIndex];
     const format = applyFormat(token.format, update);
-    if (!equalFormat(token.format, format)) {
-        tokens = tokens.slice();
-        tokens.splice(tokenIndex, 1,
-            { ...token, value: token.value.slice(0, pos) },
-            createToken(token.value.substr(pos, len), format, !len),
-            { ...token, value: token.value.slice(pos + len) }
-        );
+    if (token.format !== format) {
+        // Делим токен на две части. Если это специальный токен типа хэштэга
+        // или команды, превратим его в обычный текст
+        let nextTokens: Token[];
+        const leftEmoji = sliceEmoji(token.emoji, 0, pos);
+        const midEmoji = sliceEmoji(token.emoji, pos, pos + len);
+        const rightEmoji = sliceEmoji(token.emoji, pos + len, token.value.length);
+        const leftText = token.value.slice(0, pos);
+        const midText = token.value.slice(pos, pos + len);
+        const rightText = token.value.slice(pos + len);
+        const sticky = len === 0;
 
-        tokens = normalize(tokens);
+        if (token.type === TokenType.Text || isCustomLink(token)) {
+            nextTokens = [
+                { ...token, format: token.format, value: leftText, emoji: leftEmoji },
+                { ...token, format, value: midText, emoji: midEmoji, sticky },
+                { ...token, format: token.format, value: rightText, emoji: rightEmoji },
+            ];
+        } else {
+            nextTokens = [
+                createToken(leftText, token.format, false, leftEmoji),
+                createToken(midText, format, sticky, midEmoji),
+                createToken(rightText, token.format, false, rightEmoji),
+            ];
+        }
+
+        return normalize([
+            ...tokens.slice(0, tokenIndex),
+            ...nextTokens,
+            ...tokens.slice(tokenIndex + 1),
+        ]);
     }
 
     return tokens;
@@ -316,7 +310,6 @@ export function tokenForPos(tokens: Token[], offset: number): TokenForPos {
         if (len === offset) {
             // Попали точно на границу токенов. Проверим, если следующий является
             // sticky-токеном, то работать нужно будет с ним, иначе с текущим
-            // TODO проверить с другими типами токенов
             const nextToken = tokens[i + 1]!;
             if (tokens.length - 1 === i || nextToken.type !== TokenType.Text || !nextToken.sticky) {
                 return true;
@@ -326,7 +319,27 @@ export function tokenForPos(tokens: Token[], offset: number): TokenForPos {
         offset -= len;
     });
 
-    return { offset, index };
+    return {
+        offset: index !== -1 ? adjustOffset(tokens[index], offset) : offset,
+        index
+    };
+}
+
+/**
+ * Обновляет обновляет позицию `offset` внутри токена `token` таким образом,
+ * чтобы она не попадала на вложенный элемент, например, эмоджи
+ */
+function adjustOffset(token: Token, offset: number): number {
+    if (token.emoji) {
+        const { emoji } = token;
+        for (let i = 0; i < emoji.length && emoji[i].from < offset; i++) {
+            if (emoji[i].to > offset) {
+                return emoji[i].to;
+            }
+        }
+    }
+
+    return offset;
 }
 
 /**
@@ -334,41 +347,50 @@ export function tokenForPos(tokens: Token[], offset: number): TokenForPos {
  * типы форматирования.
  */
 function applyFormat(format: TokenFormat, update: TokenFormatUpdate): TokenFormat {
+    if (update.set) {
+        return update.set;
+    }
+
     if (update.add) {
         format |= update.add;
     }
 
     if (update.remove) {
-        format ^= format & update.remove;
+        format &= ~update.remove;
     }
 
     return format;
 }
 
 /**
- * Объединяет соседние токены, если у них одинаковый формат
+ * Объединяет соседние токены, если это можно сделать безопасно
  */
 function joinSimilar(tokens: Token[]): Token[] {
     return tokens.reduce((out, token) => {
-        const prev = out[out.length - 1];
-        if (prev && equalFormat(prev.format, token.format)) {
-            out[out.length - 1] = {
-                ...prev,
-                text: prev.text + token.value
-            };
+        let prev = out[out.length - 1];
+        if (prev && allowJoin(prev, token)) {
+            prev = { ...prev };
+
+            if (token.emoji) {
+                const nextEmoji = shiftEmoji(token.emoji, prev.value.length);
+                prev.emoji = prev.emoji ? prev.emoji.concat(nextEmoji) : nextEmoji;
+            }
+
+            prev.value += token.value;
+            out[out.length - 1] = prev;
         } else {
             out.push(token);
         }
 
         return out;
-    }, []);
+    }, [] as Token[]);
 }
 
 /**
  * Удаляет пустые токены из указанного списка
  */
 function filterEmpty(tokens: Token[]): Token[] {
-    return tokens.filter(token => token.value || token.type !== TokenType.Text || token.sticky);
+    return tokens.filter(token => token.value || (token.type === TokenType.Text && token.sticky));
 }
 
 function normalize(tokens: Token[]): Token[] {
@@ -376,8 +398,51 @@ function normalize(tokens: Token[]): Token[] {
 }
 
 /**
- * Проверяет, являются ли два указанных формата одинаковыми
+ * Проверяет, можно ли объединить два указанных токена в один
  */
-function equalFormat(fmt1: TokenFormat, fmt2: TokenFormat): boolean {
-    return fmt1 === fmt2
+function allowJoin(token1: Token, token2: Token): boolean {
+    if (token1.type === token2.type && token1.format === token2.format) {
+        return (token1.type === TokenType.Link && token1.link === (token2 as TokenLink).link)
+            || token1.type === TokenType.Text
+    }
+}
+
+/**
+ * Проверяет, что указанный токен является пользовательской ссылкой, то есть
+ * ссылка отличается от содержимого токена
+ */
+function isCustomLink(token: Token): token is TokenLink {
+    return token.type === TokenType.Link && token.link !== token.value;
+}
+
+function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
+    return emoji.map(e => ({
+        ...e,
+        from: e.from + offset,
+        to: e.to + offset
+    }));
+}
+
+/**
+ * Возвращает список эмоджи, который соответствует указанному диапазону.
+ * Если список пустой, то вернёт `undefined` для поддержки контракта с токенами
+ */
+function sliceEmoji(emoji: Emoji[] | undefined, from: number, to: number): Emoji[] | undefined {
+    if (!emoji) {
+        return undefined;
+    }
+
+    const result: Emoji[] = [];
+    for (let i = 0; i < emoji.length; i++) {
+        const e = emoji[i];
+        if (e.from >= to) {
+            break;
+        }
+
+        if (e.from >= from && e.to <= to) {
+            result.push(e);
+        }
+    }
+
+    return result.length ? result : undefined;
 }

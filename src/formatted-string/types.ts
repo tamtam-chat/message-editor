@@ -55,6 +55,9 @@ export interface TokenBase {
 
     /** Текущий формат токена */
     format: TokenFormat;
+
+    /** Список эмоджи внутри значения токена */
+    emoji?: Emoji[];
 }
 
 export interface TokenText extends TokenBase {
@@ -66,14 +69,18 @@ export interface TokenText extends TokenBase {
      * предыдущий токен
      */
     sticky: boolean;
-
-    /** Список эмоджи токена */
-    emoji?: Emoji[];
 }
 
 export interface TokenLink extends TokenBase {
     type: TokenType.Link;
     link: string;
+
+    /**
+     * Признак, указывающий, что при добавлении текста точно на границу текущего
+     * и предыдущего токена, текст будет добавлен именно в текущий, а не в
+     * предыдущий токен
+     */
+    sticky: boolean;
 
     /** Список эмоджи токена */
     emoji?: Emoji[];
@@ -115,6 +122,11 @@ export interface TokenFormatUpdate {
     add?: TokenFormat;
     /** Типы форматирования, которые надо удалить */
     remove?: TokenFormat;
+    /**
+     * Тип форматирования, которые надо применить. Если указан, параметры `add`
+     * и `remove` не используются
+     */
+    set?: TokenFormat;
 }
 
 export interface Emoji {

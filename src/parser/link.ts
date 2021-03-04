@@ -611,6 +611,7 @@ function linkToken(value: string, link: string): TokenLink {
         type: TokenType.Link,
         format: TokenFormat.None,
         value,
-        link
+        link,
+        sticky: false
     };
 }
