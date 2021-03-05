@@ -42,3 +42,5 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
 
     return state.tokens;
 }
+
+export { ParserOptions, Token, TokenFormat };

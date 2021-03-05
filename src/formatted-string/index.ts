@@ -213,42 +213,24 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
         return [];
     }
 
-    let fromIx = -1, toIx = -1;
+    const start = tokenForPos(tokens, from);
+    const end = tokenForPos(tokens, to);
 
-    for (let i = 0, len: number; i < tokens.length; i++) {
-        len = tokens[i].value.length;
-
-        if (fromIx === -1) {
-            if (from <= len) {
-                fromIx = i;
-            } else {
-                from -= len;
-            }
-        }
-
-        if (toIx === -1) {
-            if (to <= len) {
-                toIx = i;
-                break;
-            } else {
-                to -= len;
-            }
-        }
-    }
-
-    if (fromIx === toIx) {
+    if (start.index === end.index) {
         // Получаем фрагмент в пределах одного токена: всегда делаем его текстом
-        const t = tokens[fromIx];
-        return normalize([createToken(t.value.slice(from, to), t.format, false, sliceEmoji(t.emoji, from, to))]);
+        const t = tokens[start.index];
+        return [
+            createToken(t.value.slice(start.offset, end.offset), t.format, false, sliceEmoji(t.emoji, start.offset, end.offset))
+        ];
     }
 
-    const fromToken = tokens[fromIx];
-    const toToken = tokens[toIx];
+    const fromToken = tokens[start.index];
+    const toToken = tokens[end.index];
 
     return normalize([
-        createToken(fromToken.value.slice(from), fromToken.format, false, sliceEmoji(fromToken.emoji, from, fromToken.value.length)),
-        ...tokens.slice(fromIx + 1, toIx),
-        createToken(toToken.value.slice(0, to), toToken.format, false, sliceEmoji(toToken.emoji, 0, to))
+        createToken(fromToken.value.slice(start.offset), fromToken.format, false, sliceEmoji(fromToken.emoji, start.offset, fromToken.value.length)),
+        ...tokens.slice(start.index + 1, end.index),
+        createToken(toToken.value.slice(0, end.offset), toToken.format, false, sliceEmoji(toToken.emoji, 0, end.offset))
     ]);
 }
 
@@ -444,5 +426,5 @@ function sliceEmoji(emoji: Emoji[] | undefined, from: number, to: number): Emoji
         }
     }
 
-    return result.length ? result : undefined;
+    return result.length ? shiftEmoji(result, -from) : undefined;
 }

@@ -146,11 +146,14 @@ export default class ParserState {
 
         // Эмоджи добавляем с абсолютной адресацией, но храним с относительной,
         // чтобы можно было доставать из самого токена
-        this.emoji.push({
+        const token: Emoji = {
             from: from - this.textStart,
             to: to - this.textStart,
-            emoji
-        });
+        };
+        if (emoji != null) {
+            token.emoji = emoji;
+        }
+        this.emoji.push(token);
         this.textEnd = to;
     }
 

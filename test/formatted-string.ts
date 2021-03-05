@@ -3,8 +3,8 @@ import {
     createToken as token, insertText, removeText, setFormat, slice, cutText,
     Token, TokenFormat
 } from '../src/formatted-string';
-import { TokenText } from '../src/formatted-string/types';
-import { ParserOptions } from '../src/parser/types';
+import { TokenText, TokenType } from '../src/formatted-string/types';
+import parse, { ParserOptions } from '../src/parser';
 
 type StringFormat = [TokenFormat, string];
 
@@ -54,7 +54,7 @@ function text(tokens: Token[]): string {
 }
 
 describe('Formatted String', () => {
-    it('should insert text', () => {
+    it('insert text', () => {
         const tokens = [
             token('hello', TokenFormat.Italic),
             token(' '),
@@ -82,14 +82,14 @@ describe('Formatted String', () => {
         equal(repr(t4), '<i>aaahellobbb</i> ccc<b>worldddd</b>');
     });
 
-    it('should insert text into empty string', () => {
+    it('insert text into empty string', () => {
         const t1 = insertText([], 0, 'hello world', opt);
         equal(text(t1), 'hello world');
         equal(t1.length, 1);
         equal(repr(t1), 'hello world');
     });
 
-    it('should remove text', () => {
+    it('remove text', () => {
         const tokens = [
             token('aaa', TokenFormat.Italic),
             token(' '),
@@ -117,7 +117,7 @@ describe('Formatted String', () => {
         equal(repr(t4), '<i>aa</i>');
     });
 
-    it('should change format', () => {
+    it('change format', () => {
         const tokens = [token('aa bb cc dd')];
         equal(text(tokens), 'aa bb cc dd');
 
@@ -138,7 +138,7 @@ describe('Formatted String', () => {
         equal(repr(t4), 'aa bb cc dd');
     });
 
-    it('should update text with sticky mark', () => {
+    it('update text with sticky mark', () => {
         const tokens = [token('aa bb cc dd')];
 
         // Insert sticky mark inside plain text
@@ -176,7 +176,7 @@ describe('Formatted String', () => {
         equal(repr(t9), '<i>aa </i><bi>123</bi><i>bb</i> cc dd');
     });
 
-    it('should slice tokens', () => {
+    it('slice tokens', () => {
         const tokens = [
             token('12'),
             token('34', TokenFormat.Bold),
@@ -202,7 +202,7 @@ describe('Formatted String', () => {
         deepEqual(slice([], 0, 0), []);
     });
 
-    it('should cut text', () => {
+    it('cut text', () => {
         const tokens = [
             token('12'),
             token('34', TokenFormat.Bold),
@@ -217,5 +217,63 @@ describe('Formatted String', () => {
         result = cutText(tokens, 2, 6, opt);
         equal(repr(result.cut), '<b>34</b><i>56</i>');
         equal(repr(result.tokens), '1278');
+    });
+
+    it('handle emoji in string', () => {
+        const emojiText = (token: TokenText) => token.emoji.map(e => token.value.substring(e.from, e.to));
+
+        const tokens = parse('aaa 😍 bbb 😘😇 ccc 🤷🏼‍♂️ ddd');
+        let text = tokens[0] as TokenText;
+        equal(tokens.length, 1);
+        equal(text.type, TokenType.Text);
+        deepEqual(text.emoji, [
+            { from: 4, to: 6 },
+            { from: 11, to: 13 },
+            { from: 13, to: 15 },
+            { from: 20, to: 27 }
+        ]);
+        deepEqual(emojiText(text), ['😍', '😘', '😇', '🤷🏼‍♂️']);
+
+        // Добавляем текст
+        const tokens2 = insertText(tokens, 13, 'foo 😈 bar', opt);
+        text = tokens2[0] as TokenText;
+        equal(tokens2.length, 1);
+        equal(text.value, 'aaa 😍 bbb 😘foo 😈 bar😇 ccc 🤷🏼‍♂️ ddd');
+        deepEqual(emojiText(text), ['😍', '😘', '😈', '😇', '🤷🏼‍♂️']);
+
+        // Удаляем текст
+        const tokens3 = removeText(tokens2, 2, 14, opt);
+        text = tokens3[0] as TokenText;
+        equal(tokens3.length, 1);
+        equal(text.value, 'aa 😈 bar😇 ccc 🤷🏼‍♂️ ddd');
+        deepEqual(emojiText(text), ['😈', '😇', '🤷🏼‍♂️']);
+
+        // Удаляем текст с позицией внутри эмоджи
+        const tokens3_1 = removeText(tokens2, 5, 7, opt);
+        text = tokens3_1[0] as TokenText;
+        equal(tokens3_1.length, 1);
+        equal(text.value, 'aaa 😍foo 😈 bar😇 ccc 🤷🏼‍♂️ ddd');
+        deepEqual(emojiText(text), ['😍', '😈', '😇', '🤷🏼‍♂️']);
+
+        // Получаем фрагмент
+        // NB: правая граница попадает на середину эмоджи
+        const tokens4 = slice(tokens3_1, 0, 11);
+        text = tokens4[0] as TokenText;
+        equal(tokens4.length, 1);
+        equal(text.value, 'aaa 😍foo 😈');
+        deepEqual(emojiText(text), ['😍', '😈']);
+
+        // Вырезаем фрагмент
+        // NB: левая граница попадает на середину эмоджи
+        const tokens5 = cutText(tokens3_1, 5, 12, opt);
+        text = tokens5.cut[0] as TokenText;
+        equal(tokens5.cut.length, 1);
+        equal(tokens5.tokens.length, 1);
+
+        equal(text.value, 'foo 😈');
+        deepEqual(emojiText(text), ['😈']);
+
+        equal(tokens5.tokens[0].value, 'aaa 😍 bar😇 ccc 🤷🏼‍♂️ ddd');
+        deepEqual(emojiText(tokens5.tokens[0] as TokenText), ['😍', '😇', '🤷🏼‍♂️']);
     });
 });
