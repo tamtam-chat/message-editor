@@ -131,44 +131,48 @@ export function getFormat(tokens: Token[], pos: number): TokenFormat {
 /**
  * Выставляет текстовый формат `format` для всех токенов из диапазона `pos, pos + len`.
  * Если `len` не указано, вставляет sticky-метку в указанную позицию `pos`
+ * @param breakSolid Применять форматирование внутри «сплошных» токенов, то есть
+ * можно один сплошной токен разделить на несколько и указать им разное форматирование
  */
-export function setFormat(tokens: Token[], format: TokenFormatUpdate, pos: number, len = 0): Token[] {
-    const start = tokenForPos(tokens, pos);
-    if (start.index !== -1) {
-        const startToken = tokens[start.index];
+export function setFormat(tokens: Token[], format: TokenFormatUpdate, pos: number, len = 0, breakSolid?: boolean): Token[] {
+    const start = tokenForPos(tokens, pos, !breakSolid ? false : undefined);
+    const end = tokenForPos(tokens, pos + len, !breakSolid ? true : undefined);
 
-        if (!len) {
+    if (start.index === -1 || end.index === -1) {
+        // Невалидные данные, ничего не делаем
+        return tokens;
+    }
+
+    const startToken = tokens[start.index];
+
+    if (end.index === start.index) {
+        if (end.offset === start.offset) {
             // Вставляем sticky-формат в указанную точку
-            tokens = applyFormatAt(tokens, start.index, format, start.offset, len);
+            tokens = applyFormatAt(tokens, start.index, format, start.offset, 0);
         } else {
-            const end = tokenForPos(tokens, pos + len);
-            if (end.index === start.index) {
-                // Изменения в пределах одного токена, разделим его
-                tokens = applyFormatAt(tokens, start.index, format, start.offset, len);
-            } else {
-                // Затронули несколько токенов
-                tokens = tokens.slice();
+            // Изменения в пределах одного токена, разделим его
+            tokens = applyFormatAt(tokens, start.index, format, start.offset, end.offset - start.offset);
+        }
+    } else {
+        // Затронули несколько токенов
+        tokens = tokens.slice();
 
-                // Обновляем промежуточные токены, пока индексы точные
-                for (let i = start.index + 1, nextFormat: TokenFormat; i < end.index; i++) {
-                    nextFormat = applyFormat(tokens[i].format, format);
-                    if (tokens[i].format !== nextFormat) {
-                        tokens[i] = {
-                            ...tokens[i],
-                            format: nextFormat
-                        };
-                    }
-                }
-
-                tokens = applyFormatAt(tokens, end.index, format, 0, end.offset);
-                tokens = applyFormatAt(tokens, start.index, format, start.offset, startToken.value.length - start.offset);
+        // Обновляем промежуточные токены, пока индексы точные
+        for (let i = start.index + 1, nextFormat: TokenFormat; i < end.index; i++) {
+            nextFormat = applyFormat(tokens[i].format, format);
+            if (tokens[i].format !== nextFormat) {
+                tokens[i] = {
+                    ...tokens[i],
+                    format: nextFormat
+                };
             }
         }
 
-        tokens = normalize(tokens);
+        tokens = applyFormatAt(tokens, end.index, format, 0, end.offset);
+        tokens = applyFormatAt(tokens, start.index, format, start.offset, startToken.value.length - start.offset);
     }
 
-    return tokens;
+    return normalize(tokens);
 }
 
 /**
@@ -241,10 +245,21 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
 function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatUpdate, pos: number, len: number): Token[] {
     const token = tokens[tokenIndex];
     const format = applyFormat(token.format, update);
-    if (token.format !== format) {
+
+    if (token.format === format) {
+        // У токена уже есть нужный формат
+        return tokens;
+    }
+
+    let nextTokens: Token[];
+
+    if (pos === 0 && len === token.value.length) {
+        // Частный случай: меняем формат у всего токена
+        nextTokens = [{ ...token, format }];
+    } else {
         // Делим токен на две части. Если это специальный токен типа хэштэга
         // или команды, превратим его в обычный текст
-        let nextTokens: Token[];
+
         const leftEmoji = sliceEmoji(token.emoji, 0, pos);
         const midEmoji = sliceEmoji(token.emoji, pos, pos + len);
         const rightEmoji = sliceEmoji(token.emoji, pos + len, token.value.length);
@@ -266,22 +281,25 @@ function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatU
                 createToken(rightText, token.format, false, rightEmoji),
             ];
         }
-
-        return normalize([
-            ...tokens.slice(0, tokenIndex),
-            ...nextTokens,
-            ...tokens.slice(tokenIndex + 1),
-        ]);
     }
 
-    return tokens;
+    return normalize([
+        ...tokens.slice(0, tokenIndex),
+        ...nextTokens,
+        ...tokens.slice(tokenIndex + 1),
+    ]);
 }
 
 /**
  * Возвращает индекс токена из списка `tokens`, который соответствует указанной
  * позиции текста
+ * @param solid Если указан, индекс позиции токена будет обновлён таким образом,
+ * чтобы учитывать «сплошные» (неразрывные) токены, то есть токены, которые нельзя
+ * разрывать в середине. В основном это используется для форматирования, чтобы
+ * не делить токен и не заниматься репарсингом. Значение может быть `false` (начало)
+ * или `true` (конец)
  */
-export function tokenForPos(tokens: Token[], offset: number): TokenForPos {
+export function tokenForPos(tokens: Token[], offset: number, solid?: boolean): TokenForPos {
     const index = tokens.findIndex((token, i) => {
         const len = token.value.length;
 
@@ -301,27 +319,26 @@ export function tokenForPos(tokens: Token[], offset: number): TokenForPos {
         offset -= len;
     });
 
-    return {
-        offset: index !== -1 ? adjustOffset(tokens[index], offset) : offset,
-        index
-    };
-}
+    const pos: TokenForPos = { offset, index };
 
-/**
- * Обновляет обновляет позицию `offset` внутри токена `token` таким образом,
- * чтобы она не попадала на вложенный элемент, например, эмоджи
- */
-function adjustOffset(token: Token, offset: number): number {
-    if (token.emoji) {
-        const { emoji } = token;
-        for (let i = 0; i < emoji.length && emoji[i].from < offset; i++) {
-            if (emoji[i].to > offset) {
-                return emoji[i].to;
+    if (index !== -1) {
+        const token = tokens[index];
+        if (typeof solid === 'boolean' && isSolidToken(token)) {
+            pos.offset = solid ? token.value.length : 0;
+        } else if (token.emoji) {
+            // Обновляем позицию `offset` внутри токена таким образом,
+            // чтобы она не попадала на вложенный эмоджи
+            const { emoji } = token;
+            for (let i = 0; i < emoji.length && emoji[i].from < pos.offset; i++) {
+                if (emoji[i].to > pos.offset) {
+                    pos.offset = emoji[i].to;
+                    break;
+                }
             }
         }
     }
 
-    return offset;
+    return pos;
 }
 
 /**
@@ -394,7 +411,13 @@ function allowJoin(token1: Token, token2: Token): boolean {
  * ссылка отличается от содержимого токена
  */
 function isCustomLink(token: Token): token is TokenLink {
-    return token.type === TokenType.Link && token.link !== token.value;
+    if (token.type === TokenType.Link && token.link !== token.value) {
+        // Если ссылки не равны, это не значит, что они разные: это может быть ссылка
+        // без протокола
+        return normalizeUrl(token.value) !== normalizeUrl(token.link);
+
+    }
+    return false;
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
@@ -427,4 +450,29 @@ function sliceEmoji(emoji: Emoji[] | undefined, from: number, to: number): Emoji
     }
 
     return result.length ? shiftEmoji(result, -from) : undefined;
+}
+
+/**
+ * Нормализация ссылки для сравнения
+ */
+function normalizeUrl(url: string): string {
+    if (/^\/\//.test(url)) {
+        url = 'http:' + url;
+    } else if (!/^[a-z0-9-]+:/i.test(url)) {
+        url = 'http://' + url;
+    }
+
+    return url.toLowerCase();
+}
+
+/**
+ * Проверяет, является ли указанный токен сплошным, то есть его разделение на части
+ * для форматирования является не желательным
+ */
+function isSolidToken(token: Token): boolean {
+    return token.type === TokenType.Command
+        || token.type === TokenType.HashTag
+        || token.type === TokenType.UserSticker
+        || token.type === TokenType.Mention
+        || (token.type === TokenType.Link && !isCustomLink(token))
 }

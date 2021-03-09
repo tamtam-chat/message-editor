@@ -3,7 +3,7 @@ import {
     createToken as token, insertText, removeText, setFormat, slice, cutText,
     Token, TokenFormat
 } from '../src/formatted-string';
-import { TokenText, TokenType } from '../src/formatted-string/types';
+import { TokenHashTag, TokenLink, TokenText, TokenType } from '../src/formatted-string/types';
 import parse, { ParserOptions } from '../src/parser';
 
 type StringFormat = [TokenFormat, string];
@@ -51,6 +51,18 @@ function repr(tokens: Token[]): string {
 
 function text(tokens: Token[]): string {
     return tokens.map(t => t.value).join('');
+}
+
+function emojiText(token: Token): string[] {
+    return token.emoji.map(e => token.value.substring(e.from, e.to));
+}
+
+function types(tokens: Token[]): TokenType[] {
+    return tokens.map(t => t.type);
+}
+
+function values(tokens: Token[]): string[] {
+    return tokens.map(t => t.value);
 }
 
 describe('Formatted String', () => {
@@ -220,8 +232,6 @@ describe('Formatted String', () => {
     });
 
     it('handle emoji in string', () => {
-        const emojiText = (token: TokenText) => token.emoji.map(e => token.value.substring(e.from, e.to));
-
         const tokens = parse('aaa 😍 bbb 😘😇 ccc 🤷🏼‍♂️ ddd');
         let text = tokens[0] as TokenText;
         equal(tokens.length, 1);
@@ -275,5 +285,102 @@ describe('Formatted String', () => {
 
         equal(tokens5.tokens[0].value, 'aaa 😍 bar😇 ccc 🤷🏼‍♂️ ddd');
         deepEqual(emojiText(tokens5.tokens[0] as TokenText), ['😍', '😇', '🤷🏼‍♂️']);
+    });
+
+    describe('Solid tokens', () => {
+        it('link', () => {
+            const source = parse('http://ok.ru mail.ru ');
+            source.push({
+                type: TokenType.Link,
+                format: 0,
+                sticky: false,
+                link: 'https://tamtam.chat',
+                value: 'Чат'
+            });
+            let link = source[2] as TokenLink;
+
+            equal(link.type, TokenType.Link);
+            equal(link.link, 'http://mail.ru');
+            equal(link.value, 'mail.ru');
+
+            // Модификация текста авто-ссылки: должны обновить и ссылку
+            const t1 = insertText(source, 17, '123', opt);
+            link = t1[2] as TokenLink;
+            equal(t1.length, 5);
+            equal(link.type, TokenType.Link);
+            equal(link.link, 'http://mail123.ru');
+            equal(link.value, 'mail123.ru');
+
+            // Модификация текста ссылки пользовательской ссылки: должны оставить ссылку
+            const t2 = insertText(source, 24, '123😈', opt);
+            link = t2[4] as TokenLink;
+            equal(t2.length, 5);
+            equal(link.type, TokenType.Link);
+            equal(link.link, 'https://tamtam.chat');
+            equal(link.value, 'Чат123😈');
+            deepEqual(emojiText(link), ['😈']);
+
+            // Удаляем символ, из-за чего ссылка становится невалидной
+            const t3 = removeText(source, 17, 1, opt);
+            const text = t3[1] as TokenText;
+            equal(t3.length, 3);
+            equal(text.type, TokenType.Text);
+            equal(text.value, ' mailru ');
+
+            // Удаляем содержимое кастомной ссылки: должны удалить сам токен
+            const t4 = removeText(source, 21, 3, opt);
+            deepEqual(types(t4), [TokenType.Link, TokenType.Text, TokenType.Link, TokenType.Text]);
+            deepEqual(values(t4), ['http://ok.ru', ' ', 'mail.ru', ' ']);
+
+            // Удаляем пересечение токенов
+            const t5 = removeText(source, 7, 9, opt);
+            link = t5[0] as TokenLink;
+            equal(link.link, 'http://l.ru');
+            equal(link.value, 'http://l.ru');
+            deepEqual(types(t5), [TokenType.Link, TokenType.Text, TokenType.Link]);
+            deepEqual(values(t5), ['http://l.ru', ' ', 'Чат']);
+
+            // Меняем формат у части строгой ссылки: меняем формат у всей ссылки
+            const t6 = setFormat(source, { add: TokenFormat.Bold }, 7, 2);
+            link = t6[0] as TokenLink;
+            equal(link.link, 'http://ok.ru');
+            equal(link.value, 'http://ok.ru');
+            equal(link.format, TokenFormat.Bold);
+            deepEqual(types(t6), [TokenType.Link, TokenType.Text, TokenType.Link, TokenType.Text, TokenType.Link]);
+            deepEqual(values(t6), ['http://ok.ru', ' ', 'mail.ru', ' ', 'Чат']);
+        });
+
+        it('hashtag', () => {
+            const source = parse('#foo #bar #baz', opt);
+            let hashtag = source[0] as TokenHashTag;
+            equal(hashtag.type, TokenType.HashTag);
+            equal(hashtag.hashtag, 'foo');
+            equal(hashtag.value, '#foo');
+
+            const t1 = insertText(source, 4, '123', opt);
+            hashtag = t1[0] as TokenHashTag;
+            equal(hashtag.type, TokenType.HashTag);
+            equal(hashtag.hashtag, 'foo123');
+            equal(hashtag.value, '#foo123');
+            deepEqual(types(t1), [TokenType.HashTag, TokenType.Text, TokenType.HashTag, TokenType.Text, TokenType.HashTag]);
+            deepEqual(values(t1), ['#foo123', ' ', '#bar', ' ', '#baz']);
+
+            // Удаляем символ, из-за чего хэштэг становится невалидным
+            const t2 = removeText(source, 5, 1, opt);
+            deepEqual(types(t2), [TokenType.HashTag, TokenType.Text, TokenType.HashTag]);
+            deepEqual(values(t2), ['#foo', ' bar ', '#baz']);
+
+            // Удаляем диапазон, два хэштэга сливаются в один
+            const t3 = removeText(source, 3, 3, opt);
+            deepEqual(types(t3), [TokenType.HashTag, TokenType.Text, TokenType.HashTag]);
+            deepEqual(values(t3), ['#fobar', ' ', '#baz']);
+
+            // Меняем форматирование у диапазона: так как хэштэг — это сплошной
+            // токен
+            const t4 = setFormat(source, { add: TokenFormat.Bold }, 3, 3);
+            deepEqual(types(t4), [TokenType.HashTag, TokenType.Text, TokenType.HashTag, TokenType.Text, TokenType.HashTag]);
+            deepEqual(values(t4), ['#foo', ' ', '#bar', ' ', '#baz']);
+            deepEqual(t4.map(t => t.format), [TokenFormat.Bold, TokenFormat.Bold, TokenFormat.Bold, TokenFormat.None, TokenFormat.None]);
+        });
     });
 });
