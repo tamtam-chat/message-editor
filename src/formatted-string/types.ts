@@ -41,6 +41,12 @@ export const enum TokenFormat {
 
     /** Моноширинный текст */
     Monospace = 1 << 4,
+
+    /** Важный текст/заголовок */
+    Important = 1 << 5,
+
+    /** Подсвеченный фрагмент текста */
+    Highlight = 1 << 6,
 }
 
 export type Token = TokenText | TokenLink | TokenUserSticker | TokenMention

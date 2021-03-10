@@ -293,3 +293,32 @@ export function isCommandName(ch: number): boolean {
 export function asciiToUpper(ch: number): number {
     return ch >= 97 && ch <= 122 ? ch & ~32 : ch;
 }
+
+export const codePointAt = String.prototype.codePointAt
+    ? nativeCodePointAt
+    : polyfillCodePointAt;
+
+/**
+ * Нативная реализация `String#codePointAt`
+ */
+function nativeCodePointAt(str: string, pos: number): number {
+    return str.codePointAt(pos);
+}
+
+function polyfillCodePointAt(str: string, pos: number): number {
+    const size = str.length;
+
+    if (pos < 0 || pos >= size) {
+        return undefined;
+    }
+
+    const first = str.charCodeAt(pos);
+
+    if (first >= 0xD800 && first <= 0xDBFF && size > pos + 1) {
+        const second = str.charCodeAt(pos + 1);
+        if (second >= 0xDC00 && second <= 0xDFFF) {
+            return (first - 0xD800) * 0x400 + second - 0xDC00 + 0x10000;
+        }
+    }
+    return first;
+}

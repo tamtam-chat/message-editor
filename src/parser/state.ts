@@ -1,7 +1,7 @@
 import { Token, TokenFormat } from '../formatted-string';
 import { Emoji, TokenMarkdown, TokenText, TokenType } from '../formatted-string/types';
 import { ParserOptions } from './types';
-import { isDelimiter, last } from './utils';
+import { isDelimiter, last, codePointAt } from './utils';
 
 type MatchFn = (ch: number) => boolean;
 export type Bracket = 'curly' | 'square' | 'round';
@@ -42,11 +42,6 @@ export default class ParserState {
     }
 
     /**
-     * Возвращает *code point* текущего символа парсера без смещения указателя
-     */
-    public peek: () => number;
-
-    /**
      * @param text Строка, которую нужно распарсить
      * @param pos Позиция, с которой нужно начинать парсинг
      */
@@ -54,9 +49,13 @@ export default class ParserState {
         this.string = str;
         this.options = options;
         this.pos = pos;
-        this.peek = String.prototype.codePointAt
-            ? () => nativeCodePointAt(this.string, this.pos)
-            : () => polyfillCodePointAt(this.string, this.pos);
+    }
+
+    /**
+     * Возвращает *code point* текущего символа парсера без смещения указателя
+     */
+    peek(): number {
+        return codePointAt(this.string, this.pos);
     }
 
     /**
@@ -268,29 +267,4 @@ export default class ParserState {
         this.pos += code > 0xFFFF ? 2 : 1;
         return code;
     }
-}
-
-/**
- * Нативная реализация `String#codePointAt`
- */
-function nativeCodePointAt(str: string, pos: number): number {
-    return str.codePointAt(pos);
-}
-
-function polyfillCodePointAt(str: string, pos: number): number {
-    const size = str.length;
-
-    if (pos < 0 || pos >= size) {
-        return undefined;
-    }
-
-    const first = str.charCodeAt(pos);
-
-    if (first >= 0xD800 && first <= 0xDBFF && size > pos + 1) {
-        const second = str.charCodeAt(pos + 1);
-        if (second >= 0xDC00 && second <= 0xDFFF) {
-            return (first - 0xD800) * 0x400 + second - 0xDC00 + 0x10000;
-        }
-    }
-    return first;
 }
