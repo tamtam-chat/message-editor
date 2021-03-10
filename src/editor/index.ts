@@ -74,7 +74,6 @@ export default class Editor {
         // Если сработало событие input, значит, мы не смогли самостоятельно
         // обработать ввод. Попробуем его вычислить
         const range = getTextRange(this.elem);
-
         if (range && isCollapsed(range)) {
             const payload = diffAction(this.getValue(), this.getInputText());
             if (!payload) {
@@ -172,7 +171,14 @@ export default class Editor {
     set model(value: Model) {
         if (this._model !== value) {
             this._model = value;
+            // При рендеринге может слететь позиция курсора, поэтому после рендеринга
+            // проверим: если она поменялась, то восстановим
+            const prev = getTextRange(this.elem);
             render(this.elem, value);
+
+            if (prev) {
+                this.setSelection(prev[0], prev[1]);
+            }
         }
     }
 

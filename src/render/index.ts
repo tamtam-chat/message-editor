@@ -49,7 +49,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
         ...opt,
         emojiUrl: debugEmojiUrl,
         userEmojiUrl: id => `//i.mycdn.me/getSmile?smileId=${id}`,
-        fixTrailingLine: false
+        fixTrailingLine: true
     };
     const state = new ReconcileState(elem, options);
 
@@ -110,7 +110,7 @@ function renderText(token: Token, elem: HTMLElement, options: RenderOptions): vo
             const src = options.emojiUrl(emoji);
             if (img.getAttribute('src') !== src) {
                 img.setAttribute('src', src);
-                img.setAttribute('data-raw', token.value);
+                img.setAttribute('data-raw', rawEmoji);
                 img.alt = rawEmoji;
             }
 
@@ -239,7 +239,7 @@ class ReconcileState {
      * Удаляет все дочерние элементы контейнера, которые находятся правее точки `pos`
      */
     trim(): void {
-        while (this.pos < this.container.childNodes.length - 1) {
+        while (this.pos < this.container.childNodes.length) {
             this.container.childNodes[this.pos].remove();
         }
     }

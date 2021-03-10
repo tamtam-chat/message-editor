@@ -15,6 +15,37 @@
         border-radius: 5px;
         margin: 20px auto;
         max-width: 600px;
+        white-space: pre-wrap;
+    }
+
+    .editor img {
+        width: 20px;
+        height: 20px;
+        width: 1em;
+        height: 1em;
+        font-size: 20px;
+        vertical-align: -.2em;
+        margin: -1px 0;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .italic {
+        font-style: italic;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    .strike {
+        text-decoration: line-through;
+    }
+
+    .monospace {
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
     }
     </style>
 </head>
@@ -23,8 +54,10 @@
 <script type="module">
 import Editor from './dist/editor.js';
 const elem = document.querySelector('.editor');
-const editor = new Editor(elem);
+const editor = new Editor(elem, { value: 'hello tamtam.chat world!' });
 elem.focus();
+
+window.editor = editor;
 </script>
 </body>
 </html>

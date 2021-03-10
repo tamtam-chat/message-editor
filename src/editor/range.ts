@@ -87,7 +87,7 @@ export function locationToRange(ctx: HTMLElement, from: number, to?: number): Ra
  */
 export function rangeBoundToLocation(root: HTMLElement, container: Node, offset: number): number {
     // Пройдёмся по всем текстовым потомкам, пока не найдём нужный
-    const walker = root.ownerDocument.createTreeWalker(container, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
     let pos = 0;
     let node: Node;
 
@@ -115,10 +115,22 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
     let container: Node;
 
     while (container = walker.nextNode()) {
-        len =  getNodeLength(container);
+        len = getNodeLength(container);
 
         if (pos <= len) {
-            return { container, offset: pos };
+            if (isText(container)) {
+                return { container, offset: pos };
+            }
+
+            // Если попали в элемент (например, эмоджи), делаем адресацию относительно
+            // его родителя
+            let offset = 1;
+            let node = container;
+            while (node = node.previousSibling) {
+                offset++;
+            }
+
+            return { container: container.parentNode, offset };
         }
 
         pos -= len;
@@ -188,7 +200,7 @@ function isEmoji(node: Node): node is HTMLElement {
  * Возвращает текстовую длину указанного узла
  */
 function getNodeLength(node: Node): number {
-    if (node.nodeType === Node.TEXT_NODE) {
+    if (isText(node)) {
         return node.nodeValue.length;
     }
 
@@ -197,4 +209,8 @@ function getNodeLength(node: Node): number {
     }
 
     return 0;
+}
+
+function isText(node: Node): node is Text {
+    return node.nodeType === Node.TEXT_NODE;
 }
