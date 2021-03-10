@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
-    "module": "CommonJS",
+    "target": "esnext",
+    "module": "ESNext",
     "lib": ["ES2016", "DOM", "DOM.Iterable"],
     "moduleResolution": "node",
     "allowJs": true,
