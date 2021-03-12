@@ -1,6 +1,6 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
 import {
-    createToken as token, insertText, removeText, setFormat, slice, cutText,
+    createToken as token, insertText, removeText, setFormat, slice, cutText, setLink,
     Token, TokenFormat
 } from '../src/formatted-string';
 import { TokenHashTag, TokenLink, TokenText, TokenType } from '../src/formatted-string/types';
@@ -340,6 +340,71 @@ describe('Formatted String', () => {
         const t4_2 = insertText(t4_1, 13, 'a', opt);
         deepEqual(types(t4_2), [TokenType.Text, TokenType.Link]);
         deepEqual(values(t4_2), ['test ', 'mail.ru?a']);
+    });
+
+    it('set link', () => {
+        let link: TokenLink;
+        const url = 'https://tamtam.chat';
+        const url2 = 'https://ok.ru';
+        let tokens = setFormat(parse('regular bold mail.ru', opt), { add: TokenFormat.Bold }, 8, 4);
+
+        const t1 = setLink(tokens, url, 0, 7);
+        link = t1[0] as TokenLink;
+        deepEqual(types(t1), [TokenType.Link, TokenType.Text, TokenType.Text, TokenType.Text, TokenType.Link]);
+        deepEqual(values(t1), ['regular', ' ', 'bold', ' ', 'mail.ru']);
+        equal(link.auto, false);
+        equal(link.value, 'regular');
+        equal(link.link, url);
+
+        // Добавляем ссылку двум словам с разным форматом
+        const t2 = setLink(tokens, url, 0, 12);
+        deepEqual(types(t2), [TokenType.Link, TokenType.Link, TokenType.Text, TokenType.Link]);
+        deepEqual(values(t2), ['regular ', 'bold', ' ', 'mail.ru']);
+        link = t2[0] as TokenLink;
+        equal(link.auto, false);
+        equal(link.value, 'regular ');
+        equal(link.format, TokenFormat.None);
+
+        link = t2[1] as TokenLink;
+        equal(link.auto, false);
+        equal(link.value, 'bold');
+        equal(link.format, TokenFormat.Bold);
+
+        // Добавляем ссылку поверх другой ссылки
+        const t3 = setLink(t2, url2, 3, 7);
+        deepEqual(types(t3), [TokenType.Link, TokenType.Link, TokenType.Link, TokenType.Link, TokenType.Text, TokenType.Link]);
+        deepEqual(values(t3), ['reg', 'ular ', 'bo', 'ld', ' ', 'mail.ru']);
+
+        link = t3[0] as TokenLink;
+        equal(link.value, 'reg');
+        equal(link.link, url);
+        equal(link.format, TokenFormat.None);
+
+        link = t3[1] as TokenLink;
+        equal(link.value, 'ular ');
+        equal(link.link, url2);
+        equal(link.format, TokenFormat.None);
+
+        link = t3[2] as TokenLink;
+        equal(link.value, 'bo');
+        equal(link.link, url2);
+        equal(link.format, TokenFormat.Bold);
+
+        link = t3[3] as TokenLink;
+        equal(link.value, 'ld');
+        equal(link.link, url);
+        equal(link.format, TokenFormat.Bold);
+
+        // Удаление ссылки
+        const t4 = setLink(t3, null, 0, 10);
+        deepEqual(types(t4), [TokenType.Text, TokenType.Text, TokenType.Link, TokenType.Text, TokenType.Link]);
+        deepEqual(values(t4), ['regular ', 'bo', 'ld', ' ', 'mail.ru']);
+
+        // Ссылка поверх сплошного токена
+        tokens = parse('text1 @user text2', opt);
+        const t5 = setLink(tokens, url, 2, 12);
+        deepEqual(types(t5), [TokenType.Text, TokenType.Link, TokenType.Mention, TokenType.Link, TokenType.Text]);
+        deepEqual(values(t5), ['te', 'xt1 ', '@user', ' te', 'xt2']);
     });
 
     describe('Solid tokens', () => {

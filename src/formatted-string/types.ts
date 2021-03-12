@@ -131,11 +131,6 @@ export interface TokenFormatUpdate {
     add?: TokenFormat;
     /** Типы форматирования, которые надо удалить */
     remove?: TokenFormat;
-    /**
-     * Тип форматирования, которые надо применить. Если указан, параметры `add`
-     * и `remove` не используются
-     */
-    set?: TokenFormat;
 }
 
 export interface Emoji {
