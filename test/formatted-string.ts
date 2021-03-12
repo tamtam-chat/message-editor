@@ -186,6 +186,30 @@ describe('Formatted String', () => {
 
         const t9 = insertText(setFormat(t8, { add: TokenFormat.Bold }, 3), 3, '123', opt);
         equal(repr(t9), '<i>aa </i><bi>123</bi><i>bb</i> cc dd');
+
+        // Убираем форматирование в точке и дописываем текст
+        const t10 = setFormat(tokens, { add: TokenFormat.Bold }, 3, 5);
+        equal(repr(t10), 'aa <b>bb cc</b> dd');
+
+        const t10_1 = setFormat(t10, { remove: TokenFormat.Bold }, 6);
+        equal(repr(t10_1), 'aa <b>bb </b><b>cc</b> dd');
+
+        const t10_2 = insertText(t10_1, 6, 'f', opt);
+        equal(repr(t10_2), 'aa <b>bb </b>f<b>cc</b> dd');
+        const t10_3 = insertText(t10_2, 7, 'f', opt);
+        equal(repr(t10_3), 'aa <b>bb </b>ff<b>cc</b> dd');
+
+        // Добавляем sticky в конце фрагмента с форматированием
+        const t11 = setFormat(tokens, { add: TokenFormat.Bold }, 3, 5);
+        equal(repr(t11), 'aa <b>bb cc</b> dd');
+
+        const t11_1 = setFormat(t11, { remove: TokenFormat.Bold }, 8);
+        equal(repr(t11_1), 'aa <b>bb cc</b> dd');
+
+        const t11_2 = insertText(t11_1, 8, 'f', opt);
+        equal(repr(t11_2), 'aa <b>bb cc</b>f dd');
+        const t11_3 = insertText(t11_2, 9, 'f', opt);
+        equal(repr(t11_3), 'aa <b>bb cc</b>ff dd');
     });
 
     it('slice tokens', () => {
@@ -287,6 +311,37 @@ describe('Formatted String', () => {
         deepEqual(emojiText(tokens5.tokens[0] as TokenText), ['😍', '😇', '🤷🏼‍♂️']);
     });
 
+    it('edit edge cases', () => {
+        let tokens = [
+            token('foo '),
+            token('bar', TokenFormat.Bold | TokenFormat.Italic),
+            token(' ', TokenFormat.Bold),
+            token(' baz',),
+        ];
+
+        // Удаляем текст на границе форматов
+        const t1 = removeText(tokens, 8, 1, opt);
+        equal(repr(t1), 'foo <bi>bar</bi><b> </b>baz');
+
+        const t2 = removeText(t1, 7, 1, opt);
+        equal(repr(t2), 'foo <bi>bar</bi>baz');
+
+        // Меняем формат у неразрывного токена
+        tokens = parse('foo @bar', opt);
+        const t3 = setFormat(tokens, { add: TokenFormat.Bold }, 6);
+        equal(repr(t3), 'foo <b>@bar</b>');
+
+        // Дописываем текст к ссылке
+        tokens = parse('test mail.ru', opt);
+        const t4_1 = insertText(tokens, 12, '?', opt);
+        deepEqual(types(t4_1), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(t4_1), ['test ', 'mail.ru', '?']);
+
+        const t4_2 = insertText(t4_1, 13, 'a', opt);
+        deepEqual(types(t4_2), [TokenType.Text, TokenType.Link]);
+        deepEqual(values(t4_2), ['test ', 'mail.ru?a']);
+    });
+
     describe('Solid tokens', () => {
         it('link', () => {
             const source = parse('http://ok.ru mail.ru ');
@@ -295,6 +350,7 @@ describe('Formatted String', () => {
                 format: 0,
                 sticky: false,
                 link: 'https://tamtam.chat',
+                auto: false,
                 value: 'Чат'
             });
             let link = source[2] as TokenLink;

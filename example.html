@@ -10,8 +10,7 @@
         font-family: 'PT Sans', Arial, sans-serif;
         font-size: 20px;
         padding: 10px;
-        border: 1px solid #ccc;
-        box-shadow: 2px 2ps 10px rgba(0, 0, 0, 0.5);
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
         border-radius: 5px;
         margin: 20px auto;
         max-width: 600px;
@@ -24,7 +23,7 @@
         width: 1em;
         height: 1em;
         font-size: 20px;
-        vertical-align: -.2em;
+        vertical-align: -.1em;
         margin: -1px 0;
     }
 
@@ -47,6 +46,26 @@
     .monospace {
         font-family: 'JetBrains Mono', 'Fira Code', monospace;
     }
+
+    .mention {
+        display: inline-block;
+        padding: 2px 11px;
+        margin: -2px 0;
+        border-radius: 1em;
+        color: #fff;
+        background: #ff4ae8;
+        text-decoration: none;
+    }
+
+    .hashtag {
+        color: #999;
+        text-decoration: none;
+    }
+
+    .command {
+        color: green;
+        text-decoration: none;
+    }
     </style>
 </head>
 <body>
@@ -54,7 +73,17 @@
 <script type="module">
 import Editor from './dist/editor.js';
 const elem = document.querySelector('.editor');
-const editor = new Editor(elem, { value: 'hello tamtam.chat world!' });
+const editor = new Editor(elem, {
+    value: 'foo 🙈',
+    parse: {
+        textEmoji: true,
+        hashtag: true,
+        mention: true,
+        command: true,
+        userSticker: true,
+        link: true,
+    }
+});
 elem.focus();
 
 window.editor = editor;

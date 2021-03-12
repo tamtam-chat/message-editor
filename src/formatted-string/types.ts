@@ -82,14 +82,17 @@ export interface TokenLink extends TokenBase {
     link: string;
 
     /**
+     * Флаг, означающий, что ссылка была автоматически распознана в тексте,
+     * а не добавлена пользователем.
+     */
+    auto: boolean;
+
+    /**
      * Признак, указывающий, что при добавлении текста точно на границу текущего
      * и предыдущего токена, текст будет добавлен именно в текущий, а не в
      * предыдущий токен
      */
     sticky: boolean;
-
-    /** Список эмоджи токена */
-    emoji?: Emoji[];
 }
 
 export interface TokenUserSticker extends TokenBase {

@@ -91,6 +91,12 @@ function testLink(link: string, isEmail = false) {
     deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" before questions sign at the end of sentence`);
     deepEqual(values(tokens), ['Have you seen ', link, '?'], `Values: "${link}" before questions sign at the end of sentence`);
     validate(1);
+
+    // Точка в конце предложения
+    tokens = parse(`Go to ${link}.`);
+    deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" before period at the end of sentence`);
+    deepEqual(values(tokens), ['Go to ', link, '.'], `Values: "${link}" before period at the end of sentence`);
+    validate(1);
 }
 
 describe('Link', () => {
@@ -191,5 +197,9 @@ describe('Link', () => {
         for (const url of urls) {
             testLink(url, false);
         }
+    });
+
+    it.skip('debug', () => {
+        console.log(parse(`Go to mail.ru.`));
     });
 });

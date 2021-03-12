@@ -10,7 +10,7 @@
 
 import ParserState, { Bracket } from './state';
 import { consumeTree, createTree } from './tree';
-import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, toCode } from './utils';
+import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, isDelimiter, toCode } from './utils';
 import { keycap } from './emoji';
 import tld from '../data/tld';
 import { TokenFormat, TokenLink, TokenType } from '../formatted-string/types';
@@ -285,6 +285,10 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
             trailingPrintable = true;
         } else {
             if (_dot && state.consume(Codes.Dot)) {
+                if (isDelimiter(state.peek())) {
+                    state.pos--;
+                    break;
+                }
                 if (pos === labelStart) {
                     // Лэйбл не может начинаться с точки
                     state.pos = pos;
@@ -612,6 +616,7 @@ function linkToken(value: string, link: string): TokenLink {
         format: TokenFormat.None,
         value,
         link,
+        auto: true,
         sticky: false
     };
 }

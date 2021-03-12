@@ -55,6 +55,10 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
 
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
+        if (!token.value) {
+            continue;
+        }
+
         const elem = renderTokenContainer(token, state);
         const groupEnd = nextInGroup(tokens, i);
         if (groupEnd !== i) {
@@ -79,7 +83,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
         }
     }
 
-    if  (options.fixTrailingLine && tokens.length) {
+    if (options.fixTrailingLine && tokens.length) {
         const lastToken = tokens[tokens.length - 1];
         if (lastToken.value.slice(-1) === '\n') {
             state.text('\n');

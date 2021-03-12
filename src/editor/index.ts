@@ -44,15 +44,13 @@ export default class Editor {
     private caret: TextRange = [0, 0];
 
     private onKeyPress = (evt: KeyboardEvent) => {
-        // NB Firefox также добавляет `.key` на системные клавиши, типа `ArrowDown`,
-        // поэтому фильтруем событие по `.charCode`
         if (!evt.defaultPrevented && isInputEvent(evt)) {
             const range = getTextRange(this.elem);
 
             if (range) {
                 // Перехватываем keypress, что бы потом красиво и плавно всё вставить
                 this.inputHandled = true;
-                const text = evt.key;
+                const text = getTextFromKeyboardEvent(evt);
 
                 if (this.pendingUpdate) {
                     this.pendingUpdate.text += text;
@@ -67,6 +65,7 @@ export default class Editor {
         // Обрабатываем перехваченный ввод — превентим, если был перехват
         if (this.inputHandled) {
             this.inputHandled = false;
+
             this.scheduleUpdate();
             return;
         }
@@ -231,21 +230,26 @@ export default class Editor {
      * Вставляет текст в указанную позицию
      */
     insertText(pos: number, text: string): Model {
-        return this.updateModel(
+        const result = this.updateModel(
             insertText(this.model, pos, text, this.options.parse),
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
+        this.setSelection(pos + text.length);
+        return result;
     }
 
     /**
      * Удаляет указанный диапазон текста
      */
     removeText(from: number, to: number): Model {
-        return this.updateModel(
+        const result = this.updateModel(
             removeText(this.model, from, to - from, this.options.parse),
             DiffActionType.Remove,
             [from, to]);
+
+        this.setSelection(from);
+        return result;
     }
 
     /**
@@ -311,9 +315,10 @@ export default class Editor {
         }
 
         const fragment = this.slice(from, to);
-        if (fragment.length) {
-            const first = fragment[0];
-            const update: TokenFormatUpdate = first.format & format
+        const source = fragment.length ? fragment[0] : this.tokenForPos(from);
+
+        if (source) {
+            const update: TokenFormatUpdate = source.format & format
                 ? { remove: format } : { add: format };
             return this.updateFormat(update, from, to);
         }
@@ -337,6 +342,26 @@ export default class Editor {
      */
     slice(from: number, to?: number): Token[] {
         return slice(this.model, from, to);
+    }
+
+    /**
+     * Возвращает токен для указанной позиции
+     */
+    tokenForPos(pos: number): Token | undefined {
+        let offset = 0;
+        const { model } = this;
+        for (let i = 0, token: Token; i < model.length; i++) {
+            token = model[i];
+            if (pos >= offset && pos < offset + token.value.length) {
+                return token;
+            }
+            offset += token.value.length;
+        }
+
+        if (offset === pos) {
+            // Указали самый конец строки — вернём последний токен
+            return model[model.length - 1];
+        }
     }
 
     /**
@@ -488,4 +513,8 @@ function isInputEvent(evt: KeyboardEvent): boolean {
 
 function isCollapsed(range: TextRange): boolean {
     return range[0] === range[1];
+}
+
+function getTextFromKeyboardEvent(evt: KeyboardEvent): string {
+    return evt.key === 'Enter' ? '\n' : evt.key;
 }

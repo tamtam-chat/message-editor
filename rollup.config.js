@@ -14,7 +14,14 @@ export default {
     plugins: [
         resolve({ browser: true }),
         commonjs(),
-        typescript(),
+        typescript({
+            tsconfigOverride: {
+                compilerOptions: {
+                    target: 'esnext',
+                    module: 'ESNext',
+                }
+            }
+        }),
         production && terser({
             module: true
         })

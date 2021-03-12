@@ -10,7 +10,7 @@ function parse(text: string) {
         command: true,
         hashtag: true,
         link: true,
-        textEmoji: true,
+        textEmoji: false,
     });
 }
 
@@ -88,7 +88,7 @@ describe('Markdown', () => {
     });
 
     it.skip('debug', () => {
-        const tokens = parse('(_italic_)');
-        console.log(tokens);
+        const tokens = parse('-_-');
+        console.log(tokens[0]);
     });
 });

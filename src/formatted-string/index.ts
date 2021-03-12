@@ -78,10 +78,29 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         return tokens;
     }
 
-    const startToken = tokens[start.index];
+    const prefix = tokens.slice(0, start.index);
+    const suffix = tokens.slice(end.index + 1);
     const endToken = tokens[end.index];
-    const nextValue = startToken.value.slice(0, start.offset)
+    let startToken = tokens[start.index];
+    let textBound = start.offset + value.length;
+    let nextValue = startToken.value.slice(0, start.offset)
         + value + endToken.value.slice(end.offset);
+
+
+    // Разбираем пограничный случай: есть автоссылка `mail.ru`, мы дописали в конец
+    // `?` – вопрос останется текстом, так как это знак препинания в конце предложения.
+    // Но если продолжим писать текст, например, `foo`, то `mail.ru?foo` должен
+    // стать ссылкой. Поэтому если текущий токен у нас текст и ему предшествует
+    // автоссылка, нужно заново распарсить весь фрагмент со ссылкой
+    if (startToken.type === TokenType.Text && start.index > 0 && isAutoLink(tokens[start.index - 1])) {
+        const prev = tokens[start.index - 1] as TokenLink;
+        nextValue = prev.value + nextValue;
+        textBound += prev.value.length;
+        start.index--;
+        start.offset = 0;
+        startToken = prefix.pop();
+    }
+
     let nextTokens = parse(nextValue, options);
 
     if (nextTokens.length) {
@@ -105,19 +124,14 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         // Применяем форматирование из концевых токенов, но только если можем
         // сделать это безопасно: применяем только для текста
         if (startToken.format !== endToken.format) {
-            const pos = start.offset + value.length;
-            const splitPoint = tokenForPos(nextTokens, pos);
-            if (splitPoint.index !== -1 && pos !== nextValue.length && nextTokens.slice(splitPoint.index).every(t => t.type === TokenType.Text)) {
-                nextTokens = setFormat(nextTokens, { set: endToken.format }, pos, nextValue.length - pos);
+            const splitPoint = tokenForPos(nextTokens, textBound);
+            if (splitPoint.index !== -1 && textBound !== nextValue.length && nextTokens.slice(splitPoint.index).every(t => t.type === TokenType.Text)) {
+                nextTokens = setFormat(nextTokens, { set: endToken.format }, textBound, nextValue.length - textBound);
             }
         }
     }
 
-    return normalize([
-        ...tokens.slice(0, start.index),
-        ...nextTokens,
-        ...tokens.slice(end.index + 1)
-    ]);
+    return normalize([...prefix, ...nextTokens, ...suffix]);
 }
 
 /**
@@ -346,7 +360,7 @@ export function tokenForPos(tokens: Token[], offset: number, solid?: boolean): T
  * типы форматирования.
  */
 function applyFormat(format: TokenFormat, update: TokenFormatUpdate): TokenFormat {
-    if (update.set) {
+    if (update.set != null) {
         return update.set;
     }
 
@@ -411,13 +425,15 @@ function allowJoin(token1: Token, token2: Token): boolean {
  * ссылка отличается от содержимого токена
  */
 function isCustomLink(token: Token): token is TokenLink {
-    if (token.type === TokenType.Link && token.link !== token.value) {
-        // Если ссылки не равны, это не значит, что они разные: это может быть ссылка
-        // без протокола
-        return normalizeUrl(token.value) !== normalizeUrl(token.link);
+    return token.type === TokenType.Link && !token.auto;
+}
 
-    }
-    return false;
+/**
+ * Проверяет, что указанный токен — это автоссылка, то есть автоматически
+ * распарсилась из текста
+ */
+function isAutoLink(token: Token): token is TokenLink {
+    return token.type === TokenType.Link && token.auto;
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
@@ -450,19 +466,6 @@ function sliceEmoji(emoji: Emoji[] | undefined, from: number, to: number): Emoji
     }
 
     return result.length ? shiftEmoji(result, -from) : undefined;
-}
-
-/**
- * Нормализация ссылки для сравнения
- */
-function normalizeUrl(url: string): string {
-    if (/^\/\//.test(url)) {
-        url = 'http:' + url;
-    } else if (!/^[a-z0-9-]+:/i.test(url)) {
-        url = 'http://' + url;
-    }
-
-    return url.toLowerCase();
 }
 
 /**

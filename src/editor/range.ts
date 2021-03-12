@@ -87,12 +87,16 @@ export function locationToRange(ctx: HTMLElement, from: number, to?: number): Ra
  */
 export function rangeBoundToLocation(root: HTMLElement, container: Node, offset: number): number {
     // Пройдёмся по всем текстовым потомкам, пока не найдём нужный
-    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    const walker = createWalker(root);
     let pos = 0;
     let node: Node;
 
     while (node = walker.nextNode()) {
         if (node === container) {
+            if (node.nodeName === 'IMG') {
+                pos += getNodeLength(node);
+            }
+
             pos += offset;
             break;
         }
@@ -110,7 +114,7 @@ export function rangeBoundToLocation(root: HTMLElement, container: Node, offset:
  * для узла модели
  */
 export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound {
-    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    const walker = createWalker(root);
     let len: number
     let container: Node;
 
@@ -213,4 +217,8 @@ function getNodeLength(node: Node): number {
 
 function isText(node: Node): node is Text {
     return node.nodeType === Node.TEXT_NODE;
+}
+
+function createWalker(elem: HTMLElement): TreeWalker {
+    return elem.ownerDocument.createTreeWalker(elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT)
 }
