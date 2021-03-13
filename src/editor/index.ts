@@ -33,8 +33,8 @@ const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
     'Cmd+B': editor => editor.toggleFormat(TokenFormat.Bold),
     'Cmd+I': editor => editor.toggleFormat(TokenFormat.Italic),
     'Cmd+U': editor => editor.toggleFormat(TokenFormat.Strike),
-    'Cmd+M': editor => editor.toggleFormat(TokenFormat.Monospace),
-    'Cmd+L': editor => {
+    'Cmd+K': editor => editor.toggleFormat(TokenFormat.Monospace),
+    'Ctrl+L': editor => {
         const [from, to] = editor.getSelection();
         const token = editor.tokenForPos(from);
         const url = prompt('Введите ссылку', token?.type === TokenType.Link ? token.link : undefined);
@@ -331,8 +331,10 @@ export default class Editor {
         if (url) {
             url = url.trim();
         }
-        return this.updateModel(
+        const result = this.updateModel(
             setLink(this.model, url, from, to - from), 'link', [from, to]);
+        this.setSelection(from, to);
+        return result;
     }
 
     /**
