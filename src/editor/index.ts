@@ -4,8 +4,9 @@ import { TextRange } from '../types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
 import diffAction, { DiffActionType } from './diff';
-import { cutText, getLength, insertText, removeText, replaceText, setFormat, slice, TokenFormatUpdate } from '../formatted-string';
+import { cutText, getLength, insertText, removeText, replaceText, setFormat, setLink, slice, TokenFormatUpdate } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
+import { TokenType } from '../formatted-string/types';
 
 export interface EditorOptions {
     /** Значение по умолчанию для редактора */
@@ -32,6 +33,13 @@ const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
     'Cmd+B': editor => editor.toggleFormat(TokenFormat.Bold),
     'Cmd+I': editor => editor.toggleFormat(TokenFormat.Italic),
     'Cmd+U': editor => editor.toggleFormat(TokenFormat.Strike),
+    'Cmd+M': editor => editor.toggleFormat(TokenFormat.Monospace),
+    'Cmd+L': editor => {
+        const [from, to] = editor.getSelection();
+        const token = editor.tokenForPos(from);
+        const url = prompt('Введите ссылку', token?.type === TokenType.Link ? token.link : undefined);
+        editor.setLink(url, from, to);
+    },
 };
 
 export default class Editor {
@@ -281,17 +289,6 @@ export default class Editor {
     }
 
     /**
-     * Отменить последнее действие
-     */
-    undo(): HistoryEntry<Model> | undefined {
-        if (this.history.canUndo) {
-            const entry = this.history.undo();
-            this.updateModel(entry.state, false);
-            return entry;
-        }
-    }
-
-    /**
      * Обновляет форматирование у указанного диапазона
      */
     updateFormat(format: TokenFormatUpdate, from: number, to = from): Model {
@@ -324,6 +321,29 @@ export default class Editor {
         }
 
         return this.model;
+    }
+
+    /**
+     * Ставит ссылку на `url` на указанный диапазон. Если `url` пустой или равен
+     * `null`, удаляет ссылку с указанного диапазона
+     */
+    setLink(url: string | null, from: number, to = from): Model {
+        if (url) {
+            url = url.trim();
+        }
+        return this.updateModel(
+            setLink(this.model, url, from, to - from), 'link', [from, to]);
+    }
+
+    /**
+     * Отменить последнее действие
+     */
+    undo(): HistoryEntry<Model> | undefined {
+        if (this.history.canUndo) {
+            const entry = this.history.undo();
+            this.updateModel(entry.state, false);
+            return entry;
+        }
     }
 
     /**
