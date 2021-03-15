@@ -170,15 +170,34 @@ function setTextValue(node: Node, text: string): void {
         // В элементе могут быть в том числе картинки с эмоджи, которые не отобразятся
         // в node.textContent. Поэтому сделаем проверку: если есть потомок и
         // он только один, то меняем `textContent`, иначе очищаем узел
-        const children = node.childNodes;
-        if (children.length > 1 || (children.length === 1 && isElement(children[0]))) {
-            while (node.firstChild) {
-                node.firstChild.remove();
+        let ptr = node.firstChild;
+        let next: ChildNode;
+        let updated = false;
+
+        // Чтобы меньше моргала подсветка спеллчекера, попробуем
+        // найти ближайший текстовый узел и обновить его, попутно удаляя все
+        // промежуточные узлы
+        while (ptr) {
+            if (ptr.nodeType === Node.TEXT_NODE) {
+                setTextValue(ptr, text);
+                updated = true;
+
+                // Удаляем оставшиеся узлы
+                while (ptr.nextSibling) {
+                    ptr.nextSibling.remove();
+                }
+                break;
+            } else {
+                next = ptr.nextSibling;
+                ptr.remove();
+                ptr = next;
             }
         }
-    }
 
-    if (node.textContent !== text) {
+        if (!updated) {
+            node.textContent = text;
+        }
+    } else if (node.textContent !== text) {
         node.textContent = text;
     }
 }

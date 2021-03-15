@@ -103,6 +103,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
                     pos: from,
                     text: value.slice(from, from + (value.length - inputValue.length))
                 }
+                this.pendingDelete = null;
             } else {
                 payload = diffAction(value, inputValue);
             }
