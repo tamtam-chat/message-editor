@@ -492,7 +492,7 @@ function splitToken<T extends Token>(token: T, pos: number): [T, T] {
  * Проверяет, что указанный токен является пользовательской ссылкой, то есть
  * ссылка отличается от содержимого токена
  */
-function isCustomLink(token: Token): token is TokenLink {
+export function isCustomLink(token: Token): token is TokenLink {
     return token.type === TokenType.Link && !token.auto;
 }
 
@@ -500,7 +500,7 @@ function isCustomLink(token: Token): token is TokenLink {
  * Проверяет, что указанный токен — это автоссылка, то есть автоматически
  * распарсилась из текста
  */
-function isAutoLink(token: Token): token is TokenLink {
+export function isAutoLink(token: Token): token is TokenLink {
     return token.type === TokenType.Link && token.auto;
 }
 

@@ -6,7 +6,7 @@ import { getTextRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
 import {
     cutText, getLength, insertText, removeText, replaceText, setFormat, setLink,
-    slice, clamp, TokenFormatUpdate
+    slice, clamp, isCustomLink, TokenFormatUpdate
 } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { TokenType } from '../formatted-string/types';
@@ -164,7 +164,7 @@ export default class Editor {
     /**
      * Обработка события вставки текста
      */
-    private onPaste(evt: ClipboardEvent) {
+    private onPaste = (evt: ClipboardEvent) => {
         const range = getTextRange(this.elem);
         let fragment: string | Token[] = evt.clipboardData.getData(fragmentMIME);
 
@@ -306,9 +306,25 @@ export default class Editor {
      */
     paste(text: string | Model, from: number, to: number): Model {
         const value = typeof text === 'string' ? text : getText(text);
-        const next = replaceText(this.model, from, to - from, value, this.options.parse);
+        let next = replaceText(this.model, from, to - from, value, this.options.parse);
 
-        // TODO применить форматирование и типы из вставляемых токенов
+        // Применяем форматирование из фрагмента
+        if (Array.isArray(text)) {
+            let offset = from;
+            text.forEach(token => {
+                const len = token.value.length;
+                if (token.format) {
+                    next = setFormat(next, { add: token.format }, offset, len);
+                }
+
+                if (isCustomLink(token)) {
+                    next = setLink(next, token.link, offset, len)
+                }
+
+                offset += len;
+            });
+        }
+
         return this.updateModel(next, 'paste', [from, to]);
     }
 
