@@ -1,3 +1,4 @@
+import EventEmitter from 'eventemitter3';
 import parse, { ParserOptions, Token, TokenFormat } from '../parser';
 import render from '../render';
 import { TextRange } from '../types';
@@ -26,6 +27,12 @@ interface PendingUpdate {
 
 type Model = Token[];
 
+interface EditorEvents {
+    update(editor: Editor): void;
+    selectionchange(editor: Editor): void;
+    formatchange(editor: Editor): void;
+}
+
 /** MIME-тип для хранения отформатированной строки в буффере */
 const fragmentMIME = 'tamtam/fragment';
 
@@ -45,7 +52,7 @@ const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
     },
 };
 
-export default class Editor {
+export default class Editor extends EventEmitter<EditorEvents> {
     public shortcuts: Shortcuts<Editor>;
 
     private _model: Model;
@@ -128,6 +135,7 @@ export default class Editor {
 
         if (range) {
             this.saveSelection(range);
+            this.emit('selectionchange', this);
         }
     }
 
@@ -191,6 +199,7 @@ export default class Editor {
      * @param elem Контейнер, в котором будет происходить редактирование
      */
     constructor(public elem: HTMLElement, public options: EditorOptions = {}) {
+        super();
         this.model = parse(options.value || '', options.parse);
         this.history = new History({
             compactActions: [DiffActionType.Insert, DiffActionType.Remove]
@@ -210,6 +219,7 @@ export default class Editor {
             // При рендеринге может слететь позиция курсора, поэтому после рендеринга
             // проверим: если она поменялась, то восстановим
             render(this.elem, value);
+            this.emit('update', this);
         }
     }
 
@@ -346,6 +356,7 @@ export default class Editor {
             [from, to]
         );
         setRange(this.elem, from, to);
+        this.emit('formatchange', this);
         return result;
     }
 

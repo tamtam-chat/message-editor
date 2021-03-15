@@ -30,5 +30,8 @@
   "mocha": {
     "require": "ts-node/register",
     "spec": "./test/*.ts"
+  },
+  "dependencies": {
+    "eventemitter3": "^4.0.7"
   }
 }

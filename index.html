@@ -18,6 +18,11 @@
         margin: 20px 0;
     }
 
+    .editor-wrap {
+        position: relative;
+        margin-top: 100px;
+    }
+
     .editor {
         font-family: 'PT Sans', Arial, sans-serif;
         font-size: 20px;
@@ -35,6 +40,10 @@
         font-size: 20px;
         vertical-align: -.1em;
         margin: -1px 0;
+    }
+
+    .editor .monospace {
+        color: #888;
     }
 
     .bold {
@@ -55,7 +64,6 @@
 
     .monospace {
         font-family: 'JetBrains Mono', 'Fira Code', monospace;
-        color: #888;
     }
 
     .mention {
@@ -77,11 +85,75 @@
         color: green;
         text-decoration: none;
     }
+
+    .toolbar {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        border: 1px solid #070808;
+        background: #333437;
+        color: #d5dade;
+        border-radius: 6px;
+        padding: 3px 6px;
+        top: -40px;
+        left: 0;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+        font-family: serif;
+    }
+
+    .toolbar.hidden {
+        display: none;
+    }
+
+    .toolbar-btn {
+        display: block;
+        width: 26px;
+        height: 26px;
+        line-height: 26px;
+        text-align: center;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    .toolbar-btn:not(:first-of-type) {
+        margin-left: 2px;
+    }
+
+    .toolbar-btn.link {
+        width: auto;
+        padding-left: 4px;
+        padding-right: 4px;
+        font-family: 'PT Sans', Arial, sans-serif;
+    }
+
+    .toolbar-sep {
+        width: 1px;
+        height: 26px;
+        background: #4e4f52;
+        margin: 0 4px;
+    }
+
+    .toolbar-btn.selected {
+        background: #364458;
+        color: #25a6f7;
+        border-color: #4283db;
+    }
     </style>
 </head>
 <body>
     <main>
-        <div class="editor"></div>
+        <div class="editor-wrap">
+            <div class="toolbar hidden">
+                <span class="toolbar-btn bold selected" data-format="1">B</span>
+                <span class="toolbar-btn italic" data-format="2">I</span>
+                <span class="toolbar-btn strike" data-format="8">S</span>
+                <span class="toolbar-btn monospace" data-format="16">M</span>
+                <span class="toolbar-sep"></span>
+                <span class="toolbar-btn link">Ссылка</span>
+            </div>
+            <div class="editor"></div>
+        </div>
         <ul>
             <li>⌘B — жирный</li>
             <li>⌘I — курсив</li>
@@ -93,6 +165,7 @@
 <script type="module">
 import Editor from './dist/editor.js';
 const elem = document.querySelector('.editor');
+const toolbar = document.querySelector('.toolbar');
 const editor = new Editor(elem, {
     value: 'Привет, мир! 😇',
     parse: {
@@ -105,6 +178,71 @@ const editor = new Editor(elem, {
     }
 });
 editor.focus();
+editor.on('selectionchange', ed => {
+    const sel = editor.getSelection();
+    if (sel[0] !== sel[1]) {
+        showToolbar();
+        updateToolbar(ed);
+    } else {
+        hideToolbar();
+    }
+});
+editor.on('formatchange', updateToolbarState);
+toolbar.addEventListener('mousedown', evt => {
+    const btn = evt.target.closest('.toolbar-btn');
+    if (btn) {
+        evt.preventDefault();
+        const format = btn.dataset.format;
+        if (format) {
+            editor.toggleFormat(Number(format));
+        } else if (btn.classList.contains('link')) {
+            const [from, to] = editor.getSelection();
+            const token = editor.tokenForPos(from);
+            const url = prompt('Введите ссылку', token && token.type === 'link' ? token.link : undefined);
+            editor.setLink(url, from, to);
+        }
+    }
+});
+
+function updateToolbar(editor) {
+    const sel = window.getSelection();
+    if (sel) {
+        const r = sel.getRangeAt(0);
+        if (r) {
+            const rect = r.getClientRects().item(0);
+            const editorRect = elem.getBoundingClientRect();
+            toolbar.style.left = `${rect.left - editorRect.left - 5}px`;
+            toolbar.style.top = `${rect.top - editorRect.top - toolbar.offsetHeight - 5}px`;
+            updateToolbarState(editor);
+        }
+    }
+}
+
+function updateToolbarState(editor) {
+    if (toolbar.classList.contains('hidden')) {
+        return;
+    }
+
+    const token = editor.tokenForPos(editor.getSelection()[0]);
+    for (const btn of toolbar.querySelectorAll('.toolbar-btn')) {
+        const format = Number(btn.dataset.format || '0');
+        if (format) {
+            btn.classList.toggle('selected', token.format & format);
+        }
+
+        if (btn.classList.contains('link')) {
+            btn.classList.toggle('selected', token.type === 'link' && !token.auto);
+        }
+    }
+}
+
+function hideToolbar() {
+    toolbar.classList.add('hidden');
+}
+
+function showToolbar() {
+    toolbar.classList.remove('hidden');
+}
 
 window.editor = editor;
 </script>
