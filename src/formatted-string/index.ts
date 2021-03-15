@@ -356,6 +356,10 @@ function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatU
  * или `true` (конец)
  */
 export function tokenForPos(tokens: Token[], offset: number, locType: LocationType = LocationType.End, solid?: boolean): TokenForPos {
+    if (offset < 0) {
+        return { index: -1, offset: -1 };
+    }
+
     const index = tokens.findIndex((token, i) => {
         const len = token.value.length;
 

@@ -3,11 +3,10 @@ import render from '../render';
 import { TextRange } from '../types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
-import diffAction, { DiffActionType } from './diff';
+import diffAction, { DiffAction, DiffActionType } from './diff';
 import {
     cutText, getLength, insertText, removeText, replaceText, setFormat, setLink,
-    slice, clamp, tokenForPos,
-    TokenFormatUpdate, LocationType
+    slice, clamp, TokenFormatUpdate
 } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { TokenType } from '../formatted-string/types';
@@ -44,32 +43,6 @@ const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
         const url = prompt('Введите ссылку', token?.type === TokenType.Link ? token.link : undefined);
         editor.setLink(url, from, to);
     },
-    'Backspace': editor => {
-        // eslint-disable-next-line prefer-const
-        let [from, to] = editor.getSelection();
-
-        if (from === to && from > 0) {
-            const pos = tokenForPos(editor.model, from - 1, LocationType.Start);
-            from = getLength(editor.model.slice(0, pos.index)) + pos.offset;
-        }
-
-        if (from !== to) {
-            editor.removeText(from, to);
-        }
-    },
-    'Delete': editor => {
-        // eslint-disable-next-line prefer-const
-        let [from, to] = editor.getSelection();
-        if (from === to) {
-            const pos = tokenForPos(editor.model, to + 1, LocationType.End);
-            if (pos.index !== -1) {
-                to = getLength(editor.model.slice(0, pos.index)) + pos.offset;
-            }
-        }
-        if (from !== to) {
-            editor.removeText(from, to);
-        }
-    }
 };
 
 export default class Editor {
@@ -78,6 +51,7 @@ export default class Editor {
     private _model: Model;
     private inputHandled = false;
     private pendingUpdate: PendingUpdate | null = null;
+    private pendingDelete: TextRange | null = null;
     private history: History<Model>;
     private caret: TextRange = [0, 0];
 
@@ -103,7 +77,6 @@ export default class Editor {
         // Обрабатываем перехваченный ввод — превентим, если был перехват
         if (this.inputHandled) {
             this.inputHandled = false;
-
             this.scheduleUpdate();
             return;
         }
@@ -112,7 +85,21 @@ export default class Editor {
         // обработать ввод. Попробуем его вычислить
         const range = getTextRange(this.elem);
         if (range && isCollapsed(range)) {
-            const payload = diffAction(this.getValue(), this.getInputText());
+            let payload: DiffAction;
+            const value = this.getValue();
+            const inputValue = this.getInputText();
+
+            if (this.pendingDelete) {
+                const from = Math.min(range[0], this.pendingDelete[0]);
+                payload = {
+                    action: DiffActionType.Remove,
+                    pos: from,
+                    text: value.slice(from, from + (value.length - inputValue.length))
+                }
+            } else {
+                payload = diffAction(value, inputValue);
+            }
+
             if (!payload) {
                 return;
             }
@@ -138,6 +125,7 @@ export default class Editor {
 
     private onSelectionChange = () => {
         const range = getTextRange(this.elem);
+
         if (range) {
             this.saveSelection(range);
         }
@@ -161,7 +149,17 @@ export default class Editor {
         }
     }
 
-    private onHandleShortcut = (evt: KeyboardEvent) => this.shortcuts.handle(evt);
+    private onHandleShortcut = (evt: KeyboardEvent) => {
+        if (evt.defaultPrevented) {
+            return;
+        }
+
+        if (evt.key === 'Backspace' || evt.key === 'Delete') {
+            this.pendingDelete = this.getSelection();
+        } else {
+            this.shortcuts.handle(evt);
+        }
+    };
 
     /**
      * Обработка события вставки текста
@@ -269,7 +267,7 @@ export default class Editor {
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
-        setRange(this.elem, pos + text.length);
+        this.setSelection(pos + text.length);
         return result;
     }
 
@@ -282,7 +280,7 @@ export default class Editor {
             DiffActionType.Remove,
             [from, to]);
 
-        setRange(this.elem, from);
+        this.setSelection(from);
         return result;
     }
 
@@ -312,6 +310,14 @@ export default class Editor {
 
         // TODO применить форматирование и типы из вставляемых токенов
         return this.updateModel(next, 'paste', [from, to]);
+    }
+
+    /**
+     * Ставит фокус в редактор
+     */
+    focus(): void {
+        this.elem.focus();
+        this.setSelection(getLength(this.model));
     }
 
     /**
@@ -487,6 +493,8 @@ export default class Editor {
 
                 if (isCollapsed(range)) {
                     this.insertText(range[0], text);
+                } else if (!text) {
+                    this.removeText(range[0], range[1]);
                 } else {
                     this.replaceText(range[0], range[1], text);
                 }
