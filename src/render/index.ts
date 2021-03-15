@@ -164,6 +164,18 @@ function joinClassNames(classNames: string[]): string {
 }
 
 function setTextValue(node: Node, text: string): void {
+    if (isElement(node)) {
+        // В элементе могут быть в том числе картинки с эмоджи, которые не отобразятся
+        // в node.textContent. Поэтому сделаем проверку: если есть потомок и
+        // он только один, то меняем `textContent`, иначе очищаем узел
+        const children = node.childNodes;
+        if (children.length > 1 || (children.length === 1 && isElement(children[0]))) {
+            while (node.firstChild) {
+                node.firstChild.remove();
+            }
+        }
+    }
+
     if (node.textContent !== text) {
         node.textContent = text;
     }
@@ -251,6 +263,10 @@ class ReconcileState {
 
 function isElement(node?: Node): node is HTMLElement {
     return node?.nodeType === 1;
+}
+
+function isText(node?: Node): node is Text {
+    return node?.nodeType === 3;
 }
 
 /**

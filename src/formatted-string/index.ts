@@ -20,6 +20,11 @@ interface TokenForPos {
     offset: number;
 }
 
+export const enum LocationType {
+    Start = 'start',
+    End = 'end'
+}
+
 /**
  * Фабрика объекта-токена
  */
@@ -69,8 +74,8 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         return parse(value, options);
     }
 
-    const start = tokenForPos(tokens, from);
-    const end = tokenForPos(tokens, to);
+    const start = tokenForPos(tokens, from, LocationType.Start);
+    const end = tokenForPos(tokens, to, LocationType.End);
 
     if (start.index === -1 || end.index === -1) {
         // Такого не должно быть
@@ -148,8 +153,8 @@ export function getFormat(tokens: Token[], pos: number): TokenFormat {
  * можно один сплошной токен разделить на несколько и указать им разное форматирование
  */
 export function setFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, breakSolid?: boolean): Token[] {
-    const start = tokenForPos(tokens, pos, !breakSolid ? false : undefined);
-    const end = tokenForPos(tokens, pos + len, !breakSolid ? true : undefined);
+    const start = tokenForPos(tokens, pos, LocationType.Start, !breakSolid);
+    const end = tokenForPos(tokens, pos + len, LocationType.End, !breakSolid);
 
     if (start.index === -1 || end.index === -1) {
         // Невалидные данные, ничего не делаем
@@ -230,8 +235,8 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
         return [];
     }
 
-    const start = tokenForPos(tokens, from);
-    const end = tokenForPos(tokens, to);
+    const start = tokenForPos(tokens, from, LocationType.Start);
+    const end = tokenForPos(tokens, to, LocationType.End);
 
     if (start.index === end.index) {
         // Получаем фрагмент в пределах одного токена: всегда делаем его текстом
@@ -255,8 +260,8 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
  * Делает указанный диапазон ссылкой на `link`.
  */
 export function setLink(tokens: Token[], link: string | null, pos: number, len = 0): Token[] {
-    const start = tokenForPos(tokens, pos);
-    const end = tokenForPos(tokens, pos + len);
+    const start = tokenForPos(tokens, pos, LocationType.Start);
+    const end = tokenForPos(tokens, pos + len, LocationType.End);
 
     if (start.index === -1 || end.index === -1) {
         console.warn('Invalid range:', { pos, len });
@@ -350,7 +355,7 @@ function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatU
  * не делить токен и не заниматься репарсингом. Значение может быть `false` (начало)
  * или `true` (конец)
  */
-export function tokenForPos(tokens: Token[], offset: number, solid?: boolean): TokenForPos {
+export function tokenForPos(tokens: Token[], offset: number, locType: LocationType = LocationType.End, solid?: boolean): TokenForPos {
     const index = tokens.findIndex((token, i) => {
         const len = token.value.length;
 
@@ -374,15 +379,15 @@ export function tokenForPos(tokens: Token[], offset: number, solid?: boolean): T
 
     if (index !== -1) {
         const token = tokens[index];
-        if (typeof solid === 'boolean' && isSolidToken(token)) {
-            pos.offset = solid ? token.value.length : 0;
+        if (solid && isSolidToken(token)) {
+            pos.offset = locType === LocationType.End ? token.value.length : 0;
         } else if (token.emoji) {
             // Обновляем позицию `offset` внутри токена таким образом,
             // чтобы она не попадала на вложенный эмоджи
             const { emoji } = token;
             for (let i = 0; i < emoji.length && emoji[i].from < pos.offset; i++) {
                 if (emoji[i].to > pos.offset) {
-                    pos.offset = emoji[i].to;
+                    pos.offset = locType === LocationType.Start ? emoji[i].from : emoji[i].to;
                     break;
                 }
             }
@@ -571,6 +576,6 @@ function toLinkOrText(token: Token, link: string | null): TokenLink | TokenText 
     return link ? toLink(token, link) : toText(token);
 }
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }

@@ -119,6 +119,11 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
     let container: Node;
 
     while (container = walker.nextNode()) {
+        if (container.nodeType === Node.ELEMENT_NODE && container.nodeName !== 'IMG') {
+            // Пропускаем обёртки для текста
+            continue;
+        }
+
         len = getNodeLength(container);
 
         if (pos <= len) {

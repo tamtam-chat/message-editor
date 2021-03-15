@@ -286,20 +286,20 @@ describe('Formatted String', () => {
         const tokens3_1 = removeText(tokens2, 5, 7, opt);
         text = tokens3_1[0] as TokenText;
         equal(tokens3_1.length, 1);
-        equal(text.value, 'aaa 😍foo 😈 bar😇 ccc 🤷🏼‍♂️ ddd');
-        deepEqual(emojiText(text), ['😍', '😈', '😇', '🤷🏼‍♂️']);
+        equal(text.value, 'aaa foo 😈 bar😇 ccc 🤷🏼‍♂️ ddd');
+        deepEqual(emojiText(text), ['😈', '😇', '🤷🏼‍♂️']);
 
         // Получаем фрагмент
         // NB: правая граница попадает на середину эмоджи
-        const tokens4 = slice(tokens3_1, 0, 11);
+        const tokens4 = slice(tokens3_1, 0, 9);
         text = tokens4[0] as TokenText;
         equal(tokens4.length, 1);
-        equal(text.value, 'aaa 😍foo 😈');
-        deepEqual(emojiText(text), ['😍', '😈']);
+        equal(text.value, 'aaa foo 😈');
+        deepEqual(emojiText(text), ['😈']);
 
         // Вырезаем фрагмент
-        // NB: левая граница попадает на середину эмоджи
-        const tokens5 = cutText(tokens3_1, 5, 12, opt);
+        // NB: правая граница попадает на середину эмоджи
+        const tokens5 = cutText(tokens3_1, 4, 9, opt);
         text = tokens5.cut[0] as TokenText;
         equal(tokens5.cut.length, 1);
         equal(tokens5.tokens.length, 1);
@@ -307,8 +307,8 @@ describe('Formatted String', () => {
         equal(text.value, 'foo 😈');
         deepEqual(emojiText(text), ['😈']);
 
-        equal(tokens5.tokens[0].value, 'aaa 😍 bar😇 ccc 🤷🏼‍♂️ ddd');
-        deepEqual(emojiText(tokens5.tokens[0] as TokenText), ['😍', '😇', '🤷🏼‍♂️']);
+        equal(tokens5.tokens[0].value, 'aaa  bar😇 ccc 🤷🏼‍♂️ ddd');
+        deepEqual(emojiText(tokens5.tokens[0] as TokenText), ['😇', '🤷🏼‍♂️']);
     });
 
     it('edit edge cases', () => {
@@ -503,5 +503,11 @@ describe('Formatted String', () => {
             deepEqual(values(t4), ['#foo', ' ', '#bar', ' ', '#baz']);
             deepEqual(t4.map(t => t.format), [TokenFormat.Bold, TokenFormat.Bold, TokenFormat.Bold, TokenFormat.None, TokenFormat.None]);
         });
+    });
+
+    it.only('debug', () => {
+        const tokens = parse('foo 🙈', opt);
+        const t1 = removeText(tokens, 4, 2, opt);
+        console.log(t1);
     });
 });

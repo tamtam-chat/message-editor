@@ -4,7 +4,11 @@ import { TextRange } from '../types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
 import diffAction, { DiffActionType } from './diff';
-import { cutText, getLength, insertText, removeText, replaceText, setFormat, setLink, slice, TokenFormatUpdate } from '../formatted-string';
+import {
+    cutText, getLength, insertText, removeText, replaceText, setFormat, setLink,
+    slice, clamp, tokenForPos,
+    TokenFormatUpdate, LocationType
+} from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { TokenType } from '../formatted-string/types';
 
@@ -40,6 +44,32 @@ const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
         const url = prompt('Введите ссылку', token?.type === TokenType.Link ? token.link : undefined);
         editor.setLink(url, from, to);
     },
+    'Backspace': editor => {
+        // eslint-disable-next-line prefer-const
+        let [from, to] = editor.getSelection();
+
+        if (from === to && from > 0) {
+            const pos = tokenForPos(editor.model, from - 1, LocationType.Start);
+            from = getLength(editor.model.slice(0, pos.index)) + pos.offset;
+        }
+
+        if (from !== to) {
+            editor.removeText(from, to);
+        }
+    },
+    'Delete': editor => {
+        // eslint-disable-next-line prefer-const
+        let [from, to] = editor.getSelection();
+        if (from === to) {
+            const pos = tokenForPos(editor.model, to + 1, LocationType.End);
+            if (pos.index !== -1) {
+                to = getLength(editor.model.slice(0, pos.index)) + pos.offset;
+            }
+        }
+        if (from !== to) {
+            editor.removeText(from, to);
+        }
+    }
 };
 
 export default class Editor {
@@ -169,6 +199,7 @@ export default class Editor {
         });
         this.shortcuts = new Shortcuts(this);
         this.setup();
+        this.history.push(this.model, 'init', this.caret);
     }
 
     get model(): Model {
@@ -180,12 +211,7 @@ export default class Editor {
             this._model = value;
             // При рендеринге может слететь позиция курсора, поэтому после рендеринга
             // проверим: если она поменялась, то восстановим
-            const prev = getTextRange(this.elem);
             render(this.elem, value);
-
-            if (prev) {
-                this.setSelection(prev[0], prev[1]);
-            }
         }
     }
 
@@ -243,7 +269,7 @@ export default class Editor {
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
-        this.setSelection(pos + text.length);
+        setRange(this.elem, pos + text.length);
         return result;
     }
 
@@ -256,7 +282,7 @@ export default class Editor {
             DiffActionType.Remove,
             [from, to]);
 
-        this.setSelection(from);
+        setRange(this.elem, from);
         return result;
     }
 
@@ -292,11 +318,13 @@ export default class Editor {
      * Обновляет форматирование у указанного диапазона
      */
     updateFormat(format: TokenFormatUpdate, from: number, to = from): Model {
-        return this.updateModel(
+        const result = this.updateModel(
             setFormat(this.model, format, from, to - from),
             'format',
             [from, to]
         );
+        setRange(this.elem, from, to);
+        return result;
     }
 
     /**
@@ -333,7 +361,7 @@ export default class Editor {
         }
         const result = this.updateModel(
             setLink(this.model, url, from, to - from), 'link', [from, to]);
-        this.setSelection(from, to);
+        setRange(this.elem, from, to);
         return result;
     }
 
@@ -344,6 +372,13 @@ export default class Editor {
         if (this.history.canUndo) {
             const entry = this.history.undo();
             this.updateModel(entry.state, false);
+            const { current } = this.history;
+            if (current) {
+                const range = current.caret || current.range;
+                if (range) {
+                    this.setSelection(range[0], range[1]);
+                }
+            }
             return entry;
         }
     }
@@ -355,6 +390,10 @@ export default class Editor {
         if (this.history.canRedo) {
             const entry = this.history.redo();
             this.updateModel(entry.state, false);
+            const range = entry.caret || entry.range;
+            if (range) {
+                this.setSelection(range[0], range[1]);
+            }
             return entry;
         }
     }
@@ -397,6 +436,9 @@ export default class Editor {
      * Указывает текущее выделение текста или позицию каретки
      */
     setSelection(from: number, to = from): void {
+        const maxIx = getLength(this.model);
+        from = clamp(from, 0, maxIx);
+        to = clamp(to, 0, maxIx);
         setRange(this.elem, from, to);
         this.saveSelection(getTextRange(this.elem));
     }
