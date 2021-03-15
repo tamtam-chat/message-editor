@@ -18,6 +18,12 @@ const enum EmojiCodes {
 }
 
 /**
+ * Набор одиночных эмоджи в диапазоне от 0x2000 до 0x3300.
+ * Генерируется из тест-задачи Generate Low Emoji в test/emoji.js
+ */
+const emojiLow = new Set([0x203c, 0x2049, 0x2122, 0x2139, 0x2328, 0x23cf, 0x24c2, 0x25b6, 0x25c0, 0x260e, 0x2611, 0x2618, 0x261d, 0x2620, 0x2626, 0x262a, 0x2640, 0x2642, 0x2663, 0x2668, 0x267b, 0x2699, 0x26a7, 0x26c8, 0x26d1, 0x26fd, 0x2702, 0x2705, 0x270f, 0x2712, 0x2714, 0x2716, 0x271d, 0x2721, 0x2728, 0x2744, 0x2747, 0x274c, 0x274e, 0x2757, 0x27a1, 0x27b0, 0x27bf, 0x2b50, 0x2b55, 0x3030, 0x303d, 0x3297, 0x3299]);
+
+/**
  * Вернёт `true`, если удалось прочитать эмоджи из текущей позиции потока
  */
 export default function parseEmoji(state: ParserState): boolean {
@@ -172,7 +178,48 @@ function isGenderFlag(cp: number): boolean {
 function isEmoji(cp: number): boolean {
     return cp === 0x00a9
         || cp === 0x00ae
-        || (cp >= 0x2000 && cp <= 0x3300)
+
+        // || (cp >= 0x2000 && cp <= 0x3300)
+        // Набор одиночных эмоджи в диапазоне от 0x2000 до 0x3300.
+        // Генерируется из тест - задачи Generate Low Emoji в test/emoji.js
+        || emojiLow.has(cp)
+        || (cp >= 0x2194 && cp <= 0x2199)
+        || (cp >= 0x21a9 && cp <= 0x21aa)
+        || (cp >= 0x231a && cp <= 0x231b)
+        || (cp >= 0x23e9 && cp <= 0x23f3)
+        || (cp >= 0x23f8 && cp <= 0x23fa)
+        || (cp >= 0x25aa && cp <= 0x25ab)
+        || (cp >= 0x25fb && cp <= 0x25fe)
+        || (cp >= 0x2600 && cp <= 0x2604)
+        || (cp >= 0x2614 && cp <= 0x2615)
+        || (cp >= 0x2622 && cp <= 0x2623)
+        || (cp >= 0x262e && cp <= 0x262f)
+        || (cp >= 0x2638 && cp <= 0x263a)
+        || (cp >= 0x2648 && cp <= 0x2653)
+        || (cp >= 0x265f && cp <= 0x2660)
+        || (cp >= 0x2665 && cp <= 0x2666)
+        || (cp >= 0x267e && cp <= 0x267f)
+        || (cp >= 0x2692 && cp <= 0x2697)
+        || (cp >= 0x269b && cp <= 0x269c)
+        || (cp >= 0x26a0 && cp <= 0x26a1)
+        || (cp >= 0x26aa && cp <= 0x26ab)
+        || (cp >= 0x26b0 && cp <= 0x26b1)
+        || (cp >= 0x26bd && cp <= 0x26be)
+        || (cp >= 0x26c4 && cp <= 0x26c5)
+        || (cp >= 0x26ce && cp <= 0x26cf)
+        || (cp >= 0x26d3 && cp <= 0x26d4)
+        || (cp >= 0x26e9 && cp <= 0x26ea)
+        || (cp >= 0x26f0 && cp <= 0x26f5)
+        || (cp >= 0x26f7 && cp <= 0x26fa)
+        || (cp >= 0x2708 && cp <= 0x270d)
+        || (cp >= 0x2733 && cp <= 0x2734)
+        || (cp >= 0x2753 && cp <= 0x2755)
+        || (cp >= 0x2763 && cp <= 0x2764)
+        || (cp >= 0x2795 && cp <= 0x2797)
+        || (cp >= 0x2934 && cp <= 0x2935)
+        || (cp >= 0x2b05 && cp <= 0x2b07)
+        || (cp >= 0x2b1b && cp <= 0x2b1c)
+
         || (cp >= 0x1e400 && cp <= 0x1f3f)
         || (cp >= 0x1e800 && cp <= 0x1f7ff)
         || (cp >= 0x1ec00 && cp <= 0x1fbff);

@@ -504,10 +504,4 @@ describe('Formatted String', () => {
             deepEqual(t4.map(t => t.format), [TokenFormat.Bold, TokenFormat.Bold, TokenFormat.Bold, TokenFormat.None, TokenFormat.None]);
         });
     });
-
-    it.only('debug', () => {
-        const tokens = parse('foo 🙈', opt);
-        const t1 = removeText(tokens, 4, 2, opt);
-        console.log(t1);
-    });
 });

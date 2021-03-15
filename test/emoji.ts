@@ -22,6 +22,45 @@ function values(tokens: Token[]): string[] {
     return tokens.map(t => t.value);
 }
 
+/**
+ * Создаёт диапазоны эмоджи в пространстве от 0x2000 до 0x3300.
+ * При парсинге эмоджи мы не можем просто взять этот диапазон, так как туда входят
+ * и обычные символы например, № (0x2116)
+ * @param data
+ */
+function createRanges(data: string) {
+    type Rng = [number, number];
+    const ranges: Rng[] = [];
+    let range: Rng | null = null;
+
+    const trim = (str: string) => str.trim();
+    const result = new Set<number>();
+
+    data
+        .split('\n')
+        .map(trim)
+        .filter(line => line && line[0] !== '#')
+        .forEach(line => {
+            const parts = line.split(';').map(trim);
+            const emoji = parts[0].split(' ').map(code => parseInt(code, 16));
+            if (emoji[0] >= 0x2000 && emoji[0] <= 0x3300) {
+                result.add(emoji[0]);
+            }
+        });
+
+    Array.from(result)
+        .sort((a, b) => a - b)
+        .forEach(cp => {
+            if (!range || range[1] !== cp - 1) {
+                ranges.push(range = [cp, cp]);
+            } else {
+                range[1] = cp;
+            }
+        });
+
+    return ranges;
+}
+
 describe('Emoji', () => {
     describe('Unicode standard', () => {
         const parseEmoji = (text: string) => {
@@ -119,5 +158,21 @@ describe('Emoji', () => {
         deepEqual(types(tokens), [TokenType.Text]);
         deepEqual(values(tokens), ['👩🏼👩🏼‍🦰🤦🏼‍♀️']);
         deepEqual(emoji(tokens[0]), ['👩🏼', '👩🏼‍🦰', '🤦🏼‍♀️']);
+    });
+
+    it.skip('Generate Low Emoji', () => {
+        const toHex = (num:  number) => '0x' + num.toString(16);
+        const singles: string[] = [];
+        const textRanges: string[] = []
+
+        createRanges(read('emoji-test-13.txt')).forEach(r => {
+            if (r[0] === r[1]) {
+                singles.push(toHex(r[0]));
+            } else {
+                textRanges.push(`(cp >= ${toHex(r[0])} && cp <= ${toHex(r[1])})`)
+            }
+        });
+        console.log(`new Set([${singles.join(', ')}])`);
+        console.log(textRanges.join('\n|| '));
     });
 });
