@@ -6,7 +6,7 @@ import { getTextRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
 import {
     cutText, getLength, insertText, removeText, replaceText, setFormat, setLink,
-    slice, clamp, isCustomLink, TokenFormatUpdate
+    slice, clamp, isCustomLink, TokenFormatUpdate, tokenForPos, LocationType
 } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { TokenType } from '../formatted-string/types';
@@ -361,8 +361,16 @@ export default class Editor {
             to = from;
         }
 
-        const fragment = this.slice(from, to);
-        const source = fragment.length ? fragment[0] : this.tokenForPos(from);
+        let source: Token | undefined;
+        if (from !== to) {
+            const fragment = slice(this.model, from, to);
+            source = fragment[0];
+        } else {
+            const pos = tokenForPos(this.model, from, LocationType.Start);
+            if (pos.index !== -1) {
+                source = this.model[pos.index];
+            }
+        }
 
         if (source) {
             const update: TokenFormatUpdate = source.format & format
