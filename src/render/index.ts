@@ -65,12 +65,14 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
             // Можем схлопнуть несколько токенов в один
             elem.className = tokenTypeClass[token.type];
             const innerState = new ReconcileState(elem, options);
+
             while (i <= groupEnd) {
                 const innerElem = innerState.elem('span');
                 innerElem.className = formatClassNames(tokens[i].format);
                 renderText(tokens[i], innerElem, options);
                 i++;
             }
+            i = groupEnd;
             innerState.trim();
         } else {
             elem.className = joinClassNames([
@@ -265,10 +267,6 @@ function isElement(node?: Node): node is HTMLElement {
     return node?.nodeType === 1;
 }
 
-function isText(node?: Node): node is Text {
-    return node?.nodeType === 3;
-}
-
 /**
  * Возвращает позицию элемента, до которого можно сделать единую с элементом
  * в позиции `pos` группу. Используется, например, для того, чтобы сгруппировать
@@ -296,7 +294,7 @@ function canGroup(t1: Token, t2: Token): boolean {
         return true;
     }
 
-    if (t1.type === t2.value) {
+    if (t1.type === t2.type) {
         return (t1.type === TokenType.Link && t1.link === (t2 as TokenLink).link)
             || (t1.type === TokenType.Mention && t1.mention === (t2 as TokenMention).mention)
             || (t1.type === TokenType.HashTag && t1.hashtag === (t2 as TokenHashTag).hashtag);
