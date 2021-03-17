@@ -1,7 +1,9 @@
 import { TokenFormat } from '../formatted-string';
 import { Token, TokenMarkdown, TokenType } from '../formatted-string/types';
 import ParserState from './state';
-import { Codes, isDelimiter, isBound } from './utils';
+import { Codes, isDelimiter, isBound, last } from './utils';
+import link from './link';
+import mention from './mention';
 
 export const charToFormat = new Map<number, TokenFormat>([
     [Codes.Asterisk, TokenFormat.Bold],
@@ -13,10 +15,12 @@ export const charToFormat = new Map<number, TokenFormat>([
 export default function parseMarkdown(state: ParserState): boolean {
     if (state.options.markdown) {
         const { pos } = state;
-        if (isStartBound(state)) {
-            consumeOpen(state);
-        } else {
-            consumeClose(state);
+        if (!customLink(state)) {
+            if (isStartBound(state)) {
+                consumeOpen(state);
+            } else {
+                consumeClose(state);
+            }
         }
 
         return state.pos !== pos;
@@ -70,6 +74,11 @@ function isStartBound(state: ParserState): boolean {
 
     if (state.hasPendingText()) {
         return isStartBoundChar(state.peekPrev());
+    }
+
+    const token = last(state.tokens);
+    if (token?.type === TokenType.Markdown && (token.format & TokenFormat.LinkLabel)) {
+        return true;
     }
 
     return false;
@@ -163,4 +172,58 @@ function pushClose(state: ParserState, token: TokenMarkdown): void {
             break;
         }
     }
+}
+
+/**
+ * Парсинг кастомной ссылки: `[some label](mail.ru)`
+ */
+function customLink(state: ParserState): boolean {
+    const { pos } = state;
+
+    if (state.consume(Codes.SquareBracketOpen)) {
+        pushOpen(state, mdToken(state, TokenFormat.LinkLabel));
+        return true;
+    }
+
+    if (state.consume(Codes.SquareBracketClose) && (state.format & TokenFormat.LinkLabel)) {
+        // Нашли закрывающий токен ссылки: он имеет смысл только в том случае,
+        // если за ним сразу следует ссылка в виде `(mail.ru)`
+        const closeLabel = mdToken(state, TokenFormat.LinkLabel);
+        if (state.consume(Codes.RoundBracketOpen)) {
+            const openLink = mdToken(state, TokenFormat.Link);
+            const start = state.pos;
+            const innerState = new ParserState(state.string.slice(start), state.options);
+            if ((mention(innerState) || link(innerState)) && innerState.consume(Codes.RoundBracketClose)) {
+                // Смогли поглотить завершающий фрагмент ссылки
+                innerState.push(mdToken(innerState, TokenFormat.Link));
+
+                // Функция `link()` может поглотить как ссылку, так и текст, который
+                // похож на ссылку. Учитывая, что в тексте явно заданы границы ссылки,
+                // мы любой результат скинем в виде ссылки в основной поток
+                const [linkCandidate, closeLink] = innerState.tokens;
+
+                if (linkCandidate.type === TokenType.Link || linkCandidate.type === TokenType.Mention) {
+                    pushClose(state, closeLabel);
+                    pushOpen(state, openLink);
+                    state.push({
+                        type: TokenType.Link,
+                        format: state.format,
+                        value: linkCandidate.value,
+                        link: linkCandidate.type === TokenType.Link ? linkCandidate.link : linkCandidate.value,
+                        emoji: linkCandidate.emoji,
+                        auto: false,
+                        sticky: false,
+                    });
+                    pushClose(state, closeLink as TokenMarkdown);
+                    state.pos = start + innerState.pos;
+
+                    return true;
+                }
+            }
+        }
+
+        state.pos = pos;
+    }
+
+    return false;
 }

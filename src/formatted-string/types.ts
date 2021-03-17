@@ -47,6 +47,12 @@ export const enum TokenFormat {
 
     /** Подсвеченный фрагмент текста */
     Highlight = 1 << 6,
+
+    /** Текст ссылки в Markdown: `[label]` */
+    LinkLabel = 1 << 7,
+
+    /** Ссылка в Markdown: `(example.com)` */
+    Link = 1 << 8,
 }
 
 export type Token = TokenText | TokenLink | TokenUserSticker | TokenMention

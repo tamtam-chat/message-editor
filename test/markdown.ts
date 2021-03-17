@@ -3,27 +3,19 @@ import _parse, { ParserOptions } from '../src/parser';
 import { Token, TokenFormat, TokenType } from '../src/formatted-string/types';
 import { mdInsertText, mdRemoveText, mdSetFormat } from '../src/formatted-string/markdown';
 
-function parse(text: string) {
-    return _parse(text, {
-        markdown: true,
-        mention: true,
-        userSticker: true,
-        command: true,
-        hashtag: true,
-        link: true,
-        textEmoji: false,
-    });
-}
-
 const opt: ParserOptions = {
     command: true,
     hashtag: true,
     link: true,
     mention: true,
-    textEmoji: true,
+    textEmoji: false,
     userSticker: true,
     markdown: true,
 };
+
+function parse(text: string) {
+    return _parse(text, opt);
+}
 
 function types(tokens: Token[]): TokenType[] {
     return tokens.map(t => t.type);
@@ -102,6 +94,41 @@ describe('Markdown', () => {
         deepEqual(values(tokens), ['`', '{ ... }', '`', ', not code']);
     });
 
+    it('custom links', () => {
+        let tokens = parse('[some label](tamtam.chat)');
+        deepEqual(types(tokens), [TokenType.Markdown, TokenType.Text, TokenType.Markdown, TokenType.Markdown, TokenType.Link, TokenType.Markdown]);
+        deepEqual(values(tokens), ['[', 'some label', ']', '(', 'tamtam.chat', ')']);
+
+        tokens = parse('aa[some label](tamtam.chat)bb');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Markdown, TokenType.Text, TokenType.Markdown, TokenType.Markdown, TokenType.Link, TokenType.Markdown, TokenType.Text]);
+        deepEqual(values(tokens), ['aa', '[', 'some label', ']', '(', 'tamtam.chat', ')', 'bb']);
+
+        // Форматирование внутри подписи
+        tokens = parse('[*some* _label_](tamtam.chat)');
+        deepEqual(types(tokens), [
+            TokenType.Markdown,
+            TokenType.Markdown, TokenType.Text,  TokenType.Markdown,
+            TokenType.Text,
+            TokenType.Markdown, TokenType.Text, TokenType.Markdown,
+            TokenType.Markdown,
+            TokenType.Markdown, TokenType.Link, TokenType.Markdown]);
+        deepEqual(values(tokens), ['[', '*', 'some', '*', ' ', '_', 'label', '_', ']', '(', 'tamtam.chat', ')']);
+    });
+
+    it('invalid custom link', () => {
+        let tokens = parse('[some label(tamtam.chat)');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['[some label(', 'tamtam.chat', ')']);
+
+        tokens = parse('[some label]tamtam.chat)');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['[some label]', 'tamtam.chat', ')']);
+
+        tokens = parse('[some label](tamtam.chat');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link]);
+        deepEqual(values(tokens), ['[some label](', 'tamtam.chat']);
+    });
+
     it('update text', () => {
         const tokens = parse('foo bar tamtam.chat');
 
@@ -144,7 +171,6 @@ describe('Markdown', () => {
 
         const t3_2 = mdSetFormat(tokens, { add: TokenFormat.Italic }, 2, 4, opt);
         equal(text(t3_2), 'fo _o ba_ r baz');
-
     });
 
     it.skip('debug', () => {
