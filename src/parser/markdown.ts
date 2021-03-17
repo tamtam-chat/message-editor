@@ -3,10 +3,16 @@ import { Token, TokenMarkdown, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { Codes, isDelimiter, isBound } from './utils';
 
+export const charToFormat = new Map<number, TokenFormat>([
+    [Codes.Asterisk, TokenFormat.Bold],
+    [Codes.Underscore, TokenFormat.Italic],
+    [Codes.Tilde, TokenFormat.Strike],
+    [Codes.BackTick, TokenFormat.Monospace],
+]);
+
 export default function parseMarkdown(state: ParserState): boolean {
     if (state.options.markdown) {
         const { pos } = state;
-        // FIXME неправильное определение для случая с `_italic😀)_,` позиция 10
         if (isStartBound(state)) {
             consumeOpen(state);
         } else {
@@ -23,18 +29,18 @@ export default function parseMarkdown(state: ParserState): boolean {
  * Возвращает MS-формат для указанного кода
  */
 export function formatForChar(ch: number): TokenFormat {
-    switch (ch) {
-        case Codes.Asterisk:
-            return TokenFormat.Bold;
-        case Codes.Underscore:
-            return TokenFormat.Italic;
-        case Codes.Tilde:
-            return TokenFormat.Strike;
-        case Codes.BackTick:
-            return TokenFormat.Monospace;
-        default:
-            return TokenFormat.None;
-    }
+    return charToFormat.get(ch) || TokenFormat.None;
+}
+
+export function isStartBoundChar(ch: number): boolean {
+    return isBound(ch)
+        || ch === Codes.RoundBracketOpen
+        || ch === Codes.SquareBracketOpen
+        || ch === Codes.CurlyBracketOpen;
+}
+
+export function isEndBoundChar(ch: number): boolean {
+    return isDelimiter(ch);
 }
 
 export function peekClosingMarkdown(state: ParserState): boolean {
@@ -63,18 +69,14 @@ function isStartBound(state: ParserState): boolean {
     }
 
     if (state.hasPendingText()) {
-        const ch = state.peekPrev()
-        return isBound(ch)
-            || ch === Codes.RoundBracketOpen
-            || ch === Codes.SquareBracketOpen
-            || ch === Codes.CurlyBracketOpen;
+        return isStartBoundChar(state.peekPrev());
     }
 
     return false;
 }
 
 function isEndBound(state: ParserState): boolean {
-    return isDelimiter(state.peek());
+    return isEndBoundChar(state.peek());
 }
 
 /**

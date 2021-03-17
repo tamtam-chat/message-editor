@@ -9,6 +9,8 @@ import command from './command';
 import hashtag from './hashtag';
 import link from './link';
 import markdown from './markdown';
+import { TokenType } from '../formatted-string/types';
+import { normalize } from '../formatted-string/utils';
 
 const defaultOptions: ParserOptions = {
     markdown: false,
@@ -34,13 +36,21 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
 
     state.flushText();
 
-    // Если есть незакрытые токены форматирования, сбрасываем их формат,
-    // так как они не валидны
-    for (let i = 0; i < state.formatStack.length; i++) {
-        state.formatStack[i].format = TokenFormat.None;
+    let { tokens } = state;
+
+    if (options.markdown && state.formatStack.length) {
+        // Если есть незакрытые токены форматирования, сбрасываем их формат,
+        // так как они не валидны
+        for (let i = 0, token: Token; i < state.formatStack.length; i++) {
+            token = state.formatStack[i] as Token;
+            token.format = TokenFormat.None;
+            token.type = TokenType.Text;
+        }
+
+        tokens = normalize(tokens);
     }
 
-    return state.tokens;
+    return tokens;
 }
 
 export { ParserOptions, Token, TokenFormat };

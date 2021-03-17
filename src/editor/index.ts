@@ -5,10 +5,8 @@ import { TextRange } from '../types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
-import {
-    cutText, getLength, insertText, removeText, replaceText, setFormat, setLink,
-    slice, clamp, isCustomLink, TokenFormatUpdate, tokenForPos, LocationType
-} from '../formatted-string';
+import { getLength, insertText, removeText, replaceText, cutText, setFormat, setLink, slice, TokenFormatUpdate } from '../formatted-string';
+import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { TokenType } from '../formatted-string/types';
 
@@ -625,4 +623,8 @@ function isCollapsed(range: TextRange): boolean {
 
 function getTextFromKeyboardEvent(evt: KeyboardEvent): string {
     return evt.key === 'Enter' ? '\n' : evt.key;
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max);
 }
