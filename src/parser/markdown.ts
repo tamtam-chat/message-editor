@@ -2,8 +2,6 @@ import { TokenFormat } from '../formatted-string';
 import { Token, TokenMarkdown, TokenType } from '../formatted-string/types';
 import ParserState from './state';
 import { Codes, isDelimiter, isBound, last } from './utils';
-import link from './link';
-import mention from './mention';
 
 export const charToFormat = new Map<number, TokenFormat>([
     [Codes.Asterisk, TokenFormat.Bold],
@@ -194,40 +192,51 @@ function customLink(state: ParserState): boolean {
         if (state.consume(Codes.RoundBracketOpen)) {
             const openLink = mdToken(state, TokenFormat.Link);
             const start = state.pos;
-            const innerState = new ParserState(state.string.slice(start), state.options);
 
-            // TODO не нужно парсить ссылку, нужно захватить текст
-            if ((mention(innerState) || link(innerState)) && innerState.consume(Codes.RoundBracketClose)) {
-                // Смогли поглотить завершающий фрагмент ссылки
-                innerState.push(mdToken(innerState, TokenFormat.Link));
+            if (consumeCustomLinkClose(state)) {
+                const linkValue = state.substring(start);
+                pushClose(state, closeLabel);
+                pushOpen(state, openLink);
+                state.push({
+                    type: TokenType.Link,
+                    format: state.format,
+                    value: linkValue,
+                    link: linkValue,
+                    auto: false,
+                    sticky: false,
+                });
+                state.pos++;
+                pushClose(state, mdToken(state, TokenFormat.Link));
 
-                // Функция `link()` может поглотить как ссылку, так и текст, который
-                // похож на ссылку. Учитывая, что в тексте явно заданы границы ссылки,
-                // мы любой результат скинем в виде ссылки в основной поток
-                const [linkCandidate, closeLink] = innerState.tokens;
-
-                if (linkCandidate.type === TokenType.Link || linkCandidate.type === TokenType.Mention) {
-                    pushClose(state, closeLabel);
-                    pushOpen(state, openLink);
-                    state.push({
-                        type: TokenType.Link,
-                        format: state.format,
-                        value: linkCandidate.value,
-                        link: linkCandidate.type === TokenType.Link ? linkCandidate.link : linkCandidate.value,
-                        emoji: linkCandidate.emoji,
-                        auto: false,
-                        sticky: false,
-                    });
-                    pushClose(state, closeLink as TokenMarkdown);
-                    state.pos = start + innerState.pos;
-
-                    return true;
-                }
+                return true;
             }
         }
 
         state.pos = pos;
     }
 
+    return false;
+}
+
+function consumeCustomLinkClose(state: ParserState): boolean {
+    // Cчётчик на случай всякой фигни, чтобы далеко не парсить
+    let guard = 2000;
+    let ch: number;
+    const { pos } = state;
+
+    while (state.hasNext() && --guard) {
+        ch = state.peek();
+        if (ch === Codes.RoundBracketClose) {
+            return true;
+        }
+
+        if (isBound(ch)) {
+            break;
+        }
+
+        state.next();
+    }
+
+    state.pos = pos;
     return false;
 }
