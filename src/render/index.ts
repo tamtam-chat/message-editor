@@ -12,6 +12,8 @@ const formats: ClassFormat[] = [
     [TokenFormat.Underline, 'underline'],
     [TokenFormat.Important, 'important'],
     [TokenFormat.Highlight, 'highlight'],
+    [TokenFormat.Link, 'md-link'],
+    [TokenFormat.LinkLabel, 'md-link-label'],
 ];
 
 const tokenTypeClass: Record<TokenType, string> = {

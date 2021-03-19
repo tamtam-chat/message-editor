@@ -1,7 +1,7 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
 import _parse, { ParserOptions } from '../src/parser';
 import { Token, TokenFormat, TokenType } from '../src/formatted-string/types';
-import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd } from '../src/formatted-string/markdown';
+import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd, TextRange } from '../src/formatted-string/markdown';
 
 const opt: ParserOptions = {
     command: true,
@@ -179,7 +179,7 @@ describe('Markdown', () => {
 
     it('markdown to text converter', () => {
         // Выделяем текст `some label`
-        const pos: [pos: number, length: number] = [16, 12];
+        const pos: TextRange = [16, 12];
         let str = 'hello `world` [*some* _label_](tamtam.chat) here';
         let text = mdToText(parse(str), pos);
 
@@ -202,5 +202,28 @@ describe('Markdown', () => {
         deepEqual(types(text), [TokenType.Link, TokenType.Link]);
         deepEqual(values(text), ['a', 'b']);
         equal(textToMd(text), str);
+    });
+
+    it('adjust text range', () => {
+        const md = parse('hello `world` [*some* _label_](tamtam.chat) here');
+
+        // Выделяем `world`
+        let pos: TextRange = [6, 7];
+        let tokens = mdToText(md, pos);
+        deepEqual(pos, [6, 5]);
+        equal(text(tokens).substr(pos[0], pos[1]), 'world');
+
+        // Частично выделяем ссылку
+        pos = [23, 11];
+        tokens = mdToText(md, pos);
+        deepEqual(pos, [17, 5]);
+        equal(text(tokens).substr(pos[0], pos[1]), 'label');
+
+
+        // Выделяем подпись ссылки и текст за ним
+        pos = [23, 23];
+        tokens = mdToText(md, pos);
+        deepEqual(pos, [17, 8]);
+        equal(text(tokens).substr(pos[0], pos[1]), 'label he');
     });
 });

@@ -38,9 +38,17 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
         if (len === offset) {
             // Попали точно на границу токенов. Проверим, если следующий является
             // sticky-токеном, то работать нужно будет с ним, иначе с текущим
-            const nextToken = tokens[i + 1]!;
-            if (tokens.length - 1 === i || nextToken.type !== TokenType.Text || !nextToken.sticky) {
+
+            if (tokens.length - 1 === i) {
+                // Это последний токен
                 return true;
+            }
+
+            if (locType !== LocationType.Start) {
+                const nextToken = tokens[i + 1]!;
+                if (nextToken.type !== TokenType.Text || !nextToken.sticky) {
+                    return true;
+                }
             }
         }
 

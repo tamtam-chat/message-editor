@@ -96,7 +96,7 @@ export function mdToText(tokens: Token[], range?: TextRange): Token[] {
                 convertCustomLink(tokens.slice(i, linkBound), result, state);
                 i = linkBound - 1;
             } else {
-                adjustTextRange(token, state);
+                adjustTextRange(state, token);
             }
         } else {
             state.offset += len;
@@ -278,7 +278,7 @@ function convertCustomLink(customLink: Token[], output: Token[], state: MDConver
 
         customLink.slice(0, -4).forEach(token => {
             if (token.type === TokenType.Markdown) {
-                adjustTextRange(token, state);
+                adjustTextRange(state, token);
             } else {
                 output.push({
                     type: TokenType.Link,
@@ -294,7 +294,7 @@ function convertCustomLink(customLink: Token[], output: Token[], state: MDConver
         });
 
         if (state.range) {
-            customLink.slice(-4).forEach(token => adjustTextRange(token, state));
+            customLink.slice(-4).forEach(token => adjustTextRange(state, token));
         }
     }
 }
@@ -317,12 +317,17 @@ function findCustomLinkBound(tokens: Token[], start: number): number {
     }
 }
 
-function adjustTextRange(token: Token, state: MDConverterState): void {
-    if (state.range) {
-        if (state.offset < state.range[0]) {
-            state.range[0] -= token.value.length;
-        } else if (state.offset < state.range[0] + state.range[1]) {
-            state.range[1] -= token.value.length;
+function adjustTextRange(state: MDConverterState, token: Token): void {
+    const { range, offset } = state;
+    if (range) {
+        if (offset < range[0]) {
+            range[0] -= token.value.length;
+        } else if (offset < range[0] + range[1]) {
+            // state.range[1] -= token.value.length;
+            // Может быть такое, что диапазон находится внутри удаляемых токенов.
+            // Как минимум нам надо сохранить фиксированную часть
+            const fixed = offset - range[0];
+            state.range[1] = fixed + Math.max(0, range[1] - fixed - token.value.length);
         }
     }
 }

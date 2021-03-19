@@ -418,9 +418,19 @@ export default class Editor extends EventEmitter<EditorEvents> {
         if (url) {
             url = url.trim();
         }
-        const result = this.updateModel(
-            setLink(this.model, url, from, to - from), 'link', [from, to]);
-        setRange(this.element, from, to);
+
+        let updated: Model;
+        const range: Rng = [from, to - from];
+        if (this.isMarkdown) {
+            const text = mdToText(this.model, range);
+            const next = setLink(text, url, range[0], range[1]);
+            updated = parse(textToMd(next, range), this.options.parse);
+        } else {
+            updated = setLink(this.model, url, range[0], range[1]);
+        }
+
+        const result = this.updateModel(updated, 'link', [from, to]);
+        setRange(this.element, range[0], range[0] + range[1]);
         return result;
     }
 

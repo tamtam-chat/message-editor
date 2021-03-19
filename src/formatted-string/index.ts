@@ -65,8 +65,8 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         return parse(value, options);
     }
 
-    const start = tokenForPos(tokens, from, LocationType.Start);
     const end = tokenForPos(tokens, to, LocationType.End);
+    const start = from === to ? end : tokenForPos(tokens, from, LocationType.Start);
 
     if (start.index === -1 || end.index === -1) {
         // Такого не должно быть
