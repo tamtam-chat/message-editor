@@ -4,11 +4,12 @@ import { TokenType } from './types';
 import { charToFormat, isStartBoundChar, isEndBoundChar } from '../parser/markdown';
 import { isCustomLink } from './utils';
 
-type TextRange = [pos: number, len: number];
+export type TextRange = [pos: number, len: number];
 
 interface TextConvertState {
     format: TokenFormat;
     stack: TokenFormat[];
+    range?: TextRange;
     link: string;
     output: string;
 }
@@ -48,7 +49,7 @@ export function mdRemoveText(tokens: Token[], pos: number, len: number, options:
 /**
  * Вырезает текст из диапазона `from:to` и возвращает его и изменённую строку
  */
-export function cutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
+export function mdCutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
     return {
         cut: parse(getText(tokens).slice(from, to), options),
         tokens: mdRemoveText(tokens, from, to - from, options)
@@ -69,7 +70,7 @@ export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFo
     const range: TextRange = [pos, len];
     const text = mdToText(tokens, range);
     const updated = setFormat(text, format, range[0], range[1]);
-    return parse(textToMd(updated), options);
+    return parse(textToMd(updated, range), options);
 }
 
 /**
@@ -108,21 +109,22 @@ export function mdToText(tokens: Token[], range?: TextRange): Token[] {
 
 /**
  * Конвертация обычных текстовых токенов в MD-строку
- * @param baseFormat Базовый формат, от которого нужно считать разницу в форматировании
- * @param formatStack Стэк символов форматирования. Используется для того, чтобы
- * выводить закрывающие символы форматирования в правильном порядке
+ * @param range Диапазон внутри текстовой строки. Если указан, значения параметра будут
+ * изменены таким образом, чтобы указывать на ту же самую позицию внутри
+ * внутри нового списка токенов
  */
-export function textToMd(tokens: Token[]): string {
+export function textToMd(tokens: Token[], range?: TextRange): string {
     const state: TextConvertState = {
         format: 0,
         stack: [],
+        range,
         link: '',
         output: ''
     };
     tokens.forEach(token => textToMdToken(token, state));
 
     if (state.format) {
-        state.output += getFormatSymbols(state.format, state, true);
+        pushSymbols(state, getFormatSymbols(state.format, state, true))
     }
 
     return state.output;
@@ -135,6 +137,7 @@ function textToMdToken(token: Token, state: TextConvertState): void {
     let hasLink = 0;
     let bound = 0;
     let hasBound = false;
+    let suffix: string;
 
     if (isCustomLink(token)) {
         format |= TokenFormat.Link;
@@ -159,12 +162,13 @@ function textToMdToken(token: Token, state: TextConvertState): void {
 
         bound = hasLink ? state.output.length : findEndBound(state.output);
         hasBound = bound !== state.output.length;
-        state.output = state.output.slice(0, bound)
-            + getFormatSymbols(removed, state, true)
-            + state.output.slice(bound);
+        suffix = state.output.slice(bound);
+        state.output = state.output.slice(0, bound);
+        pushSymbols(state, getFormatSymbols(removed, state, true));
+        state.output += suffix;
 
         if (!added && !hasLink && !hasBound && !isEndBoundChar(token.value.charCodeAt(0))) {
-            state.output += ' ';
+            pushSymbols(state, ' ');
         }
     }
 
@@ -181,12 +185,12 @@ function textToMdToken(token: Token, state: TextConvertState): void {
 
         if (bound === 0 && !hasLink && !isStartBoundChar(state.output.charCodeAt(state.output.length - 1))) {
             // Нет чёткой границы для разделения
-            state.output += ' ';
+            pushSymbols(state, ' ');
         }
 
-        state.output += token.value.slice(0, bound)
-            + getFormatSymbols(added, state, false)
-            + token.value.slice(bound);
+        state.output += token.value.slice(0, bound);
+        pushSymbols(state, getFormatSymbols(added, state, false));
+        state.output += token.value.slice(bound);
     } else {
         state.output += token.value;
     }
@@ -321,4 +325,18 @@ function adjustTextRange(token: Token, state: MDConverterState): void {
             state.range[1] -= token.value.length;
         }
     }
+}
+
+function pushSymbols(state: TextConvertState, value: string): void {
+    const { range } = state;
+    if (range) {
+        const len = state.output.length;
+        if (len <= range[0]) {
+            range[0] += value.length;
+        } else if (len < range[0] + range[1]) {
+            range[1] += value.length;
+        }
+    }
+
+    state.output += value;
 }

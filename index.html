@@ -7,7 +7,7 @@
     <title>Editor example</title>
     <style>
     main {
-        margin: 20px auto;
+        margin: 120px auto 20px;
         max-width: 600px;
         font-family: 'PT Sans', Arial, sans-serif;
     }
@@ -20,7 +20,7 @@
 
     .editor-wrap {
         position: relative;
-        margin-top: 100px;
+        margin-bottom: 50px;
     }
 
     .editor {
@@ -31,6 +31,8 @@
         border-radius: 5px;
         white-space: pre-wrap;
         outline: none;
+        min-height: 1.3em;
+        line-height: 1.3;
     }
 
     .editor img {
@@ -144,17 +146,25 @@
 </head>
 <body>
     <main>
+        <p>Текстовый редактор</p>
         <div class="editor-wrap">
-            <div class="toolbar hidden">
-                <span class="toolbar-btn bold selected" data-format="1">B</span>
-                <span class="toolbar-btn italic" data-format="2">I</span>
-                <span class="toolbar-btn strike" data-format="8">S</span>
-                <span class="toolbar-btn monospace" data-format="16">M</span>
-                <span class="toolbar-sep"></span>
-                <span class="toolbar-btn link">Ссылка</span>
-            </div>
-            <div class="editor"></div>
+            <div id="text-editor" class="editor"></div>
         </div>
+
+        <p>Markdown редактор</p>
+        <div class="editor-wrap">
+            <div id="md-editor" class="editor"></div>
+        </div>
+
+        <div class="toolbar hidden">
+            <span class="toolbar-btn bold selected" data-format="1">B</span>
+            <span class="toolbar-btn italic" data-format="2">I</span>
+            <span class="toolbar-btn strike" data-format="8">S</span>
+            <span class="toolbar-btn monospace" data-format="16">M</span>
+            <span class="toolbar-sep"></span>
+            <span class="toolbar-btn link">Ссылка</span>
+        </div>
+
         <ul>
             <li>⌘B — жирный</li>
             <li>⌘I — курсив</li>
@@ -165,9 +175,10 @@
     </main>
 <script type="module">
 import Editor from './dist/editor.js';
-const elem = document.querySelector('.editor');
+
 const toolbar = document.querySelector('.toolbar');
-const editor = new Editor(elem, {
+let activeEditor;
+const editor = new Editor(document.querySelector('#text-editor'), {
     value: 'Привет, мир! 😇',
     parse: {
         textEmoji: true,
@@ -178,32 +189,50 @@ const editor = new Editor(elem, {
         link: true,
     }
 });
-editor.focus();
-editor.on('selectionchange', ed => {
-    const sel = editor.getSelection();
-    if (sel[0] !== sel[1]) {
-        showToolbar();
-        updateToolbar(ed);
-    } else {
-        hideToolbar();
+editor.on('selectionchange', onSelectionChange);
+editor.on('formatchange', updateToolbarState);
+
+const mdEditor = new Editor(document.querySelector('#md-editor'), {
+    value: 'Привет, markdown мир! 😇',
+    parse: {
+        textEmoji: true,
+        hashtag: true,
+        mention: true,
+        command: true,
+        userSticker: true,
+        link: true,
+        markdown: true
     }
 });
-editor.on('formatchange', updateToolbarState);
+mdEditor.on('selectionchange', onSelectionChange);
+mdEditor.on('formatchange', updateToolbarState);
+
 toolbar.addEventListener('mousedown', evt => {
     const btn = evt.target.closest('.toolbar-btn');
     if (btn) {
         evt.preventDefault();
         const format = btn.dataset.format;
         if (format) {
-            editor.toggleFormat(Number(format));
+            activeEditor.toggleFormat(Number(format));
         } else if (btn.classList.contains('link')) {
-            const [from, to] = editor.getSelection();
-            const token = editor.tokenForPos(from);
+            const [from, to] = activeEditor.getSelection();
+            const token = activeEditor.tokenForPos(from);
             const url = prompt('Введите ссылку', token && token.type === 'link' ? token.link : undefined);
-            editor.setLink(url, from, to);
+            activeEditor.setLink(url, from, to);
         }
     }
 });
+
+function onSelectionChange(editor) {
+    activeEditor = editor;
+    const sel = editor.getSelection();
+    if (sel[0] !== sel[1]) {
+        showToolbar(editor);
+        updateToolbar(editor);
+    } else {
+        hideToolbar();
+    }
+}
 
 function updateToolbar(editor) {
     const sel = window.getSelection();
@@ -211,7 +240,7 @@ function updateToolbar(editor) {
         const r = sel.getRangeAt(0);
         if (r) {
             const rect = r.getClientRects().item(0);
-            const editorRect = elem.getBoundingClientRect();
+            const editorRect = editor.element.getBoundingClientRect();
             toolbar.style.left = `${rect.left - editorRect.left - 5}px`;
             toolbar.style.top = `${rect.top - editorRect.top - toolbar.offsetHeight - 5}px`;
             updateToolbarState(editor);
@@ -241,11 +270,15 @@ function hideToolbar() {
     toolbar.classList.add('hidden');
 }
 
-function showToolbar() {
+function showToolbar(editor) {
     toolbar.classList.remove('hidden');
+    if (toolbar.parentElement !== editor.element.parentElement) {
+        editor.element.parentElement.appendChild(toolbar);
+    }
 }
 
 window.editor = editor;
+window.mdEditor = mdEditor;
 </script>
 </body>
 </html>

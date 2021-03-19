@@ -6,6 +6,7 @@ import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
 import { getLength, insertText, removeText, replaceText, cutText, setFormat, setLink, slice, TokenFormatUpdate } from '../formatted-string';
+import { mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd, TextRange as Rng } from '../formatted-string/markdown';
 import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { TokenType } from '../formatted-string/types';
@@ -62,7 +63,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
 
     private onKeyPress = (evt: KeyboardEvent) => {
         if (!evt.defaultPrevented && isInputEvent(evt)) {
-            const range = getTextRange(this.elem);
+            const range = getTextRange(this.element);
 
             if (range) {
                 // Перехватываем keypress, что бы потом красиво и плавно всё вставить
@@ -88,7 +89,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
 
         // Если сработало событие input, значит, мы не смогли самостоятельно
         // обработать ввод. Попробуем его вычислить
-        const range = getTextRange(this.elem);
+        const range = getTextRange(this.element);
         if (range && isCollapsed(range)) {
             let payload: DiffAction;
             const value = this.getValue();
@@ -130,7 +131,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
     }
 
     private onSelectionChange = () => {
-        const range = getTextRange(this.elem);
+        const range = getTextRange(this.element);
 
         if (range) {
             this.saveSelection(range);
@@ -172,7 +173,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Обработка события вставки текста
      */
     private onPaste = (evt: ClipboardEvent) => {
-        const range = getTextRange(this.elem);
+        const range = getTextRange(this.element);
         let fragment: string | Token[] = evt.clipboardData.getData(fragmentMIME);
 
         if (fragment) {
@@ -195,9 +196,9 @@ export default class Editor extends EventEmitter<EditorEvents> {
     }
 
     /**
-     * @param elem Контейнер, в котором будет происходить редактирование
+     * @param element Контейнер, в котором будет происходить редактирование
      */
-    constructor(public elem: HTMLElement, public options: EditorOptions = {}) {
+    constructor(public element: HTMLElement, public options: EditorOptions = {}) {
         super();
         this.model = parse(options.value || '', options.parse);
         this.history = new History({
@@ -217,9 +218,16 @@ export default class Editor extends EventEmitter<EditorEvents> {
             this._model = value;
             // При рендеринге может слететь позиция курсора, поэтому после рендеринга
             // проверим: если она поменялась, то восстановим
-            render(this.elem, value);
+            render(this.element, value);
             this.emit('update', this);
         }
+    }
+
+    /**
+     * Вернёт `true` если редактор работает в режиме Markdown
+     */
+    get isMarkdown(): boolean {
+        return !!(this.options.parse?.markdown);
     }
 
     /**
@@ -227,13 +235,13 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * переопределения
      */
     setup(): void {
-        this.elem.contentEditable = 'true';
-        this.elem.addEventListener('keypress', this.onKeyPress);
-        this.elem.addEventListener('keydown', this.onHandleShortcut);
-        this.elem.addEventListener('input', this.onInput);
-        this.elem.addEventListener('cut', this.onCut);
-        this.elem.addEventListener('copy', this.onCopy);
-        this.elem.addEventListener('paste', this.onPaste);
+        this.element.contentEditable = 'true';
+        this.element.addEventListener('keypress', this.onKeyPress);
+        this.element.addEventListener('keydown', this.onHandleShortcut);
+        this.element.addEventListener('input', this.onInput);
+        this.element.addEventListener('cut', this.onCut);
+        this.element.addEventListener('copy', this.onCopy);
+        this.element.addEventListener('paste', this.onPaste);
         document.addEventListener('selectionchange', this.onSelectionChange);
 
         const shortcuts = {
@@ -253,12 +261,12 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Вызывается для того, чтобы удалить все связи редактора с DOM.
      */
     dispose(): void {
-        this.elem.removeEventListener('keypress', this.onKeyPress);
-        this.elem.removeEventListener('keydown', this.onHandleShortcut);
-        this.elem.removeEventListener('input', this.onInput);
-        this.elem.removeEventListener('cut', this.onCut);
-        this.elem.removeEventListener('copy', this.onCopy);
-        this.elem.removeEventListener('paste', this.onPaste);
+        this.element.removeEventListener('keypress', this.onKeyPress);
+        this.element.removeEventListener('keydown', this.onHandleShortcut);
+        this.element.removeEventListener('input', this.onInput);
+        this.element.removeEventListener('cut', this.onCut);
+        this.element.removeEventListener('copy', this.onCopy);
+        this.element.removeEventListener('paste', this.onPaste);
         document.removeEventListener('selectionchange', this.onSelectionChange);
         this.inputHandled = false;
         this.pendingUpdate = null;
@@ -271,8 +279,11 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Вставляет текст в указанную позицию
      */
     insertText(pos: number, text: string): Model {
+        const updated = this.isMarkdown
+            ? mdInsertText(this.model, pos, text, this.options.parse)
+            : insertText(this.model, pos, text, this.options.parse);
         const result = this.updateModel(
-            insertText(this.model, pos, text, this.options.parse),
+            updated,
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
@@ -284,8 +295,11 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Удаляет указанный диапазон текста
      */
     removeText(from: number, to: number): Model {
+        const updated = this.isMarkdown
+            ? mdRemoveText(this.model, from, to - from, this.options.parse)
+            : removeText(this.model, from, to - from, this.options.parse);
         const result = this.updateModel(
-            removeText(this.model, from, to - from, this.options.parse),
+            updated,
             DiffActionType.Remove,
             [from, to]);
 
@@ -305,7 +319,9 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * @returns Вырезанный фрагмент модели
      */
     cut(from: number, to: number): Model {
-        const result = cutText(this.model, from, to, this.options.parse);
+        const result = this.isMarkdown
+            ? mdCutText(this.model, from, to, this.options.parse)
+            : cutText(this.model, from, to, this.options.parse);
         this.updateModel(result.tokens, 'cut', [from, to]);
         return result.cut;
     }
@@ -315,7 +331,9 @@ export default class Editor extends EventEmitter<EditorEvents> {
      */
     paste(text: string | Model, from: number, to: number): Model {
         const value = typeof text === 'string' ? text : getText(text);
-        let next = replaceText(this.model, from, to - from, value, this.options.parse);
+        let next = this.isMarkdown
+            ? mdReplaceText(this.model, from, to - from, value, this.options.parse)
+            : replaceText(this.model, from, to - from, value, this.options.parse);
 
         // Применяем форматирование из фрагмента
         if (Array.isArray(text)) {
@@ -323,7 +341,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
             text.forEach(token => {
                 const len = token.value.length;
                 if (token.format) {
-                    next = setFormat(next, { add: token.format }, offset, len);
+                    next = this.setFormat(next, { add: token.format }, [offset, len]);
                 }
 
                 if (isCustomLink(token)) {
@@ -341,7 +359,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Ставит фокус в редактор
      */
     focus(): void {
-        this.elem.focus();
+        this.element.focus();
         this.setSelection(getLength(this.model));
     }
 
@@ -349,12 +367,13 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Обновляет форматирование у указанного диапазона
      */
     updateFormat(format: TokenFormatUpdate, from: number, to = from): Model {
+        const range: Rng = [from, to - from];
         const result = this.updateModel(
-            setFormat(this.model, format, from, to - from),
+            this.setFormat(this.model, format, range),
             'format',
             [from, to]
         );
-        setRange(this.elem, from, to);
+        setRange(this.element, range[0], range[0] + range[1]);
         this.emit('formatchange', this);
         return result;
     }
@@ -401,7 +420,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
         }
         const result = this.updateModel(
             setLink(this.model, url, from, to - from), 'link', [from, to]);
-        setRange(this.elem, from, to);
+        setRange(this.element, from, to);
         return result;
     }
 
@@ -479,8 +498,8 @@ export default class Editor extends EventEmitter<EditorEvents> {
         const maxIx = getLength(this.model);
         from = clamp(from, 0, maxIx);
         to = clamp(to, 0, maxIx);
-        setRange(this.elem, from, to);
-        this.saveSelection(getTextRange(this.elem));
+        setRange(this.element, from, to);
+        this.saveSelection(getTextRange(this.element));
     }
 
     /**
@@ -494,7 +513,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * Возвращает строковое содержимое поля ввода
      */
     getInputText(): string {
-        const walker = this.elem.ownerDocument.createTreeWalker(this.elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+        const walker = this.element.ownerDocument.createTreeWalker(this.element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
         let result = '';
         let node: Node;
         let raw: string | undefined;
@@ -580,7 +599,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * туда помещается сериализованный фрагмент модели, чтобы сохранить форматирование
      */
     private copyFragment(clipboard: DataTransfer, cut?: boolean): boolean {
-        const range = getTextRange(this.elem);
+        const range = getTextRange(this.element);
 
         if (range && !isCollapsed(range)) {
             const fragment = cut
@@ -588,7 +607,9 @@ export default class Editor extends EventEmitter<EditorEvents> {
                 : this.slice(range[0], range[1]);
 
             clipboard.setData('text/plain', getText(fragment));
-            clipboard.setData(fragmentMIME, JSON.stringify(fragment));
+            if (!this.isMarkdown) {
+                clipboard.setData(fragmentMIME, JSON.stringify(fragment));
+            }
 
             if (cut) {
                 this.setSelection(range[0]);
@@ -598,6 +619,23 @@ export default class Editor extends EventEmitter<EditorEvents> {
         }
 
         return false;
+    }
+
+    /**
+     * Применяет новый формат к указанному диапазону и возвращает новый набор токенов
+     */
+    private setFormat(tokens: Model, format: TokenFormatUpdate, range: Rng): Model {
+        if (this.isMarkdown) {
+            // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
+            // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
+            // Полученный результат обрамим MD-символами для получения нужного результата
+            // и заново распарсим
+            const text = mdToText(tokens, range);
+            const updated = setFormat(text, format, range[0], range[1]);
+            return parse(textToMd(updated, range), this.options.parse);
+        }
+
+        return setFormat(tokens, format, range[0], range[1]);
     }
 }
 
