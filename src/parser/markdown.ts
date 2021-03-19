@@ -114,12 +114,14 @@ function consumeClose(state: ParserState): void {
     // закрывающие токены, а потом проверим, можем ли их закрыть
     const pending: TokenMarkdown[] = [];
     const { pos } = state;
+    let { format } = state;
     let nextFormat: TokenFormat;
 
     while (state.hasNext()) {
         nextFormat = formatForChar(state.peek());
-        if (nextFormat !== TokenFormat.None && state.hasFormat(nextFormat)) {
+        if (nextFormat !== TokenFormat.None && (format & nextFormat)) {
             state.pos++;
+            format &= ~nextFormat;
             pending.push(mdToken(state, nextFormat));
         } else {
             break;
@@ -193,6 +195,8 @@ function customLink(state: ParserState): boolean {
             const openLink = mdToken(state, TokenFormat.Link);
             const start = state.pos;
             const innerState = new ParserState(state.string.slice(start), state.options);
+
+            // TODO не нужно парсить ссылку, нужно захватить текст
             if ((mention(innerState) || link(innerState)) && innerState.consume(Codes.RoundBracketClose)) {
                 // Смогли поглотить завершающий фрагмент ссылки
                 innerState.push(mdToken(innerState, TokenFormat.Link));

@@ -92,6 +92,10 @@ describe('Markdown', () => {
         tokens = parse('`{ ... }`, not code');
         deepEqual(types(tokens), [TokenType.Markdown, TokenType.Text, TokenType.Markdown, TokenType.Text]);
         deepEqual(values(tokens), ['`', '{ ... }', '`', ', not code']);
+
+        tokens = parse('a *b** c');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Markdown, TokenType.Text, TokenType.Markdown, TokenType.Text]);
+        deepEqual(values(tokens), ['a ', '*', 'b', '*', '* c']);
     });
 
     it('custom links', () => {
@@ -191,7 +195,7 @@ describe('Markdown', () => {
         deepEqual(pos, [12, 10]);
         equal(textToMd(text), str);
 
-        // Вде ссылки рядом
+        // Две ссылки рядом
         str = '[*a*](mail.ru)[_b_](ok.ru)';
         text = mdToText(parse(str));
 
