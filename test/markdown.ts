@@ -1,7 +1,7 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
 import _parse, { ParserOptions } from '../src/parser';
 import { Token, TokenFormat, TokenType } from '../src/formatted-string/types';
-import { mdInsertText, mdRemoveText, mdSetFormat } from '../src/formatted-string/markdown';
+import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd } from '../src/formatted-string/markdown';
 
 const opt: ParserOptions = {
     command: true,
@@ -173,8 +173,30 @@ describe('Markdown', () => {
         equal(text(t3_2), 'fo _o ba_ r baz');
     });
 
-    it.skip('debug', () => {
-        const tokens = parse('-_-');
-        console.log(tokens[0]);
+    it('markdown to text converter', () => {
+        // Выделяем текст `some label`
+        const pos: [pos: number, length: number] = [16, 12];
+        let str = 'hello `world` [*some* _label_](tamtam.chat) here';
+        let text = mdToText(parse(str), pos);
+
+        deepEqual(types(text), [
+            TokenType.Text, TokenType.Text, TokenType.Text,
+            TokenType.Link, TokenType.Link, TokenType.Link,
+            TokenType.Text
+        ]);
+        deepEqual(values(text), ['hello ', 'world', ' ', 'some', ' ', 'label', ' here']);
+
+        // Модифицируем диапазон таким образом, чтобы он выделял чистый текст
+        // `some label`
+        deepEqual(pos, [12, 10]);
+        equal(textToMd(text), str);
+
+        // Вде ссылки рядом
+        str = '[*a*](mail.ru)[_b_](ok.ru)';
+        text = mdToText(parse(str));
+
+        deepEqual(types(text), [TokenType.Link, TokenType.Link]);
+        deepEqual(values(text), ['a', 'b']);
+        equal(textToMd(text), str);
     });
 });

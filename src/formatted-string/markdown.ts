@@ -2,6 +2,21 @@ import { getText, setFormat, CutText, TokenFormatUpdate, } from '.';
 import parse, { ParserOptions, Token, TokenFormat } from '../parser';
 import { TokenType } from './types';
 import { charToFormat, isStartBoundChar, isEndBoundChar } from '../parser/markdown';
+import { isCustomLink } from './utils';
+
+type TextRange = [pos: number, len: number];
+
+interface TextConvertState {
+    format: TokenFormat;
+    stack: TokenFormat[];
+    link: string;
+    output: string;
+}
+
+interface MDConverterState {
+    offset: number;
+    range?: TextRange;
+}
 
 const formats = Array.from(charToFormat.values());
 const formatToChar = new Map<TokenFormat, string>();
@@ -50,74 +65,133 @@ export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFo
     // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
     // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
     // Полученный результат обрамим MD-символами для получения нужного результата
-    let offset = 0;
-    const filtered = tokens.filter(t => {
-        const l = t.value.length;
-        if (t.type === TokenType.Markdown) {
-            if (offset < pos) {
-                pos -= l;
-            } else if (offset < pos + len) {
-                len -= l;
+    // и заново распарсим
+    const range: TextRange = [pos, len];
+    const text = mdToText(tokens, range);
+    const updated = setFormat(text, format, range[0], range[1]);
+    return parse(textToMd(updated), options);
+}
+
+/**
+ * Конвертация MD-токенов в список обычных текстовых токенов
+ * @param range Диапазон внутри MD-строки. Если указан, значения параметра будут
+ * изменены таким образом, чтобы указывать на ту же самую позицию внутри
+ * внутри нового списка токенов
+ */
+export function mdToText(tokens: Token[], range?: TextRange): Token[] {
+    const state: MDConverterState = { offset: 0, range };
+    const result: Token[] = [];
+
+    for (let i = 0, token: Token, len: number; i < tokens.length; i++) {
+        token = tokens[i];
+        len = token.value.length;
+
+        if (token.type === TokenType.Markdown) {
+            if (token.format & TokenFormat.LinkLabel) {
+                // Начало кастомной ссылки. В этом месте мы знаем, что за токеном
+                // следует текст ссылки и сама ссылка, поэтому пройдёмся по токенам
+                // вперёд и найдём границу всей ссылки
+                const linkBound = findCustomLinkBound(tokens, i);
+                convertCustomLink(tokens.slice(i, linkBound), result, state);
+                i = linkBound - 1;
+            } else {
+                adjustTextRange(token, state);
             }
-
-            return false;
-        }
-
-        offset += l;
-        return true;
-    });
-
-    const updated = setFormat(filtered, format, pos, len);
-    let result = ''
-    let curFormat = 0;
-
-    /**
-     * Стэк символов форматирования. Используется для того, чтобы выводить
-     * закрывающие символы форматирования в правильном порядке
-     */
-    const formatStack: TokenFormat[] = [];
-
-    updated.forEach(t => {
-        const diff = curFormat ^ t.format;
-        const removed = curFormat & diff;
-        const added = t.format & diff;
-
-        if (removed) {
-            // Есть форматы, которые надо удалить
-            const bound = findEndBound(result);
-            const hasBound = bound !== result.length;
-            result = result.slice(0, bound)
-                + getFormatSymbols(removed, formatStack, true)
-                + result.slice(bound);
-
-            if (!added && !hasBound && !isEndBoundChar(t.value.charCodeAt(0))) {
-                result += ' ';
-            }
-        }
-
-        if (added) {
-            // Есть форматы, которые надо добавить
-            const bound = findStartBound(t.value);
-            if (bound === 0 && !isStartBoundChar(result.charCodeAt(result.length - 1))) {
-                // Нет чёткой границы для разделения
-                result += ' ';
-            }
-
-            result += t.value.slice(0, bound)
-                + getFormatSymbols(added, formatStack, false)
-                + t.value.slice(bound);
         } else {
-            result += t.value;
+            state.offset += len;
+            result.push(token);
         }
-
-        curFormat = t.format;
-    });
-
-    if (curFormat) {
-        result += getFormatSymbols(curFormat, formatStack, true);
     }
 
-    return parse(result, options);
+    return result;
+}
+
+/**
+ * Конвертация обычных текстовых токенов в MD-строку
+ * @param baseFormat Базовый формат, от которого нужно считать разницу в форматировании
+ * @param formatStack Стэк символов форматирования. Используется для того, чтобы
+ * выводить закрывающие символы форматирования в правильном порядке
+ */
+export function textToMd(tokens: Token[]): string {
+    const state: TextConvertState = {
+        format: 0,
+        stack: [],
+        link: '',
+        output: ''
+    };
+    tokens.forEach(token => textToMdToken(token, state));
+
+    if (state.format) {
+        state.output += getFormatSymbols(state.format, state, true);
+    }
+
+    return state.output;
+}
+
+function textToMdToken(token: Token, state: TextConvertState): void {
+    let link = '';
+    let { format } = token;
+    let linkChange = TokenFormat.None;
+    let hasLink = 0;
+    let bound = 0;
+    let hasBound = false;
+
+    if (isCustomLink(token)) {
+        format |= TokenFormat.Link;
+        link = token.link;
+        if (state.link && token.link !== state.link) {
+            // Пограничный случай: рядом идут две разные ссылки.
+            // Добавим явный признак смены ссылки, чтобы по механике ссылка закрылась
+            // и снова открылась
+            linkChange = TokenFormat.Link;
+        }
+    }
+
+    const diff = state.format ^ format;
+    const removed = (state.format & diff) | linkChange;
+    const added = (format & diff) | linkChange;
+
+    if (removed) {
+        // Есть форматы, которые надо удалить
+        // В случае, если у нас нет ссылки, нужно найти позицию в тексте, где можем
+        // безопасно завершить форматирование
+        hasLink = removed & TokenFormat.Link;
+
+        bound = hasLink ? state.output.length : findEndBound(state.output);
+        hasBound = bound !== state.output.length;
+        state.output = state.output.slice(0, bound)
+            + getFormatSymbols(removed, state, true)
+            + state.output.slice(bound);
+
+        if (!added && !hasLink && !hasBound && !isEndBoundChar(token.value.charCodeAt(0))) {
+            state.output += ' ';
+        }
+    }
+
+    if (added) {
+        // Есть форматы, которые надо добавить
+        hasLink = added & TokenFormat.Link;
+
+        if (hasLink) {
+            bound = 0;
+            state.link = link;
+        } else {
+            bound = findStartBound(token.value);
+        }
+
+        if (bound === 0 && !hasLink && !isStartBoundChar(state.output.charCodeAt(state.output.length - 1))) {
+            // Нет чёткой границы для разделения
+            state.output += ' ';
+        }
+
+        state.output += token.value.slice(0, bound)
+            + getFormatSymbols(added, state, false)
+            + token.value.slice(bound);
+    } else {
+        state.output += token.value;
+    }
+
+    state.format = format;
 }
 
 /**
@@ -153,8 +227,13 @@ function findStartBound(text: string): number {
     return i;
 }
 
-function getFormatSymbols(format: TokenFormat, stack: TokenFormat[], close: boolean) {
+/**
+ * Возвращает набор открывающих или закрывающих MD-символов для указанного формата
+ */
+function getFormatSymbols(format: TokenFormat, state: TextConvertState, close: boolean) {
     let result = '';
+    const { stack } = state;
+
     if (close) {
         for (let i = stack.length - 1; i >= 0; i--) {
             if (format & stack[i]) {
@@ -162,7 +241,16 @@ function getFormatSymbols(format: TokenFormat, stack: TokenFormat[], close: bool
                 stack.splice(i, 1);
             }
         }
+
+        if ((format & TokenFormat.Link) && state.link) {
+            result += `](${state.link})`;
+            state.link = '';
+        }
     } else {
+        if (format & TokenFormat.Link) {
+            result += '[';
+        }
+
         for (let i = 0; i < formats.length; i++) {
             if (format & formats[i]) {
                 stack.push(formats[i]);
@@ -172,4 +260,65 @@ function getFormatSymbols(format: TokenFormat, stack: TokenFormat[], close: bool
     }
 
     return result;
+}
+
+/**
+ * Вспомогательная функция, которая конвертирует кастомную MD-ссылку в обычную
+ */
+function convertCustomLink(customLink: Token[], output: Token[], state: MDConverterState): void {
+    // Структура кастомной ссылки:
+    // '[', ...label, ']', '(', link, ')'
+    if (customLink.length) {
+        const linkToken = customLink[customLink.length - 2];
+        const link = linkToken.value;
+
+        customLink.slice(0, -4).forEach(token => {
+            if (token.type === TokenType.Markdown) {
+                adjustTextRange(token, state);
+            } else {
+                output.push({
+                    type: TokenType.Link,
+                    format: token.format & (~TokenFormat.LinkLabel),
+                    value: token.value,
+                    auto: false,
+                    emoji: token.emoji,
+                    link,
+                    sticky: false
+                });
+                state.offset += token.value.length;
+            }
+        });
+
+        if (state.range) {
+            customLink.slice(-4).forEach(token => adjustTextRange(token, state));
+        }
+    }
+}
+
+/**
+ * Находит конец кастомной ссылки в списке токенов, начиная с позиции `start`
+ */
+function findCustomLinkBound(tokens: Token[], start: number): number {
+    let linkFound = false;
+    let token: Token;
+
+    while (start < tokens.length) {
+        token = tokens[start++];
+        if (token.type === TokenType.Markdown && (token.format & TokenFormat.Link)) {
+            if (linkFound) {
+                return start;
+            }
+            linkFound = true;
+        }
+    }
+}
+
+function adjustTextRange(token: Token, state: MDConverterState): void {
+    if (state.range) {
+        if (state.offset < state.range[0]) {
+            state.range[0] -= token.value.length;
+        } else if (state.offset < state.range[0] + state.range[1]) {
+            state.range[1] -= token.value.length;
+        }
+    }
 }
