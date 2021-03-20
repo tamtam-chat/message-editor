@@ -175,6 +175,10 @@ describe('Markdown', () => {
 
         const t3_2 = mdSetFormat(tokens, { add: TokenFormat.Italic }, 2, 4, opt);
         equal(text(t3_2), 'fo _o ba_ r baz');
+
+        const t4_1 = parse('hello [world](mail.ru)');
+        const t4_2 = mdSetFormat(t4_1, { add: TokenFormat.Bold }, 7, 5, opt);
+        equal(text(t4_2), 'hello [*world*](mail.ru)');
     });
 
     it('markdown to text converter', () => {

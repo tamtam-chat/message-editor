@@ -44,11 +44,9 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
                 return true;
             }
 
-            if (locType !== LocationType.Start) {
-                const nextToken = tokens[i + 1]!;
-                if (nextToken.type !== TokenType.Text || !nextToken.sticky) {
-                    return true;
-                }
+            const nextToken = tokens[i + 1]!;
+            if (nextToken.type !== TokenType.Text || !nextToken.sticky) {
+                return true;
             }
         }
 

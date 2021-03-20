@@ -177,8 +177,15 @@ export function setFormat(tokens: Token[], format: TokenFormatUpdate | TokenForm
             }
         }
 
-        tokens = applyFormatAt(tokens, end.index, format, 0, end.offset);
-        tokens = applyFormatAt(tokens, start.index, format, start.offset, startToken.value.length - start.offset);
+        // Убедимся, что границы позиций не находились на границах токенов,
+        // иначе поставим sticky-форматирование
+        if (end.offset !== 0) {
+            tokens = applyFormatAt(tokens, end.index, format, 0, end.offset);
+        }
+
+        if (start.offset < startToken.value.length) {
+            tokens = applyFormatAt(tokens, start.index, format, start.offset, startToken.value.length - start.offset);
+        }
     }
 
     return normalize(tokens);
