@@ -32,6 +32,20 @@ interface EditorEvents {
     formatchange(editor: Editor): void;
 }
 
+interface PickLinkOptions {
+    /**
+     * Функция, которая на вход принимает текущую ссылку, если она есть, и должна
+     * вернуть новую ссылку или Promise, который вернёт ссылку
+     */
+    url: (currentUrl: string) => string | Promise<string>,
+
+    /**
+     * Диапазон, для которого нужно выставить ссылку. Если не указан,
+     * берётся текущий диапазон
+     */
+    range?: TextRange;
+}
+
 /** MIME-тип для хранения отформатированной строки в буффере */
 const fragmentMIME = 'tamtam/fragment';
 
@@ -43,12 +57,11 @@ const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
     'Cmd+I': editor => editor.toggleFormat(TokenFormat.Italic),
     'Cmd+U': editor => editor.toggleFormat(TokenFormat.Strike),
     'Cmd+K': editor => editor.toggleFormat(TokenFormat.Monospace),
-    'Ctrl+L': editor => {
-        const [from, to] = editor.getSelection();
-        const token = editor.tokenForPos(from);
-        const url = prompt('Введите ссылку', token?.type === TokenType.Link ? token.link : undefined);
-        editor.setLink(url, from, to);
-    },
+    'Ctrl+L': editor => editor.pickLink(),
+};
+
+const defaultPickLinkOptions: PickLinkOptions = {
+    url: cur => prompt('Введите ссылку', cur)
 };
 
 export default class Editor extends EventEmitter<EditorEvents> {
@@ -408,6 +421,48 @@ export default class Editor extends EventEmitter<EditorEvents> {
         }
 
         return this.model;
+    }
+
+    /**
+     * Выбрать ссылку для указанного диапазона
+     * @param callback Функция, которая на вход примет текущую ссылку в указанном
+     * диапазоне (если она есть), и должна вернуть новую ссылку. Если надо убрать
+     * ссылку, функция должна вернуть пустую строку
+     */
+    pickLink(options: PickLinkOptions = defaultPickLinkOptions): void {
+        const [from, to] = options.range || this.getSelection();
+        let token = this.tokenForPos(from);
+        let currentUrl = '';
+
+        if (token) {
+            console.log(token);
+
+            if (token.format & TokenFormat.LinkLabel) {
+                // Это подпись к ссылке в MD-формате. Найдём саму ссылку
+                let ix = this.model.indexOf(token) + 1;
+                while (ix < this.model.length) {
+                    token = this.model[ix++];
+                    if (token.type === TokenType.Link) {
+                        break;
+                    }
+                }
+            }
+
+            if (token.type === TokenType.Link) {
+                currentUrl = token.link;
+            }
+        }
+
+        const result = options.url(currentUrl);
+        if (result && typeof result === 'object' && result.then) {
+            result.then(nextUrl => {
+                if (nextUrl !== currentUrl) {
+                    this.setLink(nextUrl, from, to);
+                }
+            });
+        } else if (result !== currentUrl) {
+            this.setLink(result as string, from, to);
+        }
     }
 
     /**

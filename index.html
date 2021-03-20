@@ -197,7 +197,7 @@ editor.on('selectionchange', onSelectionChange);
 editor.on('formatchange', updateToolbarState);
 
 const mdEditor = new Editor(document.querySelector('#md-editor'), {
-    value: 'Привет, markdown мир! 😇',
+    value: 'Привет, *markdown* мир! 😇',
     parse: {
         textEmoji: true,
         hashtag: true,
@@ -219,10 +219,7 @@ toolbar.addEventListener('mousedown', evt => {
         if (format) {
             activeEditor.toggleFormat(Number(format));
         } else if (btn.classList.contains('link')) {
-            const [from, to] = activeEditor.getSelection();
-            const token = activeEditor.tokenForPos(from);
-            const url = prompt('Введите ссылку', token && token.type === 'link' ? token.link : undefined);
-            activeEditor.setLink(url, from, to);
+            activeEditor.pickLink();
         }
     }
 });
@@ -265,7 +262,7 @@ function updateToolbarState(editor) {
         }
 
         if (btn.classList.contains('link')) {
-            btn.classList.toggle('selected', token.type === 'link' && !token.auto);
+            btn.classList.toggle('selected', (token.type === 'link' && !token.auto) || (token.format & 128));
         }
     }
 }
