@@ -1,5 +1,4 @@
-import { Token } from '../parser';
-import { Emoji, TokenLink, TokenType } from './types';
+import { Token, Emoji, TokenLink, TokenType } from '../parser';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) и  */
@@ -76,14 +75,6 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
 }
 
 /**
- * Нормализация списка токенов: объединяет несколько смежных токенов в один, если
- * это возможно
- */
-export function normalize(tokens: Token[]): Token[] {
-    return joinSimilar(filterEmpty(tokens));
-}
-
-/**
  * Делит токен на две части в указанной позиции
  */
 export function splitToken<T extends Token>(token: T, pos: number): [T, T] {
@@ -154,47 +145,6 @@ export function isCustomLink(token: Token): token is TokenLink {
  */
 export function isAutoLink(token: Token): token is TokenLink {
     return token.type === TokenType.Link && token.auto;
-}
-
-/**
- * Удаляет пустые токены из указанного списка
- */
-function filterEmpty(tokens: Token[]): Token[] {
-    return tokens.filter(token => token.value || (token.type === TokenType.Text && token.sticky));
-}
-
-/**
- * Объединяет соседние токены, если это можно сделать безопасно
- */
-function joinSimilar(tokens: Token[]): Token[] {
-    return tokens.reduce((out, token) => {
-        let prev = out[out.length - 1];
-        if (prev && allowJoin(prev, token)) {
-            prev = { ...prev };
-
-            if (token.emoji) {
-                const nextEmoji = shiftEmoji(token.emoji, prev.value.length);
-                prev.emoji = prev.emoji ? prev.emoji.concat(nextEmoji) : nextEmoji;
-            }
-
-            prev.value += token.value;
-            out[out.length - 1] = prev;
-        } else {
-            out.push(token);
-        }
-
-        return out;
-    }, [] as Token[]);
-}
-
-/**
- * Проверяет, можно ли объединить два указанных токена в один
- */
-function allowJoin(token1: Token, token2: Token): boolean {
-    if (token1.type === token2.type && token1.format === token2.format) {
-        return (token1.type === TokenType.Link && token1.link === (token2 as TokenLink).link && isCustomLink(token1) && isCustomLink(token2))
-            || token1.type === TokenType.Text;
-    }
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {

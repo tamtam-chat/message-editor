@@ -1,6 +1,5 @@
-import { Token, TokenFormat } from '../formatted-string';
 import ParserState from './state';
-import { ParserOptions } from './types';
+import { ParserOptions, Token, TokenType, TokenFormat } from './types';
 import emoji from './emoji';
 import textEmoji from './text-emoji';
 import userSticker from './user-sticker';
@@ -9,8 +8,7 @@ import command from './command';
 import hashtag from './hashtag';
 import link from './link';
 import markdown from './markdown';
-import { TokenType } from '../formatted-string/types';
-import { normalize } from '../formatted-string/utils';
+import { normalize } from './utils';
 
 const defaultOptions: ParserOptions = {
     markdown: false,
@@ -53,4 +51,9 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     return tokens;
 }
 
-export { ParserOptions, Token, TokenFormat };
+export { normalize, getText, getLength, codePointAt } from './utils';
+
+export {
+    ParserOptions, Token, TokenType, TokenFormat, Emoji,
+    TokenCommand, TokenHashTag, TokenLink, TokenMarkdown, TokenMention, TokenText, TokenUserSticker
+} from './types';

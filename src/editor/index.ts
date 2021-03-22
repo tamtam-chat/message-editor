@@ -1,15 +1,16 @@
 import EventEmitter from 'eventemitter3';
-import parse, { ParserOptions, Token, TokenFormat } from '../parser';
+import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
 import render from '../render';
-import { TextRange } from '../types';
+import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
-import { getLength, insertText, removeText, replaceText, cutText, setFormat, setLink, slice, TokenFormatUpdate } from '../formatted-string';
-import { mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd, TextRange as Rng } from '../formatted-string/markdown';
+import {
+    insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
+    mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
+    TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
-import { TokenType } from '../formatted-string/types';
 
 export interface EditorOptions {
     /** Значение по умолчанию для редактора */

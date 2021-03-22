@@ -1,4 +1,4 @@
-import { codePointAt } from '../parser/utils';
+import { codePointAt } from '../parser';
 
 export const enum DiffActionType {
     Insert = 'insert',

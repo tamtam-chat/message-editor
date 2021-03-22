@@ -1,6 +1,4 @@
-import { Token, TokenFormat } from '../formatted-string';
-import { Emoji, TokenMarkdown, TokenText, TokenType } from '../formatted-string/types';
-import { ParserOptions } from './types';
+import { Emoji, Token, TokenFormat, TokenMarkdown, TokenText, TokenType, ParserOptions } from './types';
 import { isDelimiter, last, codePointAt } from './utils';
 
 type MatchFn = (ch: number) => boolean;

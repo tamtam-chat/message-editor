@@ -1,4 +1,4 @@
-import { TokenFormat } from '../formatted-string';
+import { Emoji, Token, TokenFormat, TokenLink, TokenType } from './types';
 import ParserState from './state';
 
 export const enum Codes {
@@ -294,6 +294,28 @@ export function asciiToUpper(ch: number): number {
     return ch >= 97 && ch <= 122 ? ch & ~32 : ch;
 }
 
+/**
+ * Нормализация списка токенов: объединяет несколько смежных токенов в один, если
+ * это возможно
+ */
+export function normalize(tokens: Token[]): Token[] {
+    return joinSimilar(filterEmpty(tokens));
+}
+
+/**
+ * Возвращает строковое содержимое указанных токенов
+ */
+export function getText(tokens: Token[]): string {
+    return tokens.map(token => token.value).join('');
+}
+
+/**
+ * Возвращает длину форматированного текста
+ */
+export function getLength(tokens: Token[]): number {
+    return tokens.reduce((acc, token) => acc + token.value.length, 0);
+}
+
 export const codePointAt = String.prototype.codePointAt
     ? nativeCodePointAt
     : polyfillCodePointAt;
@@ -321,4 +343,61 @@ function polyfillCodePointAt(str: string, pos: number): number {
         }
     }
     return first;
+}
+
+/**
+ * Удаляет пустые токены из указанного списка
+ */
+function filterEmpty(tokens: Token[]): Token[] {
+    return tokens.filter(token => token.value || (token.type === TokenType.Text && token.sticky));
+}
+
+/**
+ * Объединяет соседние токены, если это можно сделать безопасно
+ */
+function joinSimilar(tokens: Token[]): Token[] {
+    return tokens.reduce((out, token) => {
+        let prev = out[out.length - 1];
+        if (prev && allowJoin(prev, token)) {
+            prev = { ...prev };
+
+            if (token.emoji) {
+                const nextEmoji = shiftEmoji(token.emoji, prev.value.length);
+                prev.emoji = prev.emoji ? prev.emoji.concat(nextEmoji) : nextEmoji;
+            }
+
+            prev.value += token.value;
+            out[out.length - 1] = prev;
+        } else {
+            out.push(token);
+        }
+
+        return out;
+    }, [] as Token[]);
+}
+
+/**
+ * Проверяет, можно ли объединить два указанных токена в один
+ */
+function allowJoin(token1: Token, token2: Token): boolean {
+    if (token1.type === token2.type && token1.format === token2.format) {
+        return (token1.type === TokenType.Link && token1.link === (token2 as TokenLink).link && isCustomLink(token1) && isCustomLink(token2))
+            || token1.type === TokenType.Text;
+    }
+}
+
+function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
+    return emoji.map(e => ({
+        ...e,
+        from: e.from + offset,
+        to: e.to + offset
+    }));
+}
+
+/**
+ * Проверяет, что указанный токен является пользовательской ссылкой, то есть
+ * ссылка отличается от содержимого токена
+ */
+function isCustomLink(token: Token): token is TokenLink {
+    return token.type === TokenType.Link && !token.auto;
 }

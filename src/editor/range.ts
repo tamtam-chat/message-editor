@@ -1,4 +1,4 @@
-import { TextRange } from '../types';
+import { TextRange } from './types';
 
 interface RangeBound {
     container: Node;

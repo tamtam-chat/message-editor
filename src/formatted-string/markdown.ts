@@ -1,10 +1,7 @@
-import { getText, setFormat, CutText, TokenFormatUpdate, } from '.';
-import parse, { ParserOptions, Token, TokenFormat } from '../parser';
-import { TokenType } from './types';
+import { TextRange } from './types';
+import { Token, TokenFormat, TokenType } from '../parser';
 import { charToFormat, isStartBoundChar, isEndBoundChar } from '../parser/markdown';
 import { isCustomLink } from './utils';
-
-export type TextRange = [pos: number, len: number];
 
 interface TextConvertState {
     format: TokenFormat;
@@ -22,56 +19,6 @@ interface MDConverterState {
 const formats = Array.from(charToFormat.values());
 const formatToChar = new Map<TokenFormat, string>();
 charToFormat.forEach((v, k) => formatToChar.set(v, String.fromCharCode(k)));
-
-/**
- * Вставляет указанный текст `text` в текстовую позицию `pos` списка токенов
- * @return Обновлённый список токенов
- */
-export function mdInsertText(tokens: Token[], pos: number, text: string, options: ParserOptions): Token[] {
-    return updateTokens(tokens, text, pos, pos, options);
-}
-
-/**
- * Заменяет текст указанной длины в текстовой позиции `pos` на новый `text`
- * @return Обновлённый список токенов
- */
-export function mdReplaceText(tokens: Token[], pos: number, len: number, text: string, options: ParserOptions): Token[] {
-    return updateTokens(tokens, text, pos, pos + len, options);
-}
-
-/**
- * Удаляет текст указанной длины из списка токенов в указанной позиции
- */
-export function mdRemoveText(tokens: Token[], pos: number, len: number, options: ParserOptions): Token[] {
-    return updateTokens(tokens, '', pos, pos + len, options);
-}
-
-/**
- * Вырезает текст из диапазона `from:to` и возвращает его и изменённую строку
- */
-export function mdCutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
-    return {
-        cut: parse(getText(tokens).slice(from, to), options),
-        tokens: mdRemoveText(tokens, from, to - from, options)
-    };
-}
-
-/**
- * Выставляет текстовый формат `format` для всех токенов из диапазона `pos, pos + len`.
- * Если `len` не указано, вставляет sticky-метку в указанную позицию `pos`
- * @param breakSolid Применять форматирование внутри «сплошных» токенов, то есть
- * можно один сплошной токен разделить на несколько и указать им разное форматирование
- */
-export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, options: ParserOptions): Token[] {
-    // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
-    // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
-    // Полученный результат обрамим MD-символами для получения нужного результата
-    // и заново распарсим
-    const range: TextRange = [pos, len];
-    const text = mdToText(tokens, range);
-    const updated = setFormat(text, format, range[0], range[1]);
-    return parse(textToMd(updated, range), options);
-}
 
 /**
  * Конвертация MD-токенов в список обычных текстовых токенов
@@ -196,18 +143,6 @@ function textToMdToken(token: Token, state: TextConvertState): void {
     }
 
     state.format = format;
-}
-
-/**
- * Универсальный метод для обновления списка токенов для markdown-синтаксиса.
- * Из-за некоторых сложностей с инкрементальным обновлением токенов, мы будем
- * просто модифицировать строку и заново её парсить: производительность парсера
- * должно хватить, чтобы делать это на каждое изменение.
- */
-function updateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
-    const prevText = getText(tokens);
-    const nextText = prevText.slice(0, from) + value + prevText.slice(to);
-    return parse(nextText, options);
 }
 
 /**

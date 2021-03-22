@@ -1,20 +1,13 @@
-import parse from '../parser';
-import { ParserOptions } from '../parser/types';
-import { Emoji, Token, TokenFormat, TokenFormatUpdate, TokenLink, TokenText, TokenType } from './types';
+import parse, { getText, getLength, normalize, TokenType } from '../parser';
+import type { ParserOptions, Emoji, Token, TokenFormat, TokenLink, TokenText } from '../parser';
+import { mdToText, textToMd } from './markdown';
+import type { TokenFormatUpdate, TextRange, CutText } from './types';
 import {
-    normalize, tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken, sliceEmoji,
+    tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken, sliceEmoji,
     LocationType
 } from './utils';
 
-export { Token, TokenFormat, TokenFormatUpdate };
-
-export interface CutText {
-    /** Вырезанный фрагмент текста */
-    cut: Token[];
-
-    /** Модифицированная строка без вырезанного текста */
-    tokens: Token[];
-}
+export { mdToText, textToMd, CutText, TokenFormatUpdate, TextRange }
 
 /**
  * Фабрика объекта-токена
@@ -54,79 +47,6 @@ export function cutText(tokens: Token[], from: number, to: number, options: Pars
         cut: normalize(slice(tokens, from, to)),
         tokens: removeText(tokens, from, to - from, options)
     };
-}
-
-/**
- * Универсальный метод для обновления списка токенов: добавление, удаление и замена
- * текста в списке указанных токенов
- */
-function updateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
-    if (!tokens.length) {
-        return parse(value, options);
-    }
-
-    const end = tokenForPos(tokens, to, LocationType.End);
-    const start = from === to ? end : tokenForPos(tokens, from, LocationType.Start);
-
-    if (start.index === -1 || end.index === -1) {
-        // Такого не должно быть
-        console.warn('Invalid location:', { from, to, start, end });
-        return tokens;
-    }
-
-    const prefix = tokens.slice(0, start.index);
-    const suffix = tokens.slice(end.index + 1);
-    const endToken = tokens[end.index];
-    let startToken = tokens[start.index];
-    let textBound = start.offset + value.length;
-    let nextValue = startToken.value.slice(0, start.offset)
-        + value + endToken.value.slice(end.offset);
-
-
-    // Разбираем пограничный случай: есть автоссылка `mail.ru`, мы дописали в конец
-    // `?` – вопрос останется текстом, так как это знак препинания в конце предложения.
-    // Но если продолжим писать текст, например, `foo`, то `mail.ru?foo` должен
-    // стать ссылкой. Поэтому если текущий токен у нас текст и ему предшествует
-    // автоссылка, нужно заново распарсить весь фрагмент со ссылкой
-    if (startToken.type === TokenType.Text && start.index > 0 && isAutoLink(tokens[start.index - 1])) {
-        startToken = prefix.pop() as TokenLink;
-        nextValue = startToken.value + nextValue;
-        textBound += startToken.value.length;
-        start.index--;
-        start.offset = 0;
-    }
-
-    let nextTokens = parse(nextValue, options);
-
-    if (nextTokens.length) {
-        // Вставляем/заменяем фрагмент
-        // Проверяем пограничные случаи:
-        // — начало изменяемого диапазона находится в пользовательской ссылке:
-        //   сохраним ссылку
-        // — меняем упоминание. Если результат не начинается с упоминания, то считаем,
-        //   что пользователь меняет подпись упоминания
-        const next = nextTokens[0];
-        if (isCustomLink(startToken) || (startToken.type === TokenType.Mention && next.type !== TokenType.Mention)) {
-            nextTokens[0] = {
-                ...startToken,
-                emoji: next.emoji,
-                value: next.value,
-            };
-        }
-
-        nextTokens.forEach(t => t.format = startToken.format);
-
-        // Применяем форматирование из концевых токенов, но только если можем
-        // сделать это безопасно: применяем только для текста
-        if (startToken.format !== endToken.format) {
-            const splitPoint = tokenForPos(nextTokens, textBound);
-            if (splitPoint.index !== -1 && textBound !== nextValue.length && nextTokens.slice(splitPoint.index).every(t => t.type === TokenType.Text)) {
-                nextTokens = setFormat(nextTokens, endToken.format, textBound, nextValue.length - textBound);
-            }
-        }
-    }
-
-    return normalize([...prefix, ...nextTokens, ...suffix]);
 }
 
 /**
@@ -189,20 +109,6 @@ export function setFormat(tokens: Token[], format: TokenFormatUpdate | TokenForm
     }
 
     return normalize(tokens);
-}
-
-/**
- * Возвращает строковое содержимое указанных токенов
- */
-export function getText(tokens: Token[]): string {
-    return tokens.map(token => token.value).join('');
-}
-
-/**
- * Возвращает длину форматированного текста
- */
-export function getLength(tokens: Token[]): number {
-    return tokens.reduce((acc, token) => acc + token.value.length, 0);
 }
 
 /**
@@ -303,6 +209,141 @@ export function setLink(tokens: Token[], link: string | null, pos: number, len =
     }
 
     return normalize(nextTokens);
+}
+
+/**
+ * Вставляет указанный текст `text` в текстовую позицию `pos` списка токенов
+ * @return Обновлённый список токенов
+ */
+export function mdInsertText(tokens: Token[], pos: number, text: string, options: ParserOptions): Token[] {
+    return mdUpdateTokens(tokens, text, pos, pos, options);
+}
+
+/**
+ * Заменяет текст указанной длины в текстовой позиции `pos` на новый `text`
+ * @return Обновлённый список токенов
+ */
+export function mdReplaceText(tokens: Token[], pos: number, len: number, text: string, options: ParserOptions): Token[] {
+    return mdUpdateTokens(tokens, text, pos, pos + len, options);
+}
+
+/**
+ * Удаляет текст указанной длины из списка токенов в указанной позиции
+ */
+export function mdRemoveText(tokens: Token[], pos: number, len: number, options: ParserOptions): Token[] {
+    return mdUpdateTokens(tokens, '', pos, pos + len, options);
+}
+
+/**
+ * Вырезает текст из диапазона `from:to` и возвращает его и изменённую строку
+ */
+export function mdCutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
+    return {
+        cut: parse(getText(tokens).slice(from, to), options),
+        tokens: mdRemoveText(tokens, from, to - from, options)
+    };
+}
+
+/**
+ * Выставляет текстовый формат `format` для всех токенов из диапазона `pos, pos + len`.
+ * Если `len` не указано, вставляет sticky-метку в указанную позицию `pos`
+ * @param breakSolid Применять форматирование внутри «сплошных» токенов, то есть
+ * можно один сплошной токен разделить на несколько и указать им разное форматирование
+ */
+export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, options: ParserOptions): Token[] {
+    // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
+    // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
+    // Полученный результат обрамим MD-символами для получения нужного результата
+    // и заново распарсим
+    const range: TextRange = [pos, len];
+    const text = mdToText(tokens, range);
+    const updated = setFormat(text, format, range[0], range[1]);
+    return parse(textToMd(updated, range), options);
+}
+
+/**
+ * Универсальный метод для обновления списка токенов: добавление, удаление и замена
+ * текста в списке указанных токенов
+ */
+function updateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
+    if (!tokens.length) {
+        return parse(value, options);
+    }
+
+    const end = tokenForPos(tokens, to, LocationType.End);
+    const start = from === to ? end : tokenForPos(tokens, from, LocationType.Start);
+
+    if (start.index === -1 || end.index === -1) {
+        // Такого не должно быть
+        console.warn('Invalid location:', { from, to, start, end });
+        return tokens;
+    }
+
+    const prefix = tokens.slice(0, start.index);
+    const suffix = tokens.slice(end.index + 1);
+    const endToken = tokens[end.index];
+    let startToken = tokens[start.index];
+    let textBound = start.offset + value.length;
+    let nextValue = startToken.value.slice(0, start.offset)
+        + value + endToken.value.slice(end.offset);
+
+
+    // Разбираем пограничный случай: есть автоссылка `mail.ru`, мы дописали в конец
+    // `?` – вопрос останется текстом, так как это знак препинания в конце предложения.
+    // Но если продолжим писать текст, например, `foo`, то `mail.ru?foo` должен
+    // стать ссылкой. Поэтому если текущий токен у нас текст и ему предшествует
+    // автоссылка, нужно заново распарсить весь фрагмент со ссылкой
+    if (startToken.type === TokenType.Text && start.index > 0 && isAutoLink(tokens[start.index - 1])) {
+        startToken = prefix.pop() as TokenLink;
+        nextValue = startToken.value + nextValue;
+        textBound += startToken.value.length;
+        start.index--;
+        start.offset = 0;
+    }
+
+    let nextTokens = parse(nextValue, options);
+
+    if (nextTokens.length) {
+        // Вставляем/заменяем фрагмент
+        // Проверяем пограничные случаи:
+        // — начало изменяемого диапазона находится в пользовательской ссылке:
+        //   сохраним ссылку
+        // — меняем упоминание. Если результат не начинается с упоминания, то считаем,
+        //   что пользователь меняет подпись упоминания
+        const next = nextTokens[0];
+        if (isCustomLink(startToken) || (startToken.type === TokenType.Mention && next.type !== TokenType.Mention)) {
+            nextTokens[0] = {
+                ...startToken,
+                emoji: next.emoji,
+                value: next.value,
+            };
+        }
+
+        nextTokens.forEach(t => t.format = startToken.format);
+
+        // Применяем форматирование из концевых токенов, но только если можем
+        // сделать это безопасно: применяем только для текста
+        if (startToken.format !== endToken.format) {
+            const splitPoint = tokenForPos(nextTokens, textBound);
+            if (splitPoint.index !== -1 && textBound !== nextValue.length && nextTokens.slice(splitPoint.index).every(t => t.type === TokenType.Text)) {
+                nextTokens = setFormat(nextTokens, endToken.format, textBound, nextValue.length - textBound);
+            }
+        }
+    }
+
+    return normalize([...prefix, ...nextTokens, ...suffix]);
+}
+
+/**
+ * Универсальный метод для обновления списка токенов для markdown-синтаксиса.
+ * Из-за некоторых сложностей с инкрементальным обновлением токенов, мы будем
+ * просто модифицировать строку и заново её парсить: производительность парсера
+ * должно хватить, чтобы делать это на каждое изменение.
+ */
+function mdUpdateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
+    const prevText = getText(tokens);
+    const nextText = prevText.slice(0, from) + value + prevText.slice(to);
+    return parse(nextText, options);
 }
 
 /**

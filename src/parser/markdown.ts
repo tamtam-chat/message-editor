@@ -1,5 +1,4 @@
-import { TokenFormat } from '../formatted-string';
-import { Token, TokenMarkdown, TokenType } from '../formatted-string/types';
+import { Token, TokenMarkdown, TokenType, TokenFormat } from './types';
 import ParserState from './state';
 import { Codes, isDelimiter, isBound, last } from './utils';
 

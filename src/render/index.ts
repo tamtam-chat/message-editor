@@ -1,6 +1,4 @@
-import { TokenHashTag, TokenLink, TokenMention, TokenType } from '../formatted-string/types';
-import { Token, TokenFormat } from '../parser';
-import { codePointAt } from '../parser/utils';
+import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, codePointAt } from '../parser';
 
 type ClassFormat = [type: TokenFormat, value: string];
 

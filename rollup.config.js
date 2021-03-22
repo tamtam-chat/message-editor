@@ -7,7 +7,7 @@ const mode = process.env.NODE_ENV;
 const production = mode === 'production';
 
 export default {
-    input: './src/editor/index.ts',
+    input: './src/index.ts',
     output: [
         { format: 'es', file: 'dist/editor.js' }
     ],

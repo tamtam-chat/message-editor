@@ -12,9 +12,9 @@ import ParserState, { Bracket } from './state';
 import { consumeTree, createTree } from './tree';
 import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, isDelimiter, toCode } from './utils';
 import { keycap } from './emoji';
-import tld from '../data/tld';
-import { TokenFormat, TokenLink, TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenLink, TokenType } from './types';
 import { peekClosingMarkdown } from './markdown';
+import tld from '../data/tld';
 
 const enum FragmentMatch {
     /** Фрагмент не найден */

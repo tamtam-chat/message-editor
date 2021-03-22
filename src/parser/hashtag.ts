@@ -1,4 +1,4 @@
-import { TokenFormat, TokenType } from '../formatted-string/types';
+import { TokenFormat, TokenType } from './types';
 import ParserState from './state';
 import { Codes, isBound, isCommandName, last } from './utils';
 

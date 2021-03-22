@@ -1,6 +1,5 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import _parse from '../src/parser';
-import { Token, TokenType, TokenUserSticker } from '../src/formatted-string/types';
+import _parse, { Token, TokenType, TokenUserSticker } from '../src/parser';
 
 function parse(text: string) {
     return _parse(text, { userSticker: true });
