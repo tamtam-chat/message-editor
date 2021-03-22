@@ -47,7 +47,7 @@ export const enum TokenType {
     Markdown = 'markdown'
 }
 
-export const enum TokenFormat {
+export enum TokenFormat {
     None = 0,
 
     /** Жирный текст */

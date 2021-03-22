@@ -17,7 +17,7 @@ export interface EditorOptions {
     value?: string;
     /** Параметры для парсера текста */
     parse?: ParserOptions;
-    shortcuts?: Record<string, ShortcutHandler<Editor> | null>;
+    shortcuts?: Record<string, ShortcutHandler<Editor>>;
 }
 
 interface PendingUpdate {
@@ -49,17 +49,6 @@ interface PickLinkOptions {
 
 /** MIME-тип для хранения отформатированной строки в буффере */
 const fragmentMIME = 'tamtam/fragment';
-
-const defaultShortcuts: Record<string, ShortcutHandler<Editor>> = {
-    'Cmd+Z': editor => editor.undo(),
-    'Cmd+Y': editor => editor.redo(),
-    'Cmd+Shift+Z': editor => editor.redo(),
-    'Cmd+B': editor => editor.toggleFormat(TokenFormat.Bold),
-    'Cmd+I': editor => editor.toggleFormat(TokenFormat.Italic),
-    'Cmd+U': editor => editor.toggleFormat(TokenFormat.Strike),
-    'Cmd+K': editor => editor.toggleFormat(TokenFormat.Monospace),
-    'Ctrl+L': editor => editor.pickLink(),
-};
 
 const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
@@ -258,17 +247,13 @@ export default class Editor extends EventEmitter<EditorEvents> {
         this.element.addEventListener('paste', this.onPaste);
         document.addEventListener('selectionchange', this.onSelectionChange);
 
-        const shortcuts = {
-            ...defaultShortcuts,
-            ...this.options.shortcuts
-        };
+        const { shortcuts } = this.options;
 
-        Object.keys(shortcuts).forEach(sh => {
-            const handler = shortcuts[sh];
-            if (handler) {
-                this.shortcuts.register(sh, handler);
-            }
-        });
+        if (shortcuts) {
+            Object.keys(shortcuts).forEach(sh => {
+                this.shortcuts.register(sh, shortcuts[sh]);
+            });
+        }
     }
 
     /**

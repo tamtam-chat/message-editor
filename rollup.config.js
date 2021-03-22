@@ -19,6 +19,7 @@ export default {
                 compilerOptions: {
                     target: 'esnext',
                     module: 'ESNext',
+                    declaration: true
                 }
             }
         }),

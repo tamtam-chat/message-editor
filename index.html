@@ -178,12 +178,24 @@
         </ul>
     </main>
 <script type="module">
-import { Editor } from './dist/editor.js';
+import { Editor, TokenFormat } from './dist/editor.js';
+
+const shortcuts = {
+    'Cmd+Z': editor => editor.undo(),
+    'Cmd+Y': editor => editor.redo(),
+    'Cmd+Shift+Z': editor => editor.redo(),
+    'Cmd+B': editor => editor.toggleFormat(TokenFormat.Bold),
+    'Cmd+I': editor => editor.toggleFormat(TokenFormat.Italic),
+    'Cmd+U': editor => editor.toggleFormat(TokenFormat.Strike),
+    'Cmd+K': editor => editor.toggleFormat(TokenFormat.Monospace),
+    'Ctrl+L': editor => editor.pickLink(),
+};
 
 const toolbar = document.querySelector('.toolbar');
 let activeEditor;
 const editor = new Editor(document.querySelector('#text-editor'), {
     value: 'Привет, мир! 😇',
+    shortcuts,
     parse: {
         textEmoji: true,
         hashtag: true,
@@ -198,6 +210,7 @@ editor.on('formatchange', updateToolbarState);
 
 const mdEditor = new Editor(document.querySelector('#md-editor'), {
     value: 'Привет, *markdown* мир! 😇',
+    shortcuts,
     parse: {
         textEmoji: true,
         hashtag: true,
