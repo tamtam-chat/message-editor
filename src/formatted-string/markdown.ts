@@ -29,6 +29,7 @@ charToFormat.forEach((v, k) => formatToChar.set(v, String.fromCharCode(k)));
 export function mdToText(tokens: Token[], range?: TextRange): Token[] {
     const state: MDConverterState = { offset: 0, range };
     const result: Token[] = [];
+    let format = TokenFormat.None;
 
     for (let i = 0, token: Token, len: number; i < tokens.length; i++) {
         token = tokens[i];
@@ -43,6 +44,28 @@ export function mdToText(tokens: Token[], range?: TextRange): Token[] {
                 convertCustomLink(tokens.slice(i, linkBound), result, state);
                 i = linkBound - 1;
             } else {
+                if (format & token.format) {
+                    // Завершается форматирование. Если у последнего токена
+                    // нет текущего формата, значит, нужно сделать sticky-форматирование
+                    const prev = result[result.length - 1];
+                    if (!prev || !(prev.format & token.format)) {
+                        if ((prev.type === TokenType.Text || prev.type === TokenType.Link) && prev.sticky) {
+                            prev.format |= token.format;
+                        } else {
+                            result.push({
+                                type: TokenType.Text,
+                                format,
+                                value: '',
+                                sticky: true
+                            });
+                        }
+                    }
+
+                    format &= ~token.format;
+                } else {
+                    // Открывается форматирование
+                    format |= token.format;
+                }
                 adjustTextRange(state, token);
             }
         } else {
@@ -71,7 +94,7 @@ export function textToMd(tokens: Token[], range?: TextRange): string {
     tokens.forEach(token => textToMdToken(token, state));
 
     if (state.format) {
-        pushSymbols(state, getFormatSymbols(state.format, state, true))
+        pushSymbols(state, getFormatSymbols(state.format, state, true), false);
     }
 
     return state.output;
@@ -111,11 +134,11 @@ function textToMdToken(token: Token, state: TextConvertState): void {
         hasBound = bound !== state.output.length;
         suffix = state.output.slice(bound);
         state.output = state.output.slice(0, bound);
-        pushSymbols(state, getFormatSymbols(removed, state, true));
+        pushSymbols(state, getFormatSymbols(removed, state, true), false);
         state.output += suffix;
 
         if (!added && !hasLink && !hasBound && !isEndBoundChar(token.value.charCodeAt(0))) {
-            pushSymbols(state, ' ');
+            pushSymbols(state, ' ', false);
         }
     }
 
@@ -130,13 +153,13 @@ function textToMdToken(token: Token, state: TextConvertState): void {
             bound = findStartBound(token.value);
         }
 
-        if (bound === 0 && !hasLink && !isStartBoundChar(state.output.charCodeAt(state.output.length - 1))) {
+        if (bound === 0 && token.value && !hasLink && !isStartBoundChar(state.output.charCodeAt(state.output.length - 1))) {
             // Нет чёткой границы для разделения
-            pushSymbols(state, ' ');
+            pushSymbols(state, ' ', true);
         }
 
         state.output += token.value.slice(0, bound);
-        pushSymbols(state, getFormatSymbols(added, state, false));
+        pushSymbols(state, getFormatSymbols(added, state, false), true);
         state.output += token.value.slice(bound);
     } else {
         state.output += token.value;
@@ -150,7 +173,12 @@ function textToMdToken(token: Token, state: TextConvertState): void {
  */
 function findEndBound(text: string): number {
     let i = text.length;
-    while (i > 0 && isEndBoundChar(text.charCodeAt(i - 1))) {
+    let ch: number;
+    while (i > 0) {
+        ch = text.charCodeAt(i - 1);
+        if (!isEndBoundChar(ch) || charToFormat.has(ch)) {
+            break;
+        }
         i--;
     }
 
@@ -267,11 +295,11 @@ function adjustTextRange(state: MDConverterState, token: Token): void {
     }
 }
 
-function pushSymbols(state: TextConvertState, value: string): void {
+function pushSymbols(state: TextConvertState, value: string, opening: boolean): void {
     const { range } = state;
     if (range) {
         const len = state.output.length;
-        if (len <= range[0]) {
+        if (len < range[0] || (len === range[0] && opening)) {
             range[0] += value.length;
         } else if (len < range[0] + range[1]) {
             range[1] += value.length;

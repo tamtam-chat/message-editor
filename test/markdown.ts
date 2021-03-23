@@ -178,6 +178,20 @@ describe('Markdown', () => {
         const t4_1 = parse('hello [world](mail.ru)');
         const t4_2 = mdSetFormat(t4_1, { add: TokenFormat.Bold }, 7, 5, opt);
         equal(text(t4_2), 'hello [*world*](mail.ru)');
+
+
+        // sticky-форматирование
+        const t5_1 = parse('hello  world');
+        const t5_2 = mdSetFormat(t5_1, { add: TokenFormat.Bold }, 6, 0, opt);
+
+        const pos: TextRange = [7, 0];
+        equal(text(t5_2), 'hello ** world');
+        const t5_3 = mdToText(t5_2, pos);
+        deepEqual(pos, [6, 0]);
+
+        // Правильно обновляем позицию
+        textToMd(t5_3, pos);
+        deepEqual(pos, [7, 0]);
     });
 
     it('markdown to text converter', () => {
