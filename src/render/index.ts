@@ -100,10 +100,17 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
  * внутри токена
  */
 function renderText(token: Token, elem: HTMLElement, options: RenderOptions): void {
-    if (token.emoji && options.emojiUrl) {
-        const state = new ReconcileState(elem, options);
+    let { emoji } = token;
+    if (emoji && options.emojiUrl) {
         let offset = 0;
-        token.emoji.forEach(emojiToken => {
+        const state = new ReconcileState(elem, options);
+
+        if (token.format & TokenFormat.Monospace) {
+            // Для monospace не заменяем текстовые эмоджи
+            emoji = emoji.filter(e => !e.emoji);
+        }
+
+        emoji.forEach(emojiToken => {
             const text = token.value.slice(offset, emojiToken.from);
             const rawEmoji = token.value.slice(emojiToken.from, emojiToken.to);
             const emoji = emojiToken.emoji || rawEmoji;
