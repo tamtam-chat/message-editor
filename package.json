@@ -2,11 +2,20 @@
   "name": "@tamtam-chat/message-editor",
   "description": "Компонент поля ввода сообщения для веб-версии TamTam",
   "version": "0.1.0",
-  "main": "index.js",
+  "main": "./dist/editor.cjs.js",
+  "module": "./dist/editor.es.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    "import": "./dist/editor.es.js",
+    "require": "./dist/editor.cjs.js"
+  },
   "scripts": {
     "test": "mocha",
     "build": "rollup -c",
-    "watch": "rollup -wc"
+    "watch": "rollup -wc",
+    "clean": "rm -rf ./dist",
+    "prepare": "npm test && npm run clean && npm run build"
   },
   "keywords": [],
   "author": "Sergey Chikuyonok <serge.che@gmail.com>",
@@ -19,6 +28,7 @@
     "@types/node": "^14.14.22",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",
+    "eventemitter3": "^4.0.7",
     "eslint": "^7.21.0",
     "mocha": "^8.2.1",
     "rollup": "^2.41.0",
@@ -30,9 +40,6 @@
   "mocha": {
     "require": "ts-node/register",
     "spec": "./test/*.ts"
-  },
-  "dependencies": {
-    "eventemitter3": "^4.0.7"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

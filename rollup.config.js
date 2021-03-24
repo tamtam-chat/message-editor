@@ -9,7 +9,8 @@ const production = mode === 'production';
 export default {
     input: './src/index.ts',
     output: [
-        { format: 'es', file: 'dist/editor.js' }
+        { format: 'es', file: 'dist/editor.es.js' },
+        { format: 'cjs', file: 'dist/editor.cjs.js' }
     ],
     plugins: [
         resolve({ browser: true }),
