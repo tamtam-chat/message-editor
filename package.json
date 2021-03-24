@@ -1,7 +1,7 @@
 {
-  "name": "@tamtam/editor",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@tamtam-chat/message-editor",
+  "description": "Компонент поля ввода сообщения для веб-версии TamTam",
+  "version": "0.1.0",
   "main": "index.js",
   "scripts": {
     "test": "mocha",
@@ -33,5 +33,19 @@
   },
   "dependencies": {
     "eventemitter3": "^4.0.7"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tamtam-chat/message-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tamtam-chat/message-editor/issues"
+  },
+  "homepage": "https://github.com/tamtam-chat/message-editor#readme"
 }
