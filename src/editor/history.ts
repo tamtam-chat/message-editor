@@ -127,6 +127,14 @@ export default class History<S = Token[]> {
 			current.caret = range;
 		}
 	}
+
+    /**
+     * Очищает всю историю
+     */
+    clear(): void {
+        this._stack = [];
+        this._ptr = -1;
+    }
 }
 
 function combineEntries<S>(prev: HistoryEntry<S>, next: HistoryEntry<S>): HistoryEntry<S> {

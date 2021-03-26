@@ -7,7 +7,7 @@ import {
     LocationType
 } from './utils';
 
-export { mdToText, textToMd, CutText, TokenFormatUpdate, TextRange }
+export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
 
 /**
  * Фабрика объекта-токена
@@ -20,7 +20,7 @@ export function createToken(text: string, format: TokenFormat = 0, sticky = fals
  * Вставляет указанный текст `text` в текстовую позицию `pos` списка токенов
  * @return Обновлённый список токенов
  */
-export function insertText(tokens: Token[], pos: number, text: string, options: ParserOptions): Token[] {
+export function insertText(tokens: Token[], pos: number, text: string, options: Partial<ParserOptions>): Token[] {
     return updateTokens(tokens, text, pos, pos, options);
 }
 
@@ -28,21 +28,21 @@ export function insertText(tokens: Token[], pos: number, text: string, options: 
  * Заменяет текст указанной длины в текстовой позиции `pos` на новый `text`
  * @return Обновлённый список токенов
  */
-export function replaceText(tokens: Token[], pos: number, len: number, text: string, options: ParserOptions): Token[] {
+export function replaceText(tokens: Token[], pos: number, len: number, text: string, options: Partial<ParserOptions>): Token[] {
     return updateTokens(tokens, text, pos, pos + len, options);
 }
 
 /**
  * Удаляет текст указанной длины из списка токенов в указанной позиции
  */
-export function removeText(tokens: Token[], pos: number, len: number, options: ParserOptions): Token[] {
+export function removeText(tokens: Token[], pos: number, len: number, options: Partial<ParserOptions>): Token[] {
     return updateTokens(tokens, '', pos, pos + len, options);
 }
 
 /**
  * Вырезает текст из диапазона `from:to` и возвращает его и изменённую строку
  */
-export function cutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
+export function cutText(tokens: Token[], from: number, to: number, options: Partial<ParserOptions>): CutText {
     return {
         cut: normalize(slice(tokens, from, to)),
         tokens: removeText(tokens, from, to - from, options)
@@ -215,7 +215,7 @@ export function setLink(tokens: Token[], link: string | null, pos: number, len =
  * Вставляет указанный текст `text` в текстовую позицию `pos` списка токенов
  * @return Обновлённый список токенов
  */
-export function mdInsertText(tokens: Token[], pos: number, text: string, options: ParserOptions): Token[] {
+export function mdInsertText(tokens: Token[], pos: number, text: string, options: Partial<ParserOptions>): Token[] {
     return mdUpdateTokens(tokens, text, pos, pos, options);
 }
 
@@ -223,21 +223,21 @@ export function mdInsertText(tokens: Token[], pos: number, text: string, options
  * Заменяет текст указанной длины в текстовой позиции `pos` на новый `text`
  * @return Обновлённый список токенов
  */
-export function mdReplaceText(tokens: Token[], pos: number, len: number, text: string, options: ParserOptions): Token[] {
+export function mdReplaceText(tokens: Token[], pos: number, len: number, text: string, options: Partial<ParserOptions>): Token[] {
     return mdUpdateTokens(tokens, text, pos, pos + len, options);
 }
 
 /**
  * Удаляет текст указанной длины из списка токенов в указанной позиции
  */
-export function mdRemoveText(tokens: Token[], pos: number, len: number, options: ParserOptions): Token[] {
+export function mdRemoveText(tokens: Token[], pos: number, len: number, options: Partial<ParserOptions>): Token[] {
     return mdUpdateTokens(tokens, '', pos, pos + len, options);
 }
 
 /**
  * Вырезает текст из диапазона `from:to` и возвращает его и изменённую строку
  */
-export function mdCutText(tokens: Token[], from: number, to: number, options: ParserOptions): CutText {
+export function mdCutText(tokens: Token[], from: number, to: number, options: Partial<ParserOptions>): CutText {
     return {
         cut: parse(getText(tokens).slice(from, to), options),
         tokens: mdRemoveText(tokens, from, to - from, options)
@@ -250,7 +250,7 @@ export function mdCutText(tokens: Token[], from: number, to: number, options: Pa
  * @param breakSolid Применять форматирование внутри «сплошных» токенов, то есть
  * можно один сплошной токен разделить на несколько и указать им разное форматирование
  */
-export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, options: ParserOptions): Token[] {
+export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, options: Partial<ParserOptions>): Token[] {
     // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
     // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
     // Полученный результат обрамим MD-символами для получения нужного результата
@@ -265,7 +265,7 @@ export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFo
  * Универсальный метод для обновления списка токенов: добавление, удаление и замена
  * текста в списке указанных токенов
  */
-function updateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
+function updateTokens(tokens: Token[], value: string, from: number, to: number, options: Partial<ParserOptions>): Token[] {
     if (!tokens.length) {
         return parse(value, options);
     }
@@ -340,7 +340,7 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
  * просто модифицировать строку и заново её парсить: производительность парсера
  * должно хватить, чтобы делать это на каждое изменение.
  */
-function mdUpdateTokens(tokens: Token[], value: string, from: number, to: number, options: ParserOptions): Token[] {
+function mdUpdateTokens(tokens: Token[], value: string, from: number, to: number, options: Partial<ParserOptions>): Token[] {
     const prevText = getText(tokens);
     const nextText = prevText.slice(0, from) + value + prevText.slice(to);
     return parse(nextText, options);

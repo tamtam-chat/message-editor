@@ -1,4 +1,3 @@
-import EventEmitter from 'eventemitter3';
 import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
 import render from '../render';
 import { TextRange } from './types';
@@ -16,7 +15,7 @@ export interface EditorOptions {
     /** Значение по умолчанию для редактора */
     value?: string;
     /** Параметры для парсера текста */
-    parse?: ParserOptions;
+    parse?: Partial<ParserOptions>;
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
 }
 
@@ -27,11 +26,13 @@ interface PendingUpdate {
 
 type Model = Token[];
 
-interface EditorEvents {
-    update(editor: Editor): void;
-    selectionchange(editor: Editor): void;
-    formatchange(editor: Editor): void;
+type EventName = 'editor-selectionchange' | 'editor-update' | 'editor-update';
+
+interface EditorEventDetails {
+    editor: Editor;
 }
+
+export interface EditorEvent<T = EditorEventDetails> extends CustomEvent<T> {}
 
 interface PickLinkOptions {
     /**
@@ -54,14 +55,14 @@ const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
-export default class Editor extends EventEmitter<EditorEvents> {
+export default class Editor {
     public shortcuts: Shortcuts<Editor>;
+    public history: History<Model>;
 
     private _model: Model;
     private inputHandled = false;
     private pendingUpdate: PendingUpdate | null = null;
     private pendingDelete: TextRange | null = null;
-    private history: History<Model>;
     private caret: TextRange = [0, 0];
 
     private onKeyPress = (evt: KeyboardEvent) => {
@@ -95,7 +96,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
         const range = getTextRange(this.element);
         if (range && isCollapsed(range)) {
             let payload: DiffAction;
-            const value = this.getValue();
+            const value = this.getText();
             const inputValue = this.getInputText();
 
             if (this.pendingDelete) {
@@ -138,7 +139,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
 
         if (range) {
             this.saveSelection(range);
-            this.emit('selectionchange', this);
+            this.emit('editor-selectionchange');
         }
     }
 
@@ -185,6 +186,13 @@ export default class Editor extends EventEmitter<EditorEvents> {
             // TODO обработать вставку файлов
         } else {
             fragment = evt.clipboardData.getData('text/plain');
+
+            if (!fragment) {
+                const html = evt.clipboardData.getData('text/html');
+                if (html) {
+                    fragment = htmlToText(html);
+                }
+            }
         }
 
         if (fragment && range) {
@@ -202,13 +210,14 @@ export default class Editor extends EventEmitter<EditorEvents> {
      * @param element Контейнер, в котором будет происходить редактирование
      */
     constructor(public element: HTMLElement, public options: EditorOptions = {}) {
-        super();
-        this.model = parse(options.value || '', options.parse);
+        const value = options.value || '';
+        this.model = parse(value, options.parse);
         this.history = new History({
             compactActions: [DiffActionType.Insert, DiffActionType.Remove]
         });
         this.shortcuts = new Shortcuts(this);
         this.setup();
+        this.setSelection(value.length);
         this.history.push(this.model, 'init', this.caret);
     }
 
@@ -219,10 +228,8 @@ export default class Editor extends EventEmitter<EditorEvents> {
     set model(value: Model) {
         if (this._model !== value) {
             this._model = value;
-            // При рендеринге может слететь позиция курсора, поэтому после рендеринга
-            // проверим: если она поменялась, то восстановим
-            render(this.element, value);
-            this.emit('update', this);
+            this.render();
+            this.emit('editor-update');
         }
     }
 
@@ -250,9 +257,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
         const { shortcuts } = this.options;
 
         if (shortcuts) {
-            Object.keys(shortcuts).forEach(sh => {
-                this.shortcuts.register(sh, shortcuts[sh]);
-            });
+            this.shortcuts.registerAll(shortcuts);
         }
     }
 
@@ -269,7 +274,6 @@ export default class Editor extends EventEmitter<EditorEvents> {
         document.removeEventListener('selectionchange', this.onSelectionChange);
         this.inputHandled = false;
         this.pendingUpdate = null;
-        this.shortcuts.unregisterAll();
     }
 
     /////////// Публичные методы для работы с текстом ///////////
@@ -359,7 +363,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
      */
     focus(): void {
         this.element.focus();
-        this.setSelection(getLength(this.model));
+        this.setSelection(this.caret[0], this.caret[1]);
     }
 
     /**
@@ -373,7 +377,7 @@ export default class Editor extends EventEmitter<EditorEvents> {
             [from, to]
         );
         setRange(this.element, range[0], range[0] + range[1]);
-        this.emit('formatchange', this);
+        this.emit('editor-update');
         return result;
     }
 
@@ -554,10 +558,63 @@ export default class Editor extends EventEmitter<EditorEvents> {
     }
 
     /**
-     * Возвращает текущее значение модели редактора
+     * Заменяет текущее значение редактора на указанное. При этом полностью
+     * очищается история изменений редактора
      */
-    getValue(): string {
+    setValue(value: string | Model, selection?: TextRange): void {
+        if (typeof value === 'string') {
+            value = parse(value, this.options.parse);
+        }
+
+        if (!selection) {
+            const len = getText(value).length;
+            selection = [len, len];
+        }
+
+        this.model = value;
+        this.setSelection(selection[0], selection[1]);
+        this.history.clear();
+        this.history.push(this.model, 'init', this.caret);
+    }
+
+    /**
+     * Возвращает текущее текстовое значение модели редактора
+     */
+    getText(): string {
         return getText(this.model);
+    }
+
+    /**
+     * Обновляет опции редактора
+     */
+    setOptions(options: Partial<EditorOptions>): void {
+        let markdownUpdated = false;
+        if (options.shortcuts) {
+            this.shortcuts.unregisterAll();
+            this.shortcuts.registerAll(options.shortcuts);
+        }
+
+        if (options.parse) {
+            const markdown = !!this.options.parse?.markdown;
+            markdownUpdated = options.parse.markdown !== markdown;
+        }
+
+        this.options = {
+            ...this.options,
+            ...options
+        };
+
+        if (markdownUpdated) {
+            const sel = this.getSelection();
+            const range: Rng = [sel[0], sel[1] - sel[0]];
+            const tokens = this.options.parse?.markdown
+                ? textToMd(this.model, range)
+                : mdToText(this.model, range);
+
+            this.setValue(tokens, [range[0], range[0] + range[1]]);
+        } else {
+            this.render();
+        }
     }
 
     /**
@@ -588,6 +645,22 @@ export default class Editor extends EventEmitter<EditorEvents> {
         }
 
         return result;
+    }
+
+    /**
+     * Подписываемся на указанное событие
+     */
+    on(eventType: EventName, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): this {
+        this.element.addEventListener(eventType, listener, options);
+        return this;
+    }
+
+    /**
+     * Отписываемся от указанного события
+     */
+    off(eventType: EventName, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): this {
+        this.element.removeEventListener(eventType, listener, options);
+        return this;
     }
 
     private scheduleUpdate() {
@@ -688,6 +761,20 @@ export default class Editor extends EventEmitter<EditorEvents> {
 
         return setFormat(tokens, format, range[0], range[1]);
     }
+
+    private render(): void {
+        render(this.element, this.model, {
+            replaceTextEmoji: this.options.parse?.textEmoji
+        });
+    }
+
+    private emit(eventName: EventName) {
+        this.element.dispatchEvent(new CustomEvent<EditorEventDetails>(eventName, {
+            bubbles: true,
+            cancelable: true,
+            detail: { editor: this }
+        }));
+    }
 }
 
 /**
@@ -716,4 +803,34 @@ function getTextFromKeyboardEvent(evt: KeyboardEvent): string {
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Парсинг HTML-содержимого буффера обмена в обычный текст.
+ * Используется для некоторых редких кейсов в Safari.
+ * Например, есть сайт https://emojifinder.com, в котором результаты поиска
+ * по эмоджи выводится как набор `<input>` элементов.
+ * Если копировать такой результат, то Chrome правильно сделает plain-text представление
+ * результата, а Safari — нет. В итоге в Safari мы получим пустой текст, а вставленный
+ * HTML неправильно обработается и уронит вкладку. В этом методе мы попробуем
+ * достать текст из такого HTML-представления
+ */
+export function htmlToText(html: string): string {
+    const elem = document.createElement('template');
+    elem.innerHTML = html;
+
+    const walker = document.createTreeWalker(elem.content || elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let node = walker.currentNode;
+    let result = '';
+
+    while (node) {
+        if (node.nodeName === 'INPUT') {
+            result += (node as HTMLInputElement).value;
+        } else if (node.nodeType === node.TEXT_NODE) {
+            result += node.nodeValue;
+        }
+        node = walker.nextNode();
+    }
+
+    return result;
 }

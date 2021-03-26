@@ -180,7 +180,7 @@
         </ul>
     </main>
 <script type="module">
-import { Editor, TokenFormat } from './dist/editor.js';
+import { Editor, TokenFormat } from './dist/editor.es.js';
 
 const shortcuts = {
     'Cmd+Z': editor => editor.undo(),
@@ -207,8 +207,8 @@ const editor = new Editor(document.querySelector('#text-editor'), {
         link: true,
     }
 });
-editor.on('selectionchange', onSelectionChange);
-editor.on('formatchange', updateToolbarState);
+editor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
+    .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
 
 const mdEditor = new Editor(document.querySelector('#md-editor'), {
     value: 'Привет, *markdown* мир! 😇',
@@ -223,8 +223,8 @@ const mdEditor = new Editor(document.querySelector('#md-editor'), {
         markdown: true
     }
 });
-mdEditor.on('selectionchange', onSelectionChange);
-mdEditor.on('formatchange', updateToolbarState);
+mdEditor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
+    .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
 
 toolbar.addEventListener('mousedown', evt => {
     const btn = evt.target.closest('.toolbar-btn');

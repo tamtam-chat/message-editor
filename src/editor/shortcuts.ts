@@ -29,6 +29,15 @@ export default class Shortcuts<T> {
     }
 
     /**
+     * Регистрирует все обработчики шортактов из указанной мапы
+     */
+    registerAll(shortcuts: Record<string, ShortcutHandler<T>>): void {
+        Object.keys(shortcuts).forEach(sh => {
+            this.register(sh, shortcuts[sh]);
+        });
+    }
+
+    /**
      * Удаляет зарегистрированный шорткат
      * @param handler Если не указано, удалит любой шорткат, зарегистрированный
      * по этому сочетанию, иначе удалит только если зарегистрированный обработчик

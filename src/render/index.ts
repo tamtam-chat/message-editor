@@ -1,4 +1,4 @@
-import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, codePointAt } from '../parser';
+import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, codePointAt, Emoji } from '../parser';
 
 type ClassFormat = [type: TokenFormat, value: string];
 
@@ -42,6 +42,9 @@ export interface RenderOptions {
      * последнего перевода строки нужно добавить ещё один
      */
     fixTrailingLine: boolean;
+
+    /** Заменять текстовые смайлы на эмоджи */
+    replaceTextEmoji: boolean;
 }
 
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
@@ -49,7 +52,8 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
         ...opt,
         emojiUrl: debugEmojiUrl,
         userEmojiUrl: id => `//i.mycdn.me/getSmile?smileId=${id}`,
-        fixTrailingLine: true
+        fixTrailingLine: true,
+        replaceTextEmoji: false
     };
     const state = new ReconcileState(elem, options);
 
@@ -105,9 +109,10 @@ function renderText(token: Token, elem: HTMLElement, options: RenderOptions): vo
         let offset = 0;
         const state = new ReconcileState(elem, options);
 
-        if (token.format & TokenFormat.Monospace) {
-            // Для monospace не заменяем текстовые эмоджи
-            emoji = emoji.filter(e => !e.emoji);
+        if (!options.replaceTextEmoji || (token.format & TokenFormat.Monospace)) {
+            // Для monospace не заменяем текстовые эмоджи, также не заменяем их,
+            // если отключена опция
+            emoji = emoji.filter(isEmojiSymbol);
         }
 
         emoji.forEach(emojiToken => {
@@ -362,4 +367,8 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
     }
 
     return elem;
+}
+
+function isEmojiSymbol(emoji: Emoji): boolean {
+    return emoji.emoji === undefined;
 }
