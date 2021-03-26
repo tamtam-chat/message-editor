@@ -405,7 +405,7 @@ describe('Formatted String', () => {
 
     describe('Solid tokens', () => {
         it('link', () => {
-            const source = parse('http://ok.ru mail.ru ');
+            const source = parse('http://ok.ru mail.ru ', { link: true });
             source.push({
                 type: TokenType.Link,
                 format: 0,
