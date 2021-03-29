@@ -26,7 +26,7 @@ interface PendingUpdate {
 
 type Model = Token[];
 
-type EventName = 'editor-selectionchange' | 'editor-update' | 'editor-update';
+type EventName = 'editor-selectionchange' | 'editor-formatupdate' | 'editor-update';
 
 interface EditorEventDetails {
     editor: Editor;
@@ -60,6 +60,7 @@ export default class Editor {
     public history: History<Model>;
 
     private _model: Model;
+    private _inited = false;
     private inputHandled = false;
     private pendingUpdate: PendingUpdate | null = null;
     private pendingDelete: TextRange | null = null;
@@ -219,6 +220,7 @@ export default class Editor {
         this.setup();
         this.setSelection(value.length);
         this.history.push(this.model, 'init', this.caret);
+        this._inited = true;
     }
 
     get model(): Model {
@@ -764,16 +766,19 @@ export default class Editor {
 
     private render(): void {
         render(this.element, this.model, {
+            fixTrailingLine: true,
             replaceTextEmoji: this.options.parse?.textEmoji
         });
     }
 
     private emit(eventName: EventName) {
-        this.element.dispatchEvent(new CustomEvent<EditorEventDetails>(eventName, {
-            bubbles: true,
-            cancelable: true,
-            detail: { editor: this }
-        }));
+        if (this._inited) {
+            this.element.dispatchEvent(new CustomEvent<EditorEventDetails>(eventName, {
+                bubbles: true,
+                cancelable: true,
+                detail: { editor: this }
+            }));
+        }
     }
 }
 

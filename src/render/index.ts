@@ -47,14 +47,15 @@ export interface RenderOptions {
     replaceTextEmoji: boolean;
 }
 
+const defaultOptions: RenderOptions = {
+    emojiUrl: debugEmojiUrl,
+    userEmojiUrl: id => `//i.mycdn.me/getSmile?smileId=${id}`,
+    fixTrailingLine: false,
+    replaceTextEmoji: false,
+}
+
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
-    const options: RenderOptions = {
-        ...opt,
-        emojiUrl: debugEmojiUrl,
-        userEmojiUrl: id => `//i.mycdn.me/getSmile?smileId=${id}`,
-        fixTrailingLine: true,
-        replaceTextEmoji: false
-    };
+    const options: RenderOptions = opt ? { ...defaultOptions, ...opt }: defaultOptions;
     const state = new ReconcileState(elem, options);
 
     for (let i = 0; i < tokens.length; i++) {
