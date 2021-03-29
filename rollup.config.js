@@ -18,7 +18,7 @@ export default {
         typescript({
             tsconfigOverride: {
                 compilerOptions: {
-                    target: 'esnext',
+                    target: 'es5',
                     module: 'ESNext',
                     declaration: true
                 }
