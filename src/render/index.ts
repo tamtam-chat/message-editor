@@ -245,7 +245,7 @@ function debugEmojiUrl(emoji: string): string {
         }
     }
 
-    return `//st.mycdn.me/static/emoji/3-0-4/20/${codePoints.join('-')}@2x.png`;
+    return `//st.mycdn.me/static/emoji/3-1-1/20/${codePoints.join('-')}@2x.png`;
 }
 
 class ReconcileState {

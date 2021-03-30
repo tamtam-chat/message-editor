@@ -66,6 +66,22 @@ export default class Editor {
     private pendingDelete: TextRange | null = null;
     private caret: TextRange = [0, 0];
 
+    /**
+     * @param element Контейнер, в котором будет происходить редактирование
+     */
+    constructor(public element: HTMLElement, public options: EditorOptions = {}) {
+        const value = options.value || '';
+        this.model = parse(value, options.parse);
+        this.history = new History({
+            compactActions: [DiffActionType.Insert, DiffActionType.Remove]
+        });
+        this.shortcuts = new Shortcuts(this);
+        this.setup();
+        this.setSelection(value.length);
+        this.history.push(this.model, 'init', this.caret);
+        this._inited = true;
+    }
+
     private onKeyPress = (evt: KeyboardEvent) => {
         if (!evt.defaultPrevented && isInputEvent(evt)) {
             const range = getTextRange(this.element);
@@ -205,22 +221,6 @@ export default class Editor {
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
         }
-    }
-
-    /**
-     * @param element Контейнер, в котором будет происходить редактирование
-     */
-    constructor(public element: HTMLElement, public options: EditorOptions = {}) {
-        const value = options.value || '';
-        this.model = parse(value, options.parse);
-        this.history = new History({
-            compactActions: [DiffActionType.Insert, DiffActionType.Remove]
-        });
-        this.shortcuts = new Shortcuts(this);
-        this.setup();
-        this.setSelection(value.length);
-        this.history.push(this.model, 'init', this.caret);
-        this._inited = true;
     }
 
     get model(): Model {
