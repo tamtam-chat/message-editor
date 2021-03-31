@@ -1,6 +1,34 @@
-import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, codePointAt, Emoji } from '../parser';
+import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji } from '../parser';
+
+declare global {
+    interface Element {
+        $$emoji?: boolean;
+    }
+}
 
 type ClassFormat = [type: TokenFormat, value: string];
+export type EmojiRender = (emoji: string | null, elem?: Element) => Element | void;
+
+export interface RenderOptions {
+    /**
+     * Функция для отрисовки эмоджи
+     * @param emoji Эмоджи, который нужно нарисовать. Если указано `null`, значит,
+     * элемент с эмоджи сейчас удаляется и нужно подчистить ресурсы для него
+     * @param elem Существующий элемент, в котором нужно обновить эмоджи. Если не
+     * указан, его нужно создать
+     */
+    emoji?: EmojiRender;
+
+    /**
+     * Нужно ли исправлять завершающий перевод строки.
+     * Используется для режима редактирования, когда для отображения
+     * последнего перевода строки нужно добавить ещё один
+     */
+    fixTrailingLine: boolean;
+
+    /** Заменять текстовые смайлы на эмоджи */
+    replaceTextEmoji: boolean;
+}
 
 const formats: ClassFormat[] = [
     [TokenFormat.Bold, 'bold'],
@@ -24,32 +52,7 @@ const tokenTypeClass: Record<TokenType, string> = {
     [TokenType.UserSticker]: 'user-sticker',
 }
 
-export interface RenderOptions {
-    /**
-     * Функция, которая должна вернуть ссылку на картинку с указанным эмоджи.
-     * Если функция не указана, эмоджи рисуется как текст
-     */
-    emojiUrl?: (emoji: string) => string;
-
-    /**
-     * Функция, которая вернёт ссылку на специальный ОК-эмоджи
-     */
-    userEmojiUrl?: (id: string) => string;
-
-    /**
-     * Нужно ли исправлять завершающий перевод строки.
-     * Используется для режима редактирования, когда для отображения
-     * последнего перевода строки нужно добавить ещё один
-     */
-    fixTrailingLine: boolean;
-
-    /** Заменять текстовые смайлы на эмоджи */
-    replaceTextEmoji: boolean;
-}
-
 const defaultOptions: RenderOptions = {
-    emojiUrl: debugEmojiUrl,
-    userEmojiUrl: id => `//i.mycdn.me/getSmile?smileId=${id}`,
     fixTrailingLine: false,
     replaceTextEmoji: false,
 }
@@ -106,7 +109,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
  */
 function renderText(token: Token, elem: HTMLElement, options: RenderOptions): void {
     let { emoji } = token;
-    if (emoji && options.emojiUrl) {
+    if (emoji && options.emoji) {
         let offset = 0;
         const state = new ReconcileState(elem, options);
 
@@ -125,14 +128,7 @@ function renderText(token: Token, elem: HTMLElement, options: RenderOptions): vo
                 state.text(text);
             }
 
-            const img = state.elem('img') as HTMLImageElement;
-            const src = options.emojiUrl(emoji);
-            if (img.getAttribute('src') !== src) {
-                img.setAttribute('src', src);
-                img.setAttribute('data-raw', rawEmoji);
-                img.alt = rawEmoji;
-            }
-
+            state.emoji(emoji, rawEmoji);
             offset = emojiToken.to;
         });
 
@@ -230,22 +226,13 @@ function insertAt<T extends Node>(elem: HTMLElement, child: T, pos: number): T {
 }
 
 /**
- * Тестовая функция для проверки вывода эмоджи как картинки
+ * Удаляет указанный DOM-узел
  */
-function debugEmojiUrl(emoji: string): string {
-    const codePoints: string[] = [];
-    let i = 0;
-    let cp: number;
-    while (i < emoji.length) {
-        cp = codePointAt(emoji, i);
-        i += cp > 0xFFFF ? 2 : 1;
-
-        if (cp !== 0xFE0F && cp !== 0x200D) {
-            codePoints.push(cp.toString(16));
-        }
+function remove(node: ChildNode, emoji?: EmojiRender): void {
+    if (emoji && isElement(node)) {
+        cleanUpEmoji(node, emoji);
     }
-
-    return `//st.mycdn.me/static/emoji/3-1-1/20/${codePoints.join('-')}@2x.png`;
+    node.remove();
 }
 
 class ReconcileState {
@@ -286,11 +273,37 @@ class ReconcileState {
     }
 
     /**
+     * Ожидает элемент с указанным эмоджи, при необходимости создаёт или обновляет его
+     */
+    emoji(actualEmoji: string, rawEmoji: string): Element | void {
+        const { emoji } = this.options;
+        const node = this.container.childNodes[this.pos];
+        const isCurEmoji = node ? isEmoji(node) : false;
+        const next = emoji(actualEmoji, isCurEmoji ? node as Element : null);
+
+        if (next) {
+            if (node !== next) {
+                insertAt(this.container, next, this.pos);
+                if (isCurEmoji) {
+                    remove(node, emoji);
+                }
+            }
+            next.$$emoji = true;
+            next.setAttribute('data-raw', rawEmoji);
+            this.pos++;
+            return next;
+        } else if (isCurEmoji) {
+            remove(node, emoji);
+        }
+    }
+
+    /**
      * Удаляет все дочерние элементы контейнера, которые находятся правее точки `pos`
      */
     trim(): void {
+        const { emoji } = this.options;
         while (this.pos < this.container.childNodes.length) {
-            this.container.childNodes[this.pos].remove();
+            remove(this.container.childNodes[this.pos], emoji);
         }
     }
 }
@@ -352,19 +365,15 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
             elem.setAttribute('href', token.link);
             break;
         case TokenType.UserSticker:
-            if (state.options.userEmojiUrl) {
-                elem = state.elem('img');
-                const src = state.options.userEmojiUrl(token.stickerId);
-                if (src !== elem.getAttribute('src')) {
-                    elem.setAttribute('src', src);
-                    elem.setAttribute('data-raw', token.value);
-                }
+            if (state.options.emoji) {
+                elem = state.emoji(token.value, token.value) as HTMLElement;
             } else {
                 elem = state.elem('span');
             }
             break;
         default:
             elem = state.elem('span');
+            elem.textContent = token.value;
     }
 
     return elem;
@@ -372,4 +381,25 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
 
 function isEmojiSymbol(emoji: Emoji): boolean {
     return emoji.emoji === undefined;
+}
+
+function isEmoji(elem: Node): elem is Element {
+    return elem.nodeType === 1 ? (elem as Element).$$emoji : false;
+}
+
+/**
+ * Очищает ресурсы эмоджи внутри указанном элементе
+ */
+function cleanUpEmoji(elem: Element, emoji: EmojiRender): void {
+    const walker = document.createTreeWalker(elem, NodeFilter.SHOW_ELEMENT);
+    let node: Element;
+    while (node = walker.nextNode() as Element) {
+        if (isEmoji(node)) {
+            emoji(null, node);
+        }
+    }
+
+    if (isEmoji(elem)) {
+        emoji(null, elem);
+    }
 }

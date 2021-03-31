@@ -205,7 +205,8 @@ const editor = new Editor(document.querySelector('#text-editor'), {
         command: true,
         userSticker: true,
         link: true,
-    }
+    },
+    emoji: renderEmoji,
 });
 editor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
@@ -238,6 +239,38 @@ toolbar.addEventListener('mousedown', evt => {
         }
     }
 });
+
+/**
+ * Тестовая функция для проверки вывода эмоджи как картинки
+ */
+function renderEmoji(emoji, elem) {
+    if (emoji == null) {
+        return;
+    }
+
+    const codePoints = [];
+    let i = 0;
+    let cp = 0;
+    while (i < emoji.length) {
+        cp = emoji.codePointAt(i);
+        i += cp > 0xFFFF ? 2 : 1;
+
+        if (cp !== 0xFE0F && cp !== 0x200D) {
+            codePoints.push(cp.toString(16));
+        }
+    }
+
+    const url = `//st.mycdn.me/static/emoji/3-1-1/20/${codePoints.join('-')}@2x.png`;
+    if (!elem) {
+        elem = document.createElement('img');
+    }
+
+    if (elem.getAttribute('src') !== url) {
+        elem.setAttribute('src', url);
+    }
+
+    return elem;
+};
 
 function onSelectionChange(editor) {
     activeEditor = editor;

@@ -1,5 +1,5 @@
 import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
-import render from '../render';
+import render, { EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
@@ -17,6 +17,9 @@ export interface EditorOptions {
     /** Параметры для парсера текста */
     parse?: Partial<ParserOptions>;
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
+
+    /** Функция для отрисовки эмоджи */
+    emoji?: EmojiRender;
 }
 
 interface PendingUpdate {
@@ -767,7 +770,8 @@ export default class Editor {
     private render(): void {
         render(this.element, this.model, {
             fixTrailingLine: true,
-            replaceTextEmoji: this.options.parse?.textEmoji
+            replaceTextEmoji: this.options.parse?.textEmoji,
+            emoji: this.options.emoji,
         });
     }
 
