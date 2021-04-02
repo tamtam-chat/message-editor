@@ -65,6 +65,7 @@ export default class Editor {
     private _model: Model;
     private _inited = false;
     private inputHandled = false;
+    private pendingSelChange = false;
     private pendingUpdate: PendingUpdate | null = null;
     private pendingDelete: TextRange | null = null;
     private caret: TextRange = [0, 0];
@@ -156,10 +157,8 @@ export default class Editor {
 
     private onSelectionChange = () => {
         const range = getTextRange(this.element);
-
         if (range) {
             this.saveSelection(range);
-            this.emit('editor-selectionchange');
         }
     }
 
@@ -699,8 +698,12 @@ export default class Editor {
      * известного выделения
      */
     private saveSelection(range: TextRange): void {
+        const { caret } = this;
         this.caret = range;
         this.history.saveCaret(range);
+        if (caret[0] !== range[0] || caret[1] !== range[1]) {
+            this.notifySelChange();
+        }
     }
 
     /**
@@ -775,13 +778,30 @@ export default class Editor {
         });
     }
 
-    private emit(eventName: EventName) {
+    private emit(eventName: EventName): void {
         if (this._inited) {
             this.element.dispatchEvent(new CustomEvent<EditorEventDetails>(eventName, {
                 bubbles: true,
                 cancelable: true,
                 detail: { editor: this }
             }));
+        }
+    }
+
+    /**
+     * Отложенная нотификация об изменении позиции курсора.
+     * Учитывает особенности особенности обработки ввода в редакторе:
+     * чтобы лишний раз не моргать спеллчекером, обновление модели откладывается
+     * на момент отрисовки, поэтому если посылать уведомление сразу, выделение
+     * может указывать на позицию, которой нет в модели
+     */
+    private notifySelChange(): void {
+        if (!this.pendingSelChange) {
+            this.pendingSelChange = true;
+            requestAnimationFrame(() => {
+                this.pendingSelChange = false;
+                this.emit('editor-selectionchange');
+            });
         }
     }
 }
