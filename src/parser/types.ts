@@ -6,7 +6,7 @@ export interface ParserOptions {
     textEmoji: boolean;
 
     /** Находить упоминания: `@user_name` */
-    mention: boolean;
+    mention: boolean | 'strict';
 
     /** Находить хэштэги: `#hashtag` */
     hashtag: boolean;

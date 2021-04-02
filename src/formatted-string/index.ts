@@ -308,10 +308,8 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         // Проверяем пограничные случаи:
         // — начало изменяемого диапазона находится в пользовательской ссылке:
         //   сохраним ссылку
-        // — меняем упоминание. Если результат не начинается с упоминания, то считаем,
-        //   что пользователь меняет подпись упоминания
         const next = nextTokens[0];
-        if (isCustomLink(startToken) || (startToken.type === TokenType.Mention && next.type !== TokenType.Mention)) {
+        if (isCustomLink(startToken)) {
             nextTokens[0] = {
                 ...startToken,
                 emoji: next.emoji,

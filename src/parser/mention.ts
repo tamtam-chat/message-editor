@@ -1,14 +1,17 @@
 import { TokenFormat, TokenType } from './types';
 import ParserState from './state';
-import { Codes, consumeIdentifier, isDelimiter } from './utils';
+import { Codes, consumeIdentifier, isDelimiter, isNumber, isUnicodeAlpha } from './utils';
 
 export default function parseMention(state: ParserState): boolean {
     if (state.options.mention && state.atWordBound()) {
         const { pos } = state;
+        const consumer = state.options.mention === 'strict'
+            ? consumeIdentifier
+            : consumeMentionName;
         if (state.consume(Codes.At)) {
             // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
             // автокомплит в редакторе
-            if (consumeIdentifier(state) || isDelimiter(state.peek())) {
+            if (consumer(state) || isDelimiter(state.peek())) {
                 const value = state.substring(pos);
                 state.push({
                     type: TokenType.Mention,
@@ -24,4 +27,18 @@ export default function parseMention(state: ParserState): boolean {
     }
 
     return false;
+}
+
+function consumeMentionName(state: ParserState): boolean {
+    // Упоминание является промежуточным токеном, который используется для того,
+    // чтобы сгенерировать ссылку (type=Link). Поэтому разрешаем обычный алфавит,
+    // чтобы работал поиск по пользователям на UI
+    return state.consumeWhile(isMentionName);
+}
+
+/**
+ * Упоминание является промежуточным
+ */
+function isMentionName(ch: number): boolean {
+    return isNumber(ch) || isUnicodeAlpha(ch);
 }

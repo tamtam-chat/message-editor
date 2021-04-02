@@ -354,9 +354,9 @@ function canGroup(t1: Token, t2: Token): boolean {
 function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement {
     let elem: HTMLElement;
     switch (token.type) {
-        case TokenType.Command:
+        // case TokenType.Command:
+        // case TokenType.Mention:
         case TokenType.HashTag:
-        case TokenType.Mention:
             elem = state.elem('a');
             elem.setAttribute('href', token.value);
             break;
@@ -373,7 +373,6 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
             break;
         default:
             elem = state.elem('span');
-            elem.textContent = token.value;
     }
 
     return elem;
