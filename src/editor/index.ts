@@ -525,13 +525,17 @@ export default class Editor {
 
     /**
      * Возвращает токен для указанной позиции
+     * @param tail В случае, если позиция `pos` указывает на границу токенов,
+     * при `tail: true` вернётся токен слева от границы, иначе справа
      */
-    tokenForPos(pos: number): Token | undefined {
+    tokenForPos(pos: number, tail?: boolean): Token | undefined {
         let offset = 0;
+        let len = 0;
         const { model } = this;
         for (let i = 0, token: Token; i < model.length; i++) {
             token = model[i];
-            if (pos >= offset && pos < offset + token.value.length) {
+            len = offset + token.value.length;
+            if (pos >= offset && (tail ? pos <= len : pos < len)) {
                 return token;
             }
             offset += token.value.length;
