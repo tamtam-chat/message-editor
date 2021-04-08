@@ -81,7 +81,7 @@ export default class Editor {
         });
         this.shortcuts = new Shortcuts(this);
         this.setup();
-        this.setSelection(value.length);
+        // this.setSelection(value.length);
         this.history.push(this.model, 'init', this.caret);
         this._inited = true;
     }
@@ -429,8 +429,6 @@ export default class Editor {
         let currentUrl = '';
 
         if (token) {
-            console.log(token);
-
             if (token.format & TokenFormat.LinkLabel) {
                 // Это подпись к ссылке в MD-формате. Найдём саму ссылку
                 let ix = this.model.indexOf(token) + 1;
