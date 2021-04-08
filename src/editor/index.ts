@@ -29,7 +29,7 @@ interface PendingUpdate {
 
 type Model = Token[];
 
-type EventName = 'editor-selectionchange' | 'editor-formatupdate' | 'editor-update';
+type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
 
 interface EditorEventDetails {
     editor: Editor;
@@ -373,7 +373,7 @@ export default class Editor {
     /**
      * Обновляет форматирование у указанного диапазона
      */
-    updateFormat(format: TokenFormatUpdate, from: number, to = from): Model {
+    updateFormat(format: TokenFormat | TokenFormatUpdate, from: number, to = from): Model {
         const range: Rng = [from, to - from];
         const result = this.updateModel(
             this.setFormat(this.model, format, range),
@@ -381,7 +381,7 @@ export default class Editor {
             [from, to]
         );
         setRange(this.element, range[0], range[0] + range[1]);
-        this.emit('editor-update');
+        this.emit('editor-formatchange');
         return result;
     }
 
@@ -758,7 +758,7 @@ export default class Editor {
     /**
      * Применяет новый формат к указанному диапазону и возвращает новый набор токенов
      */
-    private setFormat(tokens: Model, format: TokenFormatUpdate, range: Rng): Model {
+    private setFormat(tokens: Model, format: TokenFormat | TokenFormatUpdate, range: Rng): Model {
         if (this.isMarkdown) {
             // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
             // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.

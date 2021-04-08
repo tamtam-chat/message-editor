@@ -66,16 +66,19 @@ export enum TokenFormat {
     Monospace = 1 << 4,
 
     /** Важный текст/заголовок */
-    Important = 1 << 5,
+    Heading = 1 << 5,
+
+    /** Красный текст */
+    Marked = 1 << 6,
 
     /** Подсвеченный фрагмент текста */
-    Highlight = 1 << 6,
+    Highlight = 1 << 7,
 
     /** Текст ссылки в Markdown: `[label]` */
-    LinkLabel = 1 << 7,
+    LinkLabel = 1 << 8,
 
     /** Ссылка в Markdown: `(example.com)` */
-    Link = 1 << 8,
+    Link = 1 << 9,
 }
 
 export type Token = TokenText | TokenLink | TokenUserSticker | TokenMention
