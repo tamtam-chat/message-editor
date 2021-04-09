@@ -20,6 +20,12 @@ export interface RenderOptions {
     emoji?: EmojiRender;
 
     /**
+     * Обработчик ссылок: принимает токен ссылки и должен вернуть значение для
+     * атрибута `href`. На вход может быть несколько типов токенов: Link, Hashtag
+     */
+    link: (token: Token) => string,
+
+    /**
      * Нужно ли исправлять завершающий перевод строки.
      * Используется для режима редактирования, когда для отображения
      * последнего перевода строки нужно добавить ещё один
@@ -56,6 +62,7 @@ const tokenTypeClass: Record<TokenType, string> = {
 const defaultOptions: RenderOptions = {
     fixTrailingLine: false,
     replaceTextEmoji: false,
+    link: getLink
 }
 
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
@@ -359,11 +366,11 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
         // case TokenType.Mention:
         case TokenType.HashTag:
             elem = state.elem('a');
-            elem.setAttribute('href', token.value);
+            elem.setAttribute('href', state.options.link(token));
             break;
         case TokenType.Link:
             elem = state.elem('a');
-            elem.setAttribute('href', token.link);
+            elem.setAttribute('href', state.options.link(token));
             break;
         case TokenType.UserSticker:
             if (state.options.emoji) {
@@ -402,4 +409,16 @@ function cleanUpEmoji(elem: Element, emoji: EmojiRender): void {
     if (isEmoji(elem)) {
         emoji(null, elem);
     }
+}
+
+function getLink(token: Token): string {
+    if (token.type === TokenType.HashTag) {
+        return token.value;
+    }
+
+    if (token.type === TokenType.Link) {
+        return token.link;
+    }
+
+    return '';
 }
