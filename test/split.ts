@@ -35,6 +35,10 @@ describe('Split string', () => {
         // В конце последовательности пробелов
         chunks = split(text, 7);
         deepEqual(toText(chunks), ['111', '222']);
+
+        // Текст полностью помещается в один чанк
+        chunks = split(text, 100);
+        deepEqual(toText(chunks), ['111    222']);
     });
 
     it('large words', () => {
@@ -50,6 +54,17 @@ describe('Split string', () => {
             '<a href="https://tamtam.chat">://ta</a>',
             '<a href="https://tamtam.chat">mtam.</a>',
             '<a href="https://tamtam.chat">chat</a>'
+        ]);
+    });
+
+    it('trim', () => {
+        const text = parse('     111111 22 https://tamtam.chat      ', { link: true });
+        const chunks = split(text, 10);
+
+        deepEqual(toText(chunks), [
+            '111111 22',
+            '<a href="https://tamtam.chat">https://ta</a>',
+            '<a href="https://tamtam.chat">mtam.chat</a>'
         ]);
     });
 });
