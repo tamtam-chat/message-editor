@@ -4,7 +4,8 @@ import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText } from './types';
 import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken, sliceEmoji,
-    LocationType
+    LocationType,
+    sliceToken
 } from './utils';
 
 export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
@@ -143,10 +144,9 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
     const end = tokenForPos(tokens, to, LocationType.End);
 
     if (start.index === end.index) {
-        // Получаем фрагмент в пределах одного токена: всегда делаем его текстом
-        const t = tokens[start.index];
+        // Получаем фрагмент в пределах одного токена
         return [
-            createToken(t.value.slice(start.offset, end.offset), t.format, false, sliceEmoji(t.emoji, start.offset, end.offset))
+            expandToken(sliceToken(tokens[start.index], start.offset, end.offset))
         ];
     }
 
@@ -154,9 +154,9 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
     const [right, ] = splitToken(tokens[end.index], end.offset);
 
     return normalize([
-        toText(left),
+        expandToken(left),
         ...tokens.slice(start.index + 1, end.index),
-        toText(right)
+        expandToken(right)
     ]);
 }
 
@@ -436,4 +436,12 @@ function toText(token: Token): TokenText {
 
 function toLinkOrText(token: Token, link: string | null): TokenLink | TokenText {
     return link ? toLink(token, link) : toText(token);
+}
+
+function expandToken(token: Token): TokenText | TokenLink {
+    if (token.type === TokenType.Link && !token.auto) {
+        return token;
+    }
+
+    return toText(token);
 }

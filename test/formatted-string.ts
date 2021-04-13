@@ -38,10 +38,16 @@ function getFormat(format: TokenFormat): string {
 /**
  * Строковое представление токенов
  */
-function repr(tokens: Token[]): string {
+export function repr(tokens: Token[]): string {
     return tokens.map(t => {
         const format = getFormat(t.format);
-        return format ? `<${format}>${t.value}</${format}>` : t.value;
+        let out = format ? `<${format}>${t.value}</${format}>` : t.value;
+
+        if (t.type === TokenType.Link) {
+            out = `<a href="${t.link}">${out}</a>`;
+        }
+
+        return out;
     }).join('');
 }
 

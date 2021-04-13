@@ -77,22 +77,31 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
 /**
  * Делит токен на две части в указанной позиции
  */
-export function splitToken<T extends Token>(token: T, pos: number): [T, T] {
+export function splitToken(token: Token, pos: number): [Token, Token] {
+    pos = clamp(pos, 0, token.value.length);
+    return [
+        sliceToken(token, 0, pos),
+        sliceToken(token, pos)
+    ];
+}
+
+/**
+ * Возвращает фрагмент указанного токена
+ */
+export function sliceToken(token: Token, start: number, end = token.value.length): Token {
     const { value, emoji } = token;
-    pos = clamp(pos, 0, value.length);
-
-    const left: T = {
+    const result = {
         ...token,
-        value: value.slice(0, pos),
-        emoji: sliceEmoji(emoji, 0, pos)
-    };
-    const right: T = {
-        ...token,
-        value: value.slice(pos),
-        emoji: sliceEmoji(emoji, pos, token.value.length)
+        value: value.slice(start, end),
+        emoji: sliceEmoji(emoji, start, end)
     };
 
-    return [left, right];
+    if (result.type === TokenType.Link) {
+        // Если достаём фрагмент автоссылки, то убираем это признак
+        result.auto = false;
+    }
+
+    return result;
 }
 
 /**
