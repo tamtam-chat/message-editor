@@ -1,5 +1,5 @@
 import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
-import render, { EmojiRender } from '../render';
+import render, { dispatch, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setRange } from './range';
@@ -782,11 +782,7 @@ export default class Editor {
 
     private emit(eventName: EventName): void {
         if (this._inited) {
-            this.element.dispatchEvent(new CustomEvent<EditorEventDetails>(eventName, {
-                bubbles: true,
-                cancelable: true,
-                detail: { editor: this }
-            }));
+            dispatch<EditorEventDetails>(this.element, eventName, { editor: this });
         }
     }
 

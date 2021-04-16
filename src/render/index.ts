@@ -367,6 +367,8 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
     if (token.type === TokenType.HashTag || isRenderLink(token)) {
         elem = state.elem('a');
         elem.setAttribute('href', state.options.link(token));
+        elem.addEventListener('mouseenter', onLinkEnter);
+        elem.addEventListener('mouseleave', onLinkLeave);
     } else if (token.type === TokenType.UserSticker) {
         if (state.options.emoji) {
             elem = state.emoji(token.value, token.value) as HTMLElement;
@@ -438,4 +440,21 @@ function isRenderLink(token: Token): boolean {
     }
 
     return false;
+}
+
+
+function onLinkEnter(evt: MouseEvent) {
+    dispatch(evt.target as Element, 'linkenter');
+}
+
+function onLinkLeave(evt: MouseEvent) {
+    dispatch(evt.target as Element, 'linkleave');
+}
+
+export function dispatch<T = unknown>(elem: Element, eventName: string, detail?: T): void {
+    elem.dispatchEvent(new CustomEvent<T>(eventName, {
+        bubbles: true,
+        cancelable: true,
+        detail
+    }));
 }
