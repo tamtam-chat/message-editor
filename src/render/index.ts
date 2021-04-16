@@ -1,3 +1,4 @@
+import { isAutoLink } from '../formatted-string/utils';
 import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji } from '../parser';
 
 declare global {
@@ -79,7 +80,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
         const groupEnd = nextInGroup(tokens, i);
         if (groupEnd !== i) {
             // Можем схлопнуть несколько токенов в один
-            elem.className = tokenTypeClass[token.type];
+            elem.className = getTokenTypeClass(token);
             const innerState = new ReconcileState(elem, options);
 
             while (i <= groupEnd) {
@@ -92,7 +93,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
             innerState.trim();
         } else {
             elem.className = joinClassNames([
-                tokenTypeClass[token.type],
+                getTokenTypeClass(token),
                 formatClassNames(token.format)
             ]);
             if (token.type !== TokenType.UserSticker) {
@@ -361,26 +362,19 @@ function canGroup(t1: Token, t2: Token): boolean {
  */
 function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement {
     let elem: HTMLElement;
-    switch (token.type) {
-        // case TokenType.Command:
-        // case TokenType.Mention:
-        case TokenType.HashTag:
-            elem = state.elem('a');
-            elem.setAttribute('href', state.options.link(token));
-            break;
-        case TokenType.Link:
-            elem = state.elem('a');
-            elem.setAttribute('href', state.options.link(token));
-            break;
-        case TokenType.UserSticker:
-            if (state.options.emoji) {
-                elem = state.emoji(token.value, token.value) as HTMLElement;
-            } else {
-                elem = state.elem('span');
-            }
-            break;
-        default:
+
+    // Ссылки рисуем только если нет моноширинного текста
+    if (token.type === TokenType.HashTag || isRenderLink(token)) {
+        elem = state.elem('a');
+        elem.setAttribute('href', state.options.link(token));
+    } else if (token.type === TokenType.UserSticker) {
+        if (state.options.emoji) {
+            elem = state.emoji(token.value, token.value) as HTMLElement;
+        } else {
             elem = state.elem('span');
+        }
+    } else {
+        elem = state.elem('span');
     }
 
     return elem;
@@ -421,4 +415,27 @@ function getLink(token: Token): string {
     }
 
     return '';
+}
+
+/**
+ * Возвращает класс для указанного токена
+ */
+function getTokenTypeClass(token: Token): string {
+    if (isAutoLink(token) && (token.format & TokenFormat.Monospace)) {
+        return '';
+    }
+
+    return tokenTypeClass[token.type];
+}
+
+/**
+ * Если указанный токен является ссылкой, вернёт `true`, если его можно нарисовать
+ * как ссылку
+ */
+function isRenderLink(token: Token): boolean {
+    if (token.type === TokenType.Link) {
+        return !token.auto || !(token.format & TokenFormat.Monospace);
+    }
+
+    return false;
 }
