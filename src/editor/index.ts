@@ -318,7 +318,9 @@ export default class Editor {
      * Заменяет текст в указанном диапазоне `from:to` на новый
      */
     replaceText(from: number, to: number, text: string): Model {
-        return this.paste(text, from, to);
+        const result = this.paste(text, from, to);
+        this.setSelection(from + text.length);
+        return result;
     }
 
     /**

@@ -139,8 +139,10 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
             }
 
             // Если попали в элемент (например, эмоджи), делаем адресацию относительно
-            // его родителя
-            let offset = 1;
+            // его родителя.
+            // Учитываем захват элемента в зависимости того, попадает ли позиция
+            // внутрь токена (pos > 0) или нет
+            let offset = pos === 0 ? 0 : 1;
             let node = container;
             while (node = node.previousSibling) {
                 offset++;
