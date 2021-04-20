@@ -280,7 +280,6 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
     let nextValue = startToken.value.slice(0, start.offset)
         + value + endToken.value.slice(end.offset);
 
-
     // Разбираем пограничный случай: есть автоссылка `mail.ru`, мы дописали в конец
     // `?` – вопрос останется текстом, так как это знак препинания в конце предложения.
     // Но если продолжим писать текст, например, `foo`, то `mail.ru?foo` должен
@@ -302,11 +301,8 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         // — начало изменяемого диапазона находится в пользовательской ссылке:
         //   сохраним ссылку
         if (isCustomLink(startToken)) {
-            nextTokens = nextTokens.map(t => ({
-                ...startToken,
-                emoji: t.emoji,
-                value: t.value,
-            }));
+            const { link } = startToken;
+            nextTokens = nextTokens.map(t => toLink(t, link));
         }
 
         nextTokens.forEach(t => t.format = startToken.format);
@@ -318,6 +314,10 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
             if (splitPoint.index !== -1 && textBound !== nextValue.length && nextTokens.slice(splitPoint.index).every(t => t.type === TokenType.Text)) {
                 nextTokens = setFormat(nextTokens, endToken.format, textBound, nextValue.length - textBound);
             }
+        }
+
+        if (isCustomLink(endToken) && value) {
+            nextTokens = setLink(nextTokens, endToken.link, start.offset, textBound - start.offset);
         }
     }
 
@@ -410,16 +410,12 @@ function expandToken(token: Token): TokenText | TokenLink {
     return toText(token);
 }
 
-function parseOptionsForToken(token: Token, options: Partial<ParserOptions>): Partial<ParserOptions> {
-    if (isCustomLink(token)) {
-        return {
-            ...options,
-            hashtag: false,
-            mention: false,
-            link: false,
-            command: false,
-
-        }
+function getLink(left: Token, right: Token): string | undefined {
+    if (isCustomLink(left)) {
+        return left.link;
     }
 
+    if (isCustomLink(right)) {
+        return right.link;
+    }
 }
