@@ -402,11 +402,11 @@ describe('Formatted String', () => {
         deepEqual(types(t4), [TokenType.Text, TokenType.Text, TokenType.Link, TokenType.Text, TokenType.Link]);
         deepEqual(values(t4), ['regular ', 'bo', 'ld', ' ', 'mail.ru']);
 
-        // Ссылка поверх сплошного токена
+        // Ссылка поверх сплошного токена: удаляем его, заменяем на ссылку
         tokens = parse('text1 @user text2', opt);
         const t5 = setLink(tokens, url, 2, 12);
-        deepEqual(types(t5), [TokenType.Text, TokenType.Link, TokenType.Mention, TokenType.Link, TokenType.Text]);
-        deepEqual(values(t5), ['te', 'xt1 ', '@user', ' te', 'xt2']);
+        deepEqual(types(t5), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(t5), ['te', 'xt1 @user te', 'xt2']);
     });
 
     describe('Solid tokens', () => {

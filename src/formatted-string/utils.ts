@@ -1,4 +1,4 @@
-import { Token, Emoji, TokenLink, TokenType } from '../parser';
+import { Token, Emoji, TokenLink, TokenType, TokenText } from '../parser';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) и  */
@@ -79,9 +79,18 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
  */
 export function splitToken(token: Token, pos: number): [Token, Token] {
     pos = clamp(pos, 0, token.value.length);
+    let right = sliceToken(token, pos);
+
+    // Так как у нас фактически все токены зависят от префикса, деление
+    // токена всегда должно превратить правую часть в обычный текст, только если
+    // это не произвольная ссылка
+    if (!isCustomLink(right) && pos > 0) {
+        right = toText(right);
+    }
+
     return [
         sliceToken(token, 0, pos),
-        sliceToken(token, pos)
+        right
     ];
 }
 
@@ -166,4 +175,32 @@ function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
 
 export function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Конвертирует указанный токен в текст
+ */
+export function toText(token: Token): TokenText {
+    return {
+        type: TokenType.Text,
+        format: token.format,
+        value: token.value,
+        emoji: token.emoji,
+        sticky: 'sticky' in token ? token.sticky : false
+    };
+}
+
+/**
+ * Конвертирует указанный токен в ссылку
+ */
+export function toLink(token: Token, link: string): TokenLink {
+    return {
+        type: TokenType.Link,
+        format: token.format,
+        value: token.value,
+        emoji: token.emoji,
+        link,
+        auto: false,
+        sticky: 'sticky' in token ? token.sticky : false,
+    };
 }

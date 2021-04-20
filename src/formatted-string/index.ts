@@ -3,9 +3,8 @@ import type { ParserOptions, Emoji, Token, TokenFormat, TokenLink, TokenText } f
 import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText } from './types';
 import {
-    tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken, sliceEmoji,
-    LocationType,
-    sliceToken
+    tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
+    LocationType, sliceToken, toLink, toText
 } from './utils';
 
 export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
@@ -177,35 +176,29 @@ export function setLink(tokens: Token[], link: string | null, pos: number, len =
 
     // Меняем промежуточные токены на ссылки
     for (let i = start.index + 1; i < end.index; i++) {
-        token = nextTokens[i];
-        if (!isSolidToken(token)) {
-            nextTokens[i] = toLinkOrText(token, link);
-        }
+        nextTokens[i] = toLinkOrText(nextTokens[i], link);
     }
 
     // Обновляем концевые токены
     if (start.index === end.index) {
         // Попали в один токен
         token = nextTokens[start.index];
-        if (!isSolidToken(token)) {
-            const [left, _mid] = splitToken(token, start.offset);
-            const [mid, right] = splitToken(_mid, end.offset - start.offset);
-            const next = toLinkOrText(mid, link);
-            next.sticky = len === 0;
-            nextTokens.splice(start.index, 1, left, next, right);
-        }
+        const [left, _mid] = splitToken(token, start.offset);
+        const [mid, right] = splitToken(_mid, end.offset - start.offset);
+        const next = toLinkOrText(mid, link);
+        next.sticky = len === 0;
+        nextTokens.splice(start.index, 1, left, next, right);
     } else {
+        let left: Token;
+        let right: Token;
+
         token = nextTokens[end.index];
-        if (!isSolidToken(token)) {
-            const [left, right] = splitToken(token, end.offset);
-            nextTokens.splice(end.index, 1, toLinkOrText(left, link), right);
-        }
+        [left, right] = splitToken(token, end.offset);
+        nextTokens.splice(end.index, 1, toLinkOrText(left, link), right);
 
         token = nextTokens[start.index];
-        if (!isSolidToken(token)) {
-            const [left, right] = splitToken(token, start.offset);
-            nextTokens.splice(start.index, 1, left, toLinkOrText(right, link));
-        }
+        [left, right] = splitToken(token, start.offset);
+        nextTokens.splice(start.index, 1, left, toLinkOrText(right, link));
     }
 
     return normalize(nextTokens);
@@ -308,13 +301,12 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         // Проверяем пограничные случаи:
         // — начало изменяемого диапазона находится в пользовательской ссылке:
         //   сохраним ссылку
-        const next = nextTokens[0];
         if (isCustomLink(startToken)) {
-            nextTokens[0] = {
+            nextTokens = nextTokens.map(t => ({
                 ...startToken,
-                emoji: next.emoji,
-                value: next.value,
-            };
+                emoji: t.emoji,
+                value: t.value,
+            }));
         }
 
         nextTokens.forEach(t => t.format = startToken.format);
@@ -406,34 +398,6 @@ export function applyFormat(format: TokenFormat, update: TokenFormatUpdate | Tok
     return format;
 }
 
-/**
- * Конвертирует указанный токен в ссылку
- */
-function toLink(token: Token, link: string): TokenLink {
-    return {
-        type: TokenType.Link,
-        format: token.format,
-        value: token.value,
-        emoji: token.emoji,
-        link,
-        auto: false,
-        sticky: 'sticky' in token ? token.sticky : false,
-    };
-}
-
-/**
- * Конвертирует указанный токен в текст
- */
-function toText(token: Token): TokenText {
-    return {
-        type: TokenType.Text,
-        format: token.format,
-        value: token.value,
-        emoji: token.emoji,
-        sticky: 'sticky' in token ? token.sticky : false
-    };
-}
-
 function toLinkOrText(token: Token, link: string | null): TokenLink | TokenText {
     return link ? toLink(token, link) : toText(token);
 }
@@ -444,4 +408,18 @@ function expandToken(token: Token): TokenText | TokenLink {
     }
 
     return toText(token);
+}
+
+function parseOptionsForToken(token: Token, options: Partial<ParserOptions>): Partial<ParserOptions> {
+    if (isCustomLink(token)) {
+        return {
+            ...options,
+            hashtag: false,
+            mention: false,
+            link: false,
+            command: false,
+
+        }
+    }
+
 }
