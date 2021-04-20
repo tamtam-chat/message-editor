@@ -2,7 +2,7 @@ import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '
 import render, { dispatch, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, setRange } from './range';
+import { getTextRange, setDOMRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
@@ -91,7 +91,7 @@ export default class Editor {
             const range = getTextRange(this.element);
 
             if (range) {
-                // Перехватываем keypress, что бы потом красиво и плавно всё вставить
+                // Перехватываем обработку `input`, что бы потом красиво и плавно всё вставить
                 this.inputHandled = true;
                 const text = getTextFromKeyboardEvent(evt);
 
@@ -559,8 +559,30 @@ export default class Editor {
         const maxIx = getLength(this.model);
         from = clamp(from, 0, maxIx);
         to = clamp(to, 0, maxIx);
+
+        if (from === maxIx && to === maxIx) {
+            // Ставим позицию в самый конец поля ввода.
+            // Если в тексте есть несколько строк, браузеры будут немного тупить:
+            // 1. Если `\n` есть в конце ввода, браузеры его не отобразят, поэтому
+            //    внутри функции `render()` мы принудительно добавляем `<br>`
+            //    в конце (см. fixNewLine)
+            // 2. В случае с Firefox не получится правильно спозиционировать каретку,
+            //    ему зачем-то нужна позиция перед `\n`, что не соответствует
+            //    поведению других браузеров
+            // Поэтому для многострочного ввода, если в конце есть перевод строки,
+            // мы будем выставлять диапазон перед фиктивным `<br>`
+            const { lastChild } = this.element;
+            if (lastChild && lastChild.nodeName === 'BR') {
+                const offset = this.element.childNodes.length - 1;
+                const range = document.createRange();
+                range.setStart(this.element, offset);
+                range.setEnd(this.element, offset);
+                setDOMRange(range);
+                return;
+            }
+        }
+
         setRange(this.element, from, to);
-        this.saveSelection(getTextRange(this.element));
     }
 
     /**
@@ -639,6 +661,8 @@ export default class Editor {
                 raw = (node as Element).getAttribute('data-raw');
                 if (raw) {
                     result += raw;
+                } else if (node.nodeName === 'BR') {
+                    result += '\n';
                 }
             }
         }
@@ -670,28 +694,11 @@ export default class Editor {
     }
 
     private scheduleUpdate() {
-        const update = () => {
-            if (this.pendingUpdate) {
-                const { range, text } = this.pendingUpdate;
-
-                if (isCollapsed(range)) {
-                    this.insertText(range[0], text);
-                } else if (!text) {
-                    this.removeText(range[0], range[1]);
-                } else {
-                    this.replaceText(range[0], range[1], text);
-                }
-
-                this.pendingUpdate = null;
-            }
-        };
-
         // Откладываем изменение модели, даём браузеру применить UI-изменения,
         // а модель поменяем в качестве уведомления. Это сделает UX приятнее
         // и нативнее, в частности, не будет сильно моргать браузерная
         // проверка правописания
-        requestAnimationFrame(() => update());
-
+        requestAnimationFrame(() => this.flushPendingUpdate());
         return true;
     }
 
@@ -800,6 +807,22 @@ export default class Editor {
                 this.pendingSelChange = false;
                 this.emit('editor-selectionchange');
             });
+        }
+    }
+
+    private flushPendingUpdate() {
+        if (this.pendingUpdate) {
+            const { range, text } = this.pendingUpdate;
+
+            if (isCollapsed(range)) {
+                this.insertText(range[0], text);
+            } else if (!text) {
+                this.removeText(range[0], range[1]);
+            } else {
+                this.replaceText(range[0], range[1], text);
+            }
+
+            this.pendingUpdate = null;
         }
     }
 }

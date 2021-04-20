@@ -105,7 +105,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
     if (options.fixTrailingLine && tokens.length) {
         const lastToken = tokens[tokens.length - 1];
         if (lastToken.value.slice(-1) === '\n') {
-            state.text('\n');
+            state.elem('br');
         }
     }
 

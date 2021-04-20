@@ -23,23 +23,30 @@ export function getRange(root: HTMLElement): Range {
 export function setRange(root: HTMLElement, from: number, to?: number): Range | undefined {
     const range = locationToRange(root, from, to);
     if (range) {
-        const sel = window.getSelection();
-
-        // Если уже есть выделение, сравним указанный диапазон с текущим:
-        // если они равны, то ничего не делаем, чтобы лишний раз не напрягать
-        // браузер и не портить UX
-        if (sel.rangeCount) {
-            const curRange = sel.getRangeAt(0);
-            const startBound = curRange.compareBoundaryPoints(Range.START_TO_START, range);
-            const endBound = curRange.compareBoundaryPoints(Range.END_TO_END, range);
-            if (startBound === 0 && endBound === 0) {
-                return;
-            }
-        }
-        sel.empty();
-        sel.addRange(range);
-        return range;
+        return setDOMRange(range);
     }
+}
+
+/**
+ * Обновляет DOM-диапазон, если он отличается от текущего
+ */
+export function setDOMRange(range: Range): Range | undefined {
+    const sel = window.getSelection();
+
+    // Если уже есть выделение, сравним указанный диапазон с текущим:
+    // если они равны, то ничего не делаем, чтобы лишний раз не напрягать
+    // браузер и не портить UX
+    if (sel.rangeCount) {
+        const curRange = sel.getRangeAt(0);
+        const startBound = curRange.compareBoundaryPoints(Range.START_TO_START, range);
+        const endBound = curRange.compareBoundaryPoints(Range.END_TO_END, range);
+        if (startBound === 0 && endBound === 0) {
+            return;
+        }
+    }
+    sel.empty();
+    sel.addRange(range);
+    return range;
 }
 
 /**
@@ -70,7 +77,7 @@ export function rangeToLocation(root: HTMLElement, range: Range): TextRange {
  */
 export function locationToRange(ctx: HTMLElement, from: number, to?: number): Range {
     const start = locationToRangeBound(ctx, from);
-    const end = to != null ? locationToRangeBound(ctx, to) : start;
+    const end = to == null || to === from ? start : locationToRangeBound(ctx, to);
 
     if (start && end) {
         const range = document.createRange();
