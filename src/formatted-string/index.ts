@@ -132,7 +132,8 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
     }
 
     if (from < 0 || from > fullLen || to < 0 || to > fullLen || to < from) {
-        throw new Error(`Invalid range: ${from}:${to}`);
+        console.warn(`Invalid range: ${from}:${to}. Max length: ${fullLen}`);
+        return [];
     }
 
     if (from === to) {
