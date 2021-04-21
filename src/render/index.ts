@@ -369,12 +369,8 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
         elem.setAttribute('href', state.options.link(token));
         elem.addEventListener('mouseenter', onLinkEnter);
         elem.addEventListener('mouseleave', onLinkLeave);
-    } else if (token.type === TokenType.UserSticker) {
-        if (state.options.emoji) {
-            elem = state.emoji(token.value, token.value) as HTMLElement;
-        } else {
-            elem = state.elem('span');
-        }
+    } else if (token.type === TokenType.UserSticker && state.options.emoji) {
+        elem = state.emoji(token.value, token.value) as HTMLElement;
     } else {
         elem = state.elem('span');
     }

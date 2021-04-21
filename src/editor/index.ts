@@ -701,7 +701,6 @@ export default class Editor {
         // и нативнее, в частности, не будет сильно моргать браузерная
         // проверка правописания
         requestAnimationFrame(() => this.flushPendingUpdate());
-        return true;
     }
 
     /**
