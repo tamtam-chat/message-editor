@@ -36,13 +36,17 @@ export function setDOMRange(range: Range): Range | undefined {
     // Если уже есть выделение, сравним указанный диапазон с текущим:
     // если они равны, то ничего не делаем, чтобы лишний раз не напрягать
     // браузер и не портить UX
-    if (sel.rangeCount) {
-        const curRange = sel.getRangeAt(0);
-        const startBound = curRange.compareBoundaryPoints(Range.START_TO_START, range);
-        const endBound = curRange.compareBoundaryPoints(Range.END_TO_END, range);
-        if (startBound === 0 && endBound === 0) {
-            return;
+    try {
+        if (sel.rangeCount) {
+            const curRange = sel.getRangeAt(0);
+            const startBound = curRange.compareBoundaryPoints(Range.START_TO_START, range);
+            const endBound = curRange.compareBoundaryPoints(Range.END_TO_END, range);
+            if (startBound === 0 && endBound === 0) {
+                return;
+            }
         }
+    } catch {
+        // Может быть ошибка, если элемент ещё не в DOM-дереве: игнорируем её
     }
     sel.empty();
     sel.addRange(range);
