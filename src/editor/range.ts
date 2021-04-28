@@ -13,7 +13,7 @@ export function getRange(root: HTMLElement): Range {
     const sel = window.getSelection();
     const range = sel.rangeCount && sel.getRangeAt(0);
     if (range && isValidRange(range, root)) {
-        return normalizeRange(range, root);
+        return range;
     }
 }
 
@@ -96,26 +96,28 @@ export function locationToRange(ctx: HTMLElement, from: number, to?: number): Ra
  * Возвращает позицию символа в тексте `ctx`, на который указывает граница
  * диапазона (DOM Range), определяемая параметрами `container` и `offset`
  */
-export function rangeBoundToLocation(root: HTMLElement, container: Node, offset: number): number {
-    // Пройдёмся по всем текстовым потомкам, пока не найдём нужный
-    const walker = createWalker(root);
-    let pos = 0;
-    let node: Node;
+export function rangeBoundToLocation(root: HTMLElement, node: Node, offset: number): number {
+    let result = 0;
 
-    while (node = walker.nextNode()) {
-        if (node === container) {
-            if (node.nodeName === 'IMG') {
-                pos += getNodeLength(node);
-            }
-
-            pos += offset;
-            break;
+    if (isText(node)) {
+        result = offset;
+    } else {
+        let i = 0;
+        while (i < offset) {
+            result += getNodeLength(node.childNodes[i++]);
         }
-
-        pos += getNodeLength(node);
     }
 
-    return pos;
+    // Tree walker идёт по узлам в их порядке следования в DOM. Соответственно,
+    // как только мы дойдём до указанного контейнера, мы посчитаем весь предыдущий
+    // контент
+    const walker = createWalker(root);
+    let n: Node;
+    while ((n = walker.nextNode()) && n !== node) {
+        result += getNodeLength(n);
+    }
+
+    return result;
 }
 
 /**
@@ -130,7 +132,7 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
     let container: Node;
 
     while (container = walker.nextNode()) {
-        if (container.nodeType === Node.ELEMENT_NODE && container.nodeName !== 'IMG') {
+        if (container.nodeType === Node.ELEMENT_NODE && !isEmoji(container)) {
             // Пропускаем обёртки для текста
             continue;
         }
@@ -169,49 +171,6 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
  */
 function isValidRange(range: Range, container: HTMLElement): boolean {
     return container.contains(range.commonAncestorContainer);
-}
-
-/**
- * Нормализует диапазон. В случае, если выделен не текст а что-то неожиданное, например родитель.
- */
-function normalizeRange(nativeRange: Range, container: HTMLElement): Range | null {
-    if (!isValidRange(nativeRange, container)) {
-        return null;
-    }
-
-    const range = document.createRange();
-    const start = { node: nativeRange.startContainer, offset: nativeRange.startOffset };
-    const end = { node: nativeRange.endContainer, offset: nativeRange.endOffset };
-
-    [start, end].forEach(position => {
-        let { node, offset } = position;
-
-        // Логика поиска выделенного текста
-        while (!(node instanceof Text) && node.childNodes.length > 0) {
-            if (node.childNodes.length > offset) {
-                node = node.childNodes[offset];
-                offset = 0;
-            } else if (node.childNodes.length === offset) {
-                node = node.lastChild;
-                if (node instanceof Text) {
-                    offset = node.data.length;
-                } else if (node.childNodes.length > 0) {
-                    offset = node.childNodes.length;
-                } else {
-                    offset = 0;
-                }
-            } else {
-                break;
-            }
-        }
-        position.node = node;
-        position.offset = offset;
-    });
-
-    range.setStart(start.node, start.offset);
-    range.setEnd(end.node, end.offset);
-
-    return range;
 }
 
 function isEmoji(node: Node): node is HTMLElement {
