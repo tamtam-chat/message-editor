@@ -104,17 +104,19 @@ export function rangeBoundToLocation(root: HTMLElement, node: Node, offset: numb
     } else {
         let i = 0;
         while (i < offset) {
-            result += getNodeLength(node.childNodes[i++]);
+            result += getNodeLength(node.childNodes[i++], true);
         }
     }
 
-    // Tree walker идёт по узлам в их порядке следования в DOM. Соответственно,
-    // как только мы дойдём до указанного контейнера, мы посчитаем весь предыдущий
-    // контент
-    const walker = createWalker(root);
-    let n: Node;
-    while ((n = walker.nextNode()) && n !== node) {
-        result += getNodeLength(n);
+    if (root !== node) {
+        // Tree walker идёт по узлам в их порядке следования в DOM. Соответственно,
+        // как только мы дойдём до указанного контейнера, мы посчитаем весь предыдущий
+        // контент
+        const walker = createWalker(root);
+        let n: Node;
+        while ((n = walker.nextNode()) && n !== node) {
+            result += getNodeLength(n);
+        }
     }
 
     return result;
@@ -180,7 +182,7 @@ function isEmoji(node: Node): node is HTMLElement {
 /**
  * Возвращает текстовую длину указанного узла
  */
-function getNodeLength(node: Node): number {
+function getNodeLength(node: Node, deep = false): number {
     if (isText(node)) {
         return node.nodeValue.length;
     }
@@ -189,7 +191,14 @@ function getNodeLength(node: Node): number {
         return (node.getAttribute('data-raw') || '').length;
     }
 
-    return 0;
+    let result = 0;
+    if (deep) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+            result += getNodeLength(node.childNodes[i], true);
+        }
+    }
+
+    return result;
 }
 
 function isText(node: Node): node is Text {
