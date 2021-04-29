@@ -39,5 +39,10 @@ describe('Command', () => {
         tokens = parse('/приветёЁ');
         deepEqual(types(tokens), [TokenType.Command]);
         deepEqual(values(tokens), ['/приветёЁ']);
+
+        // Распознаём команды только на границах слов
+        tokens = parse('http:/');
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['http:/']);
     });
 });

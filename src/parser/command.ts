@@ -1,9 +1,9 @@
 import { TokenFormat, TokenType } from './types';
 import ParserState from './state';
-import { Codes, isCommandName, isDelimiter } from './utils';
+import { Codes, isCommandName, isDelimiter, isWhitespace } from './utils';
 
 export default function parseCommand(state: ParserState): boolean {
-    if (state.options.command && state.atWordBound()) {
+    if (state.options.command && atWordBound(state.peekPrev())) {
         const { pos } = state;
         if (state.consume(Codes.Slash)) {
             // Разрешаем поглотить самостоятельный символ `/`, чтобы показывать
@@ -24,4 +24,8 @@ export default function parseCommand(state: ParserState): boolean {
     }
 
     return false;
+}
+
+function atWordBound(ch: number) {
+    return ch !== ch || isWhitespace(ch);
 }
