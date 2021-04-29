@@ -367,6 +367,7 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
     if (token.type === TokenType.HashTag || isRenderLink(token)) {
         elem = state.elem('a');
         elem.setAttribute('href', state.options.link(token));
+        elem.setAttribute('target', '_blank');
         elem.addEventListener('mouseenter', onLinkEnter);
         elem.addEventListener('mouseleave', onLinkLeave);
     } else if (token.type === TokenType.UserSticker && state.options.emoji) {
