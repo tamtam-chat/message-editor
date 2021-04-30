@@ -145,6 +145,10 @@ export default class Editor {
                     break;
                 case 'remove':
                     this.removeText(from, to);
+
+                    // При удалении текста почему-то не срабатывает событие для `onSelectionChange`,
+                    // поэтому дёрнем его вручную
+                    this.onSelectionChange();
                     break;
                 case 'replace':
                     this.replaceText(from, to, payload.text);
@@ -156,9 +160,11 @@ export default class Editor {
     }
 
     private onSelectionChange = () => {
-        const range = getTextRange(this.element);
-        if (range) {
-            this.saveSelection(range);
+        if (!this.pendingSelChange) {
+            const range = getTextRange(this.element);
+            if (range) {
+                this.saveSelection(range);
+            }
         }
     }
 
