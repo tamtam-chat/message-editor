@@ -1,5 +1,6 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import { createToken as token, insertText, removeText, setFormat, slice, cutText, setLink } from '../src/formatted-string';
+import { insertText, removeText, setFormat, slice, cutText, setLink } from '../src/formatted-string';
+import { createToken as token } from '../src/formatted-string/utils';
 import parse, { ParserOptions, Token, TokenFormat, TokenHashTag, TokenLink, TokenText, TokenType } from '../src/parser';
 
 type StringFormat = [TokenFormat, string];
@@ -238,6 +239,9 @@ describe('Formatted String', () => {
         deepEqual(slice(tokens, 1, 1), []);
         deepEqual(slice(tokens, 8, 8), []);
         deepEqual(slice([], 0, 0), []);
+
+        const t5 = slice(parse('@aaa', { mention: true }), 0, 4);
+        equal(t5[0].type, TokenType.Mention);
     });
 
     it('cut text', () => {

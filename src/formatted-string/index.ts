@@ -1,5 +1,5 @@
 import parse, { getText, getLength, normalize, TokenType } from '../parser';
-import type { ParserOptions, Emoji, Token, TokenFormat, TokenLink, TokenText } from '../parser';
+import type { ParserOptions, Token, TokenFormat, TokenLink, TokenText } from '../parser';
 import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText } from './types';
 import {
@@ -9,12 +9,6 @@ import {
 
 export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
 
-/**
- * Фабрика объекта-токена
- */
-export function createToken(text: string, format: TokenFormat = 0, sticky = false, emoji?: Emoji[]): Token {
-    return { type: TokenType.Text, format, value: text, emoji, sticky };
-}
 
 /**
  * Вставляет указанный текст `text` в текстовую позицию `pos` списка токенов
@@ -145,6 +139,12 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
 
     if (start.index === end.index) {
         // Получаем фрагмент в пределах одного токена
+        const t = tokens[start.index]
+        if (start.offset === 0 && end.offset === t.value.length) {
+            // Токен целиком
+            return [t];
+        }
+
         return [
             expandToken(sliceToken(tokens[start.index], start.offset, end.offset))
         ];
@@ -404,19 +404,15 @@ function toLinkOrText(token: Token, link: string | null): TokenLink | TokenText 
 }
 
 function expandToken(token: Token): TokenText | TokenLink {
-    if (token.type === TokenType.Link && !token.auto) {
-        return token;
+    if (token.type === TokenType.Link) {
+        if (!token.auto) {
+            return token;
+        }
+
+        // Авто-ссылка: проверим её содержимое: если текст соответствует ссылке,
+        // то оставим её, иначе превратим в текст
+        return parse(token.value, { link: true })[0] as TokenText | TokenLink;
     }
 
     return toText(token);
-}
-
-function getLink(left: Token, right: Token): string | undefined {
-    if (isCustomLink(left)) {
-        return left.link;
-    }
-
-    if (isCustomLink(right)) {
-        return right.link;
-    }
 }

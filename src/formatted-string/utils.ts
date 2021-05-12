@@ -1,4 +1,4 @@
-import { Token, Emoji, TokenLink, TokenType, TokenText } from '../parser';
+import { Token, Emoji, TokenLink, TokenType, TokenText, TokenFormat } from '../parser';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) и  */
@@ -79,6 +79,16 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
  */
 export function splitToken(token: Token, pos: number): [Token, Token] {
     pos = clamp(pos, 0, token.value.length);
+
+    // Разбор пограничных случаев: позиция попадает на начало или конец токена
+    if (pos === 0) {
+        return [createToken('') , token];
+    }
+
+    if (pos === token.value.length) {
+        return [token, createToken('')];
+    }
+
     let right = sliceToken(token, pos);
 
     // Так как у нас фактически все токены зависят от префикса, деление
@@ -203,4 +213,11 @@ export function toLink(token: Token, link: string): TokenLink {
         auto: false,
         sticky: 'sticky' in token ? token.sticky : false,
     };
+}
+
+/**
+ * Фабрика объекта-токена
+ */
+export function createToken(text: string, format: TokenFormat = 0, sticky = false, emoji?: Emoji[]): Token {
+    return { type: TokenType.Text, format, value: text, emoji, sticky };
 }
