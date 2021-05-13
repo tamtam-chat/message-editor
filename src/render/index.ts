@@ -383,7 +383,7 @@ function isEmojiSymbol(emoji: Emoji): boolean {
     return emoji.emoji === undefined;
 }
 
-function isEmoji(elem: Node): elem is Element {
+export function isEmoji(elem: Node): elem is Element {
     return elem.nodeType === 1 ? (elem as Element).$$emoji : false;
 }
 

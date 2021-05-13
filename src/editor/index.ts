@@ -1,5 +1,5 @@
 import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
-import render, { dispatch, EmojiRender } from '../render';
+import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, setDOMRange, setRange } from './range';
@@ -231,6 +231,26 @@ export default class Editor {
         }
     }
 
+    private onClick = (evt: MouseEvent) => {
+        if (isEmoji(evt.target as Node)) {
+            // Кликнули на эмоджи, будем позиционировать каретку относительно
+            // него
+            const elem = evt.target as HTMLElement;
+            const rect = elem.getBoundingClientRect();
+            const center = rect.left + rect.width * 0.6;
+            const range = document.createRange();
+            if (evt.clientX < center) {
+                range.setStartBefore(elem);
+                range.setEndBefore(elem);
+            } else {
+                range.setStartAfter(elem);
+                range.setEndAfter(elem);
+            }
+
+            setDOMRange(range);
+        }
+    }
+
     get model(): Model {
         return this._model;
     }
@@ -262,6 +282,7 @@ export default class Editor {
         this.element.addEventListener('cut', this.onCut);
         this.element.addEventListener('copy', this.onCopy);
         this.element.addEventListener('paste', this.onPaste);
+        this.element.addEventListener('click', this.onClick);
         document.addEventListener('selectionchange', this.onSelectionChange);
 
         const { shortcuts } = this.options;
@@ -281,6 +302,7 @@ export default class Editor {
         this.element.removeEventListener('cut', this.onCut);
         this.element.removeEventListener('copy', this.onCopy);
         this.element.removeEventListener('paste', this.onPaste);
+        this.element.removeEventListener('click', this.onClick);
         document.removeEventListener('selectionchange', this.onSelectionChange);
         this.inputHandled = false;
         this.pendingUpdate = null;
