@@ -1,7 +1,7 @@
 {
   "name": "@tamtam-chat/message-editor",
   "description": "Компонент поля ввода сообщения для веб-версии TamTam",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "main": "./dist/editor.cjs.js",
   "module": "./dist/editor.es.js",
   "types": "./dist/index.d.ts",
