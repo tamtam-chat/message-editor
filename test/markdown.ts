@@ -243,4 +243,18 @@ describe('Markdown', () => {
         deepEqual(pos, [17, 8]);
         equal(text(tokens).substr(pos[0], pos[1]), 'label he');
     });
+
+    it('overlapping format', () => {
+        const tokens = parse('_hello, *mark_ down* world!');
+        deepEqual(tokens, [
+            { type: TokenType.Markdown, format: TokenFormat.Italic, value: '_' },
+            { type: TokenType.Text, format: TokenFormat.Italic, value: 'hello, ', sticky: false },
+            { type: TokenType.Markdown, format: TokenFormat.Italic | TokenFormat.Bold, value: '*' },
+            { type: TokenType.Text, format: TokenFormat.Italic | TokenFormat.Bold, value: 'mark', sticky: false },
+            { type: TokenType.Markdown, format: TokenFormat.Italic | TokenFormat.Bold, value: '_' },
+            { type: TokenType.Text, format: TokenFormat.Bold, value: ' down', sticky: false },
+            { type: TokenType.Markdown, format: TokenFormat.Bold, value: '*' },
+            { type: TokenType.Text, format: TokenFormat.None, value: ' world!', sticky: false }
+        ]);
+    });
 });

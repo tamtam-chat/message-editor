@@ -159,17 +159,34 @@ function pushClose(state: ParserState, token: TokenMarkdown): void {
     state.format &= ~token.format;
 
     // Находим все промежуточные токены до открывающего и добавляем им указанный формат
-    const openToken = state.formatStack.pop()!;
-    // NB: минус 2, потому что добавили закрывающий токен.
-    // Закрывающий токен добавляем для того, чтобы скинуть накопленный текст
-    let i = state.tokens.length - 2;
-    let prevToken: Token;
-    while (i >= 0) {
-        prevToken = state.tokens[i--];
-        prevToken.format |= token.format;
-        if (prevToken === openToken) {
-            break;
+    const openToken = popOpenToken(state, token);
+    if (openToken) {
+        // NB: минус 2, потому что добавили закрывающий токен.
+        // Закрывающий токен добавляем для того, чтобы скинуть накопленный текст
+        let i = state.tokens.length - 2;
+        let prevToken: Token;
+        while (i >= 0) {
+            prevToken = state.tokens[i--];
+            prevToken.format |= token.format;
+            if (prevToken === openToken) {
+                break;
+            }
         }
+    }
+}
+
+/**
+ * Возвращает соответствующий открывающий md-токен для указанного закрывающего
+ * md-токена
+ */
+function popOpenToken(state: ParserState, token: TokenMarkdown): TokenMarkdown | undefined {
+    const stack = state.formatStack;
+    let i = stack.length - 1;
+    while (i >= 0) {
+        if (stack[i].format & token.format) {
+            return stack.splice(i, 1)[0];
+        }
+        i--;
     }
 }
 
