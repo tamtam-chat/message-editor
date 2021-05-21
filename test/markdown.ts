@@ -219,6 +219,10 @@ describe('Markdown', () => {
         deepEqual(types(text), [TokenType.Link, TokenType.Link]);
         deepEqual(values(text), ['a', 'b']);
         equal(textToMd(text), str);
+
+        text = mdToText(parse('aa *_bb_* cc'));
+        deepEqual(types(text), [TokenType.Text, TokenType.Text, TokenType.Text]);
+        deepEqual(values(text), ['aa ', 'bb', ' cc']);
     });
 
     it('adjust text range', () => {

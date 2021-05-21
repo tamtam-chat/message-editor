@@ -44,7 +44,10 @@ export function mdToText(tokens: Token[], range?: TextRange): Token[] {
                 convertCustomLink(tokens.slice(i, linkBound), result, state);
                 i = linkBound - 1;
             } else {
-                if (format & token.format) {
+                // NB достаём формат по символу токена, так как сам токен может
+                // содержать накопленный формат внешних токенов.
+                // Например, в `*_aa_*` у токена `_` будет формат Bold | Italic
+                if (format & charToFormat.get(token.value.charCodeAt(0))) {
                     // Завершается форматирование. Если у последнего токена
                     // нет текущего формата, значит, нужно сделать sticky-форматирование
                     const prev = result[result.length - 1];
