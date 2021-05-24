@@ -1,4 +1,4 @@
-import { isAutoLink } from '../formatted-string/utils';
+import { isAutoLink, isCustomLink } from '../formatted-string/utils';
 import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji } from '../parser';
 
 declare global {
@@ -422,6 +422,11 @@ function getLink(token: Token): string {
 function getTokenTypeClass(token: Token): string {
     if (isAutoLink(token) && (token.format & TokenFormat.Monospace)) {
         return '';
+    }
+
+    // Костыль: ссылкам, которые являются упоминанием, добавляем класс `mention`
+    if (isCustomLink(token) && token.link[0] === '@') {
+        return `${tokenTypeClass[token.type]} ${tokenTypeClass.mention}`;
     }
 
     return tokenTypeClass[token.type];

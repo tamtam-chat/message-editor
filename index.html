@@ -222,7 +222,8 @@ const mdEditor = new Editor(document.querySelector('#md-editor'), {
         userSticker: true,
         link: true,
         markdown: true
-    }
+    },
+    emoji: renderEmoji,
 });
 mdEditor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
