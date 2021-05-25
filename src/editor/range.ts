@@ -187,7 +187,7 @@ function getNodeLength(node: Node, deep = false): number {
         return node.nodeValue.length;
     }
 
-    if (isEmoji(node)) {
+    if (isElement(node) && node.hasAttribute('data-raw')) {
         return (node.getAttribute('data-raw') || '').length;
     }
 
@@ -203,6 +203,10 @@ function getNodeLength(node: Node, deep = false): number {
 
 function isText(node: Node): node is Text {
     return node.nodeType === Node.TEXT_NODE;
+}
+
+function isElement(node: Node): node is Element {
+    return node.nodeType === Node.ELEMENT_NODE;
 }
 
 function createWalker(elem: HTMLElement): TreeWalker {
