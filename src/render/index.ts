@@ -437,13 +437,12 @@ function getTokenTypeClass(token: Token): string {
  * как ссылку
  */
 function isRenderLink(token: Token): boolean {
-    if (token.type === TokenType.Link) {
-        return !token.auto || !(token.format & TokenFormat.Monospace);
+    if (!(token.format & TokenFormat.Monospace)) {
+        return token.type === TokenType.Mention || isCustomLink(token);
     }
 
     return false;
 }
-
 
 function onLinkEnter(evt: MouseEvent) {
     dispatch(evt.target as Element, 'linkenter');
