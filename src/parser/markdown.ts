@@ -228,9 +228,9 @@ function customLink(state: ParserState): boolean {
             }
         }
 
-        state.pos = pos;
     }
 
+    state.pos = pos;
     return false;
 }
 
