@@ -4,7 +4,7 @@ import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText } from './types';
 import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
-    LocationType, sliceToken, toLink, toText
+    sliceToken, toLink, toText, tokenRange
 } from './utils';
 
 export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
@@ -58,10 +58,9 @@ export function getFormat(tokens: Token[], pos: number): TokenFormat {
  * можно один сплошной токен разделить на несколько и указать им разное форматирование
  */
 export function setFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, breakSolid?: boolean): Token[] {
-    const start = tokenForPos(tokens, pos, LocationType.Start, !breakSolid);
-    const end = tokenForPos(tokens, pos + len, LocationType.End, !breakSolid);
+    const [start, end] = tokenRange(tokens, pos, pos + len, !breakSolid);
 
-    if (start.index === -1 || end.index === -1) {
+    if (start.index === -1 || end.index === -1 || end.index < start.index) {
         // Невалидные данные, ничего не делаем
         return tokens;
     }
@@ -134,8 +133,7 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
         return [];
     }
 
-    const start = tokenForPos(tokens, from, LocationType.Start);
-    const end = tokenForPos(tokens, to, LocationType.End);
+    const [start, end] = tokenRange(tokens, from, to);
 
     if (start.index === end.index) {
         // Получаем фрагмент в пределах одного токена
@@ -164,8 +162,7 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
  * Делает указанный диапазон ссылкой на `link`.
  */
 export function setLink(tokens: Token[], link: string | null, pos: number, len = 0): Token[] {
-    const start = tokenForPos(tokens, pos, LocationType.Start);
-    const end = tokenForPos(tokens, pos + len, LocationType.End);
+    const [start, end] = tokenRange(tokens, pos, pos + len);
 
     if (start.index === -1 || end.index === -1) {
         console.warn('Invalid range:', { pos, len });
@@ -264,8 +261,7 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         return parse(value, options);
     }
 
-    const end = tokenForPos(tokens, to, LocationType.End);
-    const start = from === to ? end : tokenForPos(tokens, from, LocationType.Start);
+    const [start, end] = tokenRange(tokens, from, to);
 
     if (start.index === -1 || end.index === -1) {
         // Такого не должно быть

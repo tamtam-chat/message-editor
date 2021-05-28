@@ -44,7 +44,7 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
             }
 
             const nextToken = tokens[i + 1]!;
-            if (nextToken.type !== TokenType.Text || !nextToken.sticky) {
+            if (!isSticky(nextToken) && locType === LocationType.End) {
                 return true;
             }
         }
@@ -72,6 +72,23 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
     }
 
     return pos;
+}
+
+/**
+ * Возвращает позиции в токенах для указанного диапазона
+ */
+export function tokenRange(tokens: Token[], from: number, to: number, solid = false): [TokenForPos, TokenForPos] {
+    const start = tokenForPos(tokens, from, LocationType.Start, solid);
+    const end = tokenForPos(tokens, to, LocationType.End, solid);
+    // Из-за особенностей определения позиций может случиться, что концевой токен
+    // будет левее начального. В этом случае отдаём предпочтение концевому
+    if (end.index < start.index && from === to) {
+        return [end, end];
+    }
+
+    return end.index < start.index && from === to
+        ? [end, end]
+        : [start, end]
 }
 
 /**
@@ -220,4 +237,8 @@ export function toLink(token: Token, link: string): TokenLink {
  */
 export function createToken(text: string, format: TokenFormat = 0, sticky = false, emoji?: Emoji[]): Token {
     return { type: TokenType.Text, format, value: text, emoji, sticky };
+}
+
+export function isSticky(token: Token): boolean {
+    return 'sticky' in token && token.sticky;
 }

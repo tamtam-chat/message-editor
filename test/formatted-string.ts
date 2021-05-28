@@ -346,6 +346,15 @@ describe('Formatted String', () => {
         const t4_2 = insertText(t4_1, 13, 'a', opt);
         deepEqual(types(t4_2), [TokenType.Text, TokenType.Link]);
         deepEqual(values(t4_2), ['test ', 'mail.ru?a']);
+
+        // Удаление текста после ссылки
+        const t5_1 = setLink(parse('[asd ]', opt), 'ok.ru', 1, 3);
+        deepEqual(types(t5_1), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(t5_1), ['[', 'asd', ' ]']);
+
+        const t5_2 = removeText(t5_1, 4, 1, opt);
+        deepEqual(types(t5_2), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(t5_2), ['[', 'asd', ']']);
     });
 
     it('set link', () => {
