@@ -437,11 +437,12 @@ function getTokenTypeClass(token: Token): string {
  * как ссылку
  */
 function isRenderLink(token: Token): boolean {
-    if (!(token.format & TokenFormat.Monospace)) {
-        return token.type === TokenType.Mention || isCustomLink(token);
+    if ((token.format & TokenFormat.Monospace)) {
+        // Внутри моноширинного текста разрешаем только «ручные» ссылки либо
+        // полные автоссылки (начинаются с протокола)
+        return token.type === TokenType.Link && (!token.auto || /^[a-z+]+:\/\//i.test(token.value));
     }
-
-    return false;
+    return token.type === TokenType.Mention || token.type === TokenType.Link;
 }
 
 function onLinkEnter(evt: MouseEvent) {
