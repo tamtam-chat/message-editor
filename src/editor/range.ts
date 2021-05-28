@@ -102,9 +102,20 @@ export function rangeBoundToLocation(root: HTMLElement, node: Node, offset: numb
     if (isText(node)) {
         result = offset;
     } else {
-        let i = 0;
-        while (i < offset) {
-            result += getNodeLength(node.childNodes[i++], true);
+        const nodeLen = getNodeLength(node, false);
+        if (nodeLen) {
+            // Сам узел является представлением какого-то токена.
+            // Если смещение больше 0, значит диапазон выставили внутри токена
+            // и его надо поглотить
+            if (offset > 0) {
+                result += nodeLen;
+            }
+        } else {
+            let i = 0;
+            while (i < offset) {
+                result += getNodeLength(node.childNodes[i++], true);
+            }
+            result += getNodeLength(node, false);
         }
     }
 
