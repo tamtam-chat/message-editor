@@ -294,14 +294,6 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
 
     if (nextTokens.length) {
         // Вставляем/заменяем фрагмент
-        // Проверяем пограничные случаи:
-        // — начало изменяемого диапазона находится в пользовательской ссылке:
-        //   сохраним ссылку
-        if (isCustomLink(startToken)) {
-            const { link } = startToken;
-            nextTokens = nextTokens.map(t => toLink(t, link));
-        }
-
         nextTokens.forEach(t => t.format = startToken.format);
 
         // Применяем форматирование из концевых токенов, но только если можем
@@ -313,9 +305,24 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
             }
         }
 
-        if (isCustomLink(endToken) && value) {
-            nextTokens = setLink(nextTokens, endToken.link, start.offset, textBound - start.offset);
+        // Проверяем пограничные случаи:
+        // — начало изменяемого диапазона находится в пользовательской ссылке:
+        //   сохраним ссылку
+        if (isCustomLink(startToken)) {
+            const { link } = startToken;
+
+            // Проверяем, куда пришло редактирование: если добавляем текст
+            // в самом конце ссылки, то не распространяем ссылку на этот текст
+            if (start.offset === startToken.value.length) {
+                nextTokens = setLink(nextTokens, link, 0, start.offset);
+            } else {
+                nextTokens = nextTokens.map(t => toLink(t, link));
+            }
         }
+
+        // if (isCustomLink(endToken) && value) {
+        //     nextTokens = setLink(nextTokens, endToken.link, start.offset, textBound - start.offset);
+        // }
     }
 
     return normalize([...prefix, ...nextTokens, ...suffix]);

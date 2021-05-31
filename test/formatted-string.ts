@@ -422,6 +422,25 @@ describe('Formatted String', () => {
         deepEqual(values(t5), ['te', 'xt1 @user te', 'xt2']);
     });
 
+    it('edit link', () => {
+        let tokens = setLink(parse('aa bb cc'), 'https://ok.ru', 3, 2);
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['aa ', 'bb', ' cc']);
+
+        tokens = insertText(tokens, 5, 'd', opt);
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['aa ', 'bb', 'd cc']);
+
+        tokens = insertText(tokens, 4, 'e', opt);
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['aa ', 'beb', 'd cc']);
+
+        tokens = insertText(tokens, 3, 'f', opt);
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['aa f', 'beb', 'd cc']);
+        // console.log(tokens);
+    });
+
     describe('Solid tokens', () => {
         it('link', () => {
             const source = parse('http://ok.ru mail.ru ', { link: true });
@@ -448,12 +467,12 @@ describe('Formatted String', () => {
             equal(link.value, 'mail123.ru');
 
             // Модификация текста ссылки пользовательской ссылки: должны оставить ссылку
-            const t2 = insertText(source, 24, '123😈', opt);
+            const t2 = insertText(source, 23, '123😈', opt);
             link = t2[4] as TokenLink;
             equal(t2.length, 5);
             equal(link.type, TokenType.Link);
             equal(link.link, 'https://tamtam.chat');
-            equal(link.value, 'Чат123😈');
+            equal(link.value, 'Ча123😈т');
             deepEqual(emojiText(link), ['😈']);
 
             // Удаляем символ, из-за чего ссылка становится невалидной
