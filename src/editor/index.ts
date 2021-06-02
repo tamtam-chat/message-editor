@@ -590,6 +590,7 @@ export default class Editor {
         from = clamp(from, 0, maxIx);
         to = clamp(to, 0, maxIx);
 
+        this.caret = [from, to];
         if (from === maxIx && to === maxIx) {
             // Ставим позицию в самый конец поля ввода.
             // Если в тексте есть несколько строк, браузеры будут немного тупить:
@@ -867,6 +868,10 @@ function getText(tokens: Token[]): string {
  * Проверяет, является ли указанное событие с клавиатуры вводом символа
  */
 function isInputEvent(evt: KeyboardEvent): boolean {
+    if (evt.key === 'Enter') {
+        return true;
+    }
+
     // NB Firefox также добавляет `.key` на системные клавиши, типа `ArrowDown`,
     // поэтому фильтруем событие по `.charCode`
     return evt.key && evt.charCode && !evt.metaKey && !evt.ctrlKey;
