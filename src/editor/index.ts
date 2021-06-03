@@ -69,6 +69,7 @@ export default class Editor {
     private pendingUpdate: PendingUpdate | null = null;
     private pendingDelete: TextRange | null = null;
     private caret: TextRange = [0, 0];
+    private focused = false;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -251,6 +252,9 @@ export default class Editor {
         }
     }
 
+    private onFocus = () => this.focused = true;
+    private onBlur = () => this.focused = false;
+
     get model(): Model {
         return this._model;
     }
@@ -283,6 +287,8 @@ export default class Editor {
         this.element.addEventListener('copy', this.onCopy);
         this.element.addEventListener('paste', this.onPaste);
         this.element.addEventListener('click', this.onClick);
+        this.element.addEventListener('focus', this.onFocus);
+        this.element.addEventListener('blur', this.onBlur);
         document.addEventListener('selectionchange', this.onSelectionChange);
 
         const { shortcuts } = this.options;
@@ -303,6 +309,8 @@ export default class Editor {
         this.element.removeEventListener('copy', this.onCopy);
         this.element.removeEventListener('paste', this.onPaste);
         this.element.removeEventListener('click', this.onClick);
+        this.element.removeEventListener('focus', this.onFocus);
+        this.element.removeEventListener('blur', this.onBlur);
         document.removeEventListener('selectionchange', this.onSelectionChange);
         this.inputHandled = false;
         this.pendingUpdate = null;
@@ -587,10 +595,9 @@ export default class Editor {
      */
     setSelection(from: number, to = from): void {
         const maxIx = getLength(this.model);
-        from = clamp(from, 0, maxIx);
-        to = clamp(to, 0, maxIx);
-
+        [from ,to] = this.normalizeRange([from, to]);
         this.saveSelection([from, to]);
+
         if (from === maxIx && to === maxIx) {
             // Ставим позицию в самый конец поля ввода.
             // Если в тексте есть несколько строк, браузеры будут немного тупить:
@@ -631,7 +638,13 @@ export default class Editor {
         }
 
         this.model = value;
-        this.setSelection(selection[0], selection[1]);
+
+        if (this.focused) {
+            this.setSelection(selection[0], selection[1]);
+        } else {
+            this.saveSelection(this.normalizeRange(selection));
+        }
+
         this.history.clear();
         this.history.push(this.model, 'init', this.caret);
     }
@@ -854,6 +867,11 @@ export default class Editor {
 
             this.pendingUpdate = null;
         }
+    }
+
+    private normalizeRange([from, to]: TextRange): TextRange {
+        const maxIx = getLength(this.model);
+        return [clamp(from, 0, maxIx), clamp(to, 0, maxIx)];
     }
 }
 
