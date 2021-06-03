@@ -365,7 +365,7 @@ function consumePath(state: ParserState): boolean {
     const { pos } = state;
 
     state.resetBrackets();
-    while (state.consume(Codes.Slash)) {
+    if (state.consume(Codes.Slash)) {
         segment(state);
     }
 
@@ -459,7 +459,7 @@ function segment(state: ParserState): boolean {
             if (bracketMatch === ConsumeResult.Skip) {
                 break;
             }
-        } else if (!(uchar(state) || state.consume(isSearch) || state.consume(Codes.Percent))) {
+        } else if (!(uchar(state) || state.consume(isSearch) || state.consume(Codes.Percent) || state.consume(Codes.Slash))) {
             break;
         }
     }
