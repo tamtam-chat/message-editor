@@ -590,7 +590,7 @@ export default class Editor {
         from = clamp(from, 0, maxIx);
         to = clamp(to, 0, maxIx);
 
-        this.caret = [from, to];
+        this.saveSelection([from, to]);
         if (from === maxIx && to === maxIx) {
             // Ставим позицию в самый конец поля ввода.
             // Если в тексте есть несколько строк, браузеры будут немного тупить:
