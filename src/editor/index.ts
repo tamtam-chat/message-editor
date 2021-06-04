@@ -453,6 +453,8 @@ export default class Editor {
             const update: TokenFormatUpdate = source.format & format
                 ? { remove: format } : { add: format };
             return this.updateFormat(update, from, to);
+        } else if (!this.model.length && format) {
+            return this.updateFormat({ add: format }, 0, 0);
         }
 
         return this.model;

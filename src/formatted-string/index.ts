@@ -4,7 +4,7 @@ import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText } from './types';
 import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
-    sliceToken, toLink, toText, tokenRange
+    sliceToken, toLink, toText, tokenRange, createToken
 } from './utils';
 
 export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
@@ -58,6 +58,11 @@ export function getFormat(tokens: Token[], pos: number): TokenFormat {
  * можно один сплошной токен разделить на несколько и указать им разное форматирование
  */
 export function setFormat(tokens: Token[], format: TokenFormatUpdate | TokenFormat, pos: number, len = 0, breakSolid?: boolean): Token[] {
+    if (!tokens.length) {
+        // Пограничный случай: выставляем формат пустой строке
+        return [createToken('', applyFormat(0, format), true)];
+    }
+
     const [start, end] = tokenRange(tokens, pos, pos + len, !breakSolid);
 
     if (start.index === -1 || end.index === -1 || end.index < start.index) {
