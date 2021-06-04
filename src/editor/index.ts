@@ -193,6 +193,9 @@ export default class Editor {
         }
 
         if (evt.key === 'Backspace' || evt.key === 'Delete') {
+            // NB: если есть накопленные изменения — сбрасываем их, так как ситуация
+            // с синхронным переходом в режим удаления может произойти из-за Punto Switcher
+            this.flushPendingUpdate();
             this.pendingDelete = this.getSelection();
         } else {
             this.shortcuts.handle(evt);
