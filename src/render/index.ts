@@ -364,7 +364,7 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
     let elem: HTMLElement;
 
     // Ссылки рисуем только если нет моноширинного текста
-    if (token.type === TokenType.HashTag || isRenderLink(token)) {
+    if (isRenderLink(token)) {
         elem = state.elem('a');
         elem.setAttribute('href', state.options.link(token));
         elem.setAttribute('target', '_blank');
@@ -424,9 +424,13 @@ function getTokenTypeClass(token: Token): string {
         return '';
     }
 
-    // Костыль: ссылкам, которые являются упоминанием, добавляем класс `mention`
-    if (isCustomLink(token) && token.link[0] === '@') {
-        return `${tokenTypeClass[token.type]} ${tokenTypeClass.mention}`;
+    if (isRenderLink(token)) {
+        let { type } = token;
+        if (isCustomLink(token) && token.link[0] === '@') {
+            type = TokenType.Mention;
+        }
+
+        return type !== TokenType.Link ? `${tokenTypeClass.link} ${tokenTypeClass[type]}` : tokenTypeClass[type];
     }
 
     return tokenTypeClass[token.type];
@@ -442,7 +446,10 @@ function isRenderLink(token: Token): boolean {
         // полные автоссылки (начинаются с протокола)
         return token.type === TokenType.Link && (!token.auto || /^[a-z+]+:\/\//i.test(token.value));
     }
-    return token.type === TokenType.Mention || token.type === TokenType.Link;
+    return token.type === TokenType.Mention
+        || token.type === TokenType.Command
+        || token.type === TokenType.Link
+        || token.type === TokenType.HashTag;
 }
 
 function onLinkEnter(evt: MouseEvent) {
