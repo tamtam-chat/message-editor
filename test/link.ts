@@ -200,6 +200,12 @@ describe('Link', () => {
         }
     });
 
+    it('invalid url', () => {
+        const tokens = parse('/var/tmp/foo_bar.cf');
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['/var/tmp/foo_bar.cf']);
+    });
+
     it.skip('debug', () => {
         console.log(parse(`Go to mail.ru.`));
     });

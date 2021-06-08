@@ -131,8 +131,8 @@ export function isBound(ch?: number): boolean {
 
 export function isDelimiter(ch?: number): boolean {
     return isBound(ch)
-        || isPunctuation(ch)
-        || isMarkdown(ch);
+        || isPunctuation(ch);
+        // || isMarkdown(ch);
 }
 
 /**
