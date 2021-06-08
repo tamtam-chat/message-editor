@@ -105,6 +105,10 @@ describe('Emoji', () => {
         it('unicode 13.1', () => {
             check(read('emoji-test-13.txt'));
         });
+
+        it('unicode 14', () => {
+            check(read('emoji-test-14.txt'));
+        });
     });
 
     it('basic emoji in text', () => {
