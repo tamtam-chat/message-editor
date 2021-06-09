@@ -455,6 +455,16 @@ describe('Formatted String', () => {
         deepEqual(values(tokens), ['a ', 'https://ok.ru']);
     });
 
+    it('insert text before custom link', () => {
+        let tokens = setLink(parse('foo'), 'ok.ru', 0, 3);
+        deepEqual(types(tokens), [TokenType.Link]);
+        deepEqual(values(tokens), ['foo']);
+
+        tokens = insertText(tokens, 0, 'a', { link: true });
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link]);
+        deepEqual(values(tokens), ['a', 'foo']);
+    });
+
     describe('Solid tokens', () => {
         it('link', () => {
             const source = parse('http://ok.ru mail.ru ', { link: true });

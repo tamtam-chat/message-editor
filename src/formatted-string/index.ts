@@ -317,9 +317,12 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
             const { link } = startToken;
 
             // Проверяем, куда пришло редактирование: если добавляем текст
-            // в самом конце ссылки, то не распространяем ссылку на этот текст
+            // в самом конце ссылки иил в самом начале, то не распространяем
+            // ссылку на этот текст
             if (start.offset === startToken.value.length) {
                 nextTokens = setLink(nextTokens, link, 0, start.offset);
+            } else if (start.offset === 0) {
+                nextTokens = setLink(nextTokens, link, value.length, startToken.value.length);
             } else {
                 nextTokens = nextTokens.map(t => toLink(t, link));
             }
