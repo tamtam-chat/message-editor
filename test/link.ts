@@ -44,9 +44,9 @@ function testLink(link: string, isEmail = false) {
     validate(1);
 
     // Граница слов
-    tokens = parse(`.${link}`);
+    tokens = parse(`;${link}`);
     deepEqual(types(tokens), [TokenType.Text, TokenType.Link], `Types: "${link}" after word bound`);
-    deepEqual(values(tokens), ['.', link], `Values: "${link}" after word bound`);
+    deepEqual(values(tokens), [';', link], `Values: "${link}" after word bound`);
     validate(1);
 
     // Сразу за эмоджи
@@ -201,9 +201,13 @@ describe('Link', () => {
     });
 
     it('invalid url', () => {
-        const tokens = parse('/var/tmp/foo_bar.cf');
+        let tokens = parse('/var/tmp/foo_bar.cf');
         deepEqual(types(tokens), [TokenType.Text]);
         deepEqual(values(tokens), ['/var/tmp/foo_bar.cf']);
+
+        tokens = parse('/ok.ru');
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['/ok.ru']);
     });
 
     it.skip('debug', () => {

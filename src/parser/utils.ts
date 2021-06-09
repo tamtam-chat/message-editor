@@ -84,10 +84,15 @@ export const enum Codes {
     Hash = 35,
 }
 
+const boundPunctuation = new Set<number>([
+    Codes.DoubleQuote, Codes.SingleQuote, Codes.SemiColon,
+    Codes.RoundBracketOpen, Codes.RoundBracketClose,
+    Codes.SquareBracketOpen, Codes.SquareBracketClose,
+    Codes.CurlyBracketOpen, Codes.CurlyBracketClose,
+]);
+
 const punctuation = new Set<number>([
-    Codes.Exclamation, Codes.DoubleQuote, Codes.SingleQuote, Codes.RoundBracketOpen,
-    Codes.RoundBracketClose, Codes.Comma, Codes.Dot, Codes.Colon, Codes.SemiColon,
-    Codes.Question, Codes.SquareBracketOpen, Codes.SquareBracketClose, Codes.CurlyBracketOpen, Codes.CurlyBracketClose,
+    Codes.Exclamation, Codes.Comma, Codes.Dot, Codes.Colon, Codes.Question,
     Codes.Hyphen, Codes.EnDash, Codes.EmDash
 ]);
 
@@ -96,7 +101,11 @@ const delimiterPunctuation = new Set<number>([
 ]);
 
 export function isPunctuation(ch: number): boolean {
-    return punctuation.has(ch);
+    return boundPunctuation.has(ch) || punctuation.has(ch);
+}
+
+export function isBoundPunctuation(ch: number): boolean {
+    return boundPunctuation.has(ch);
 }
 
 export function isDelimiterPunct(ch: number): boolean {
@@ -131,7 +140,7 @@ export function isBound(ch?: number): boolean {
 
 export function isDelimiter(ch?: number): boolean {
     return isBound(ch)
-        || isPunctuation(ch);
+        || isBoundPunctuation(ch);
         // || isMarkdown(ch);
 }
 

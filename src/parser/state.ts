@@ -1,5 +1,5 @@
 import { Emoji, Token, TokenFormat, TokenMarkdown, TokenText, TokenType, ParserOptions } from './types';
-import { isDelimiter, last, codePointAt } from './utils';
+import { isDelimiter, last, codePointAt, isBound } from './utils';
 
 type MatchFn = (ch: number) => boolean;
 export type Bracket = 'curly' | 'square' | 'round';
@@ -216,29 +216,40 @@ export default class ParserState {
         // Для указанной позиции нам нужно проверить, что предыдущий символ или токен
         // является границей слов
         const { pos } = this;
-        if (pos === 0) {
-            // Находимся в самом начале
+        if (pos === 0 || this.isAfterEmoji()) {
             return true;
         }
 
         if (this.hasPendingText()) {
-            if (this.emoji.length && last(this.emoji).to === (this.textEnd - this.textStart)) {
-                return true;
-            }
-
             return isDelimiter(this.peekPrev());
         }
 
         const lastToken = last(this.tokens);
         if (lastToken) {
-            if (lastToken.type === TokenType.Text && lastToken.emoji?.length) {
-                // Если в конце текстовый токен, проверим, чтобы он закачивался
-                // на эмоджи
-                const lastEmoji = last(lastToken.emoji);
-                return lastEmoji.to === lastToken.value.length;
-            }
-
             return lastToken.type === TokenType.Markdown;
+        }
+
+        return false;
+    }
+
+    /**
+     * Вернёт `true`, если в данный момент находимся сразу после эмоджи
+     */
+    isAfterEmoji(): boolean {
+        if (this.hasPendingText()) {
+            if (this.emoji.length && last(this.emoji).to === (this.textEnd - this.textStart)) {
+                return true;
+            }
+        } else {
+            const lastToken = last(this.tokens);
+            if (lastToken) {
+                if (lastToken.type === TokenType.Text && lastToken.emoji?.length) {
+                    // Если в конце текстовый токен, проверим, чтобы он закачивался
+                    // на эмоджи
+                    const lastEmoji = last(lastToken.emoji);
+                    return lastEmoji.to === lastToken.value.length;
+                }
+            }
         }
 
         return false;

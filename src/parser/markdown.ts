@@ -1,6 +1,6 @@
 import { Token, TokenMarkdown, TokenType, TokenFormat } from './types';
 import ParserState from './state';
-import { Codes, isDelimiter, isBound, last } from './utils';
+import { Codes, isDelimiter, isBound, last, isPunctuation } from './utils';
 
 export const charToFormat = new Map<number, TokenFormat>([
     [Codes.Asterisk, TokenFormat.Bold],
@@ -41,7 +41,7 @@ export function isStartBoundChar(ch: number): boolean {
 }
 
 export function isEndBoundChar(ch: number): boolean {
-    return isDelimiter(ch);
+    return isDelimiter(ch) || isPunctuation(ch);
 }
 
 export function peekClosingMarkdown(state: ParserState): boolean {

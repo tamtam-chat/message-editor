@@ -441,6 +441,20 @@ describe('Formatted String', () => {
         // console.log(tokens);
     });
 
+    it('insert text before link', () => {
+        let tokens = parse('https://ok.ru', { link: true });
+        deepEqual(types(tokens), [TokenType.Link]);
+        deepEqual(values(tokens), ['https://ok.ru']);
+
+        tokens = insertText(tokens, 0, 'a', { link: true });
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(values(tokens), ['ahttps://ok.ru']);
+
+        tokens = insertText(tokens, 1, ' ', { link: true });
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link]);
+        deepEqual(values(tokens), ['a ', 'https://ok.ru']);
+    });
+
     describe('Solid tokens', () => {
         it('link', () => {
             const source = parse('http://ok.ru mail.ru ', { link: true });
