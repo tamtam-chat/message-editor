@@ -8,9 +8,9 @@
  * https://tools.ietf.org/html/rfc1738
  */
 
-import ParserState, { Bracket } from './state';
+import ParserState, { Bracket, Quote } from './state';
 import { consumeTree, createTree } from './tree';
-import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, isDelimiter, toCode } from './utils';
+import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, isDelimiter, toCode, isBound, isPunctuation } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenLink, TokenType } from './types';
 import { peekClosingMarkdown } from './markdown';
@@ -55,11 +55,14 @@ const maxLabelSize = 63;
 /** Маска для парсинга доменного имени */
 const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
 const safeChars = new Set(toCode('$-_.+'));
-const extraChars = new Set(toCode('!*\'()[],'));
+const extraChars = new Set(toCode('!*"\'()[],'));
 const searchChars = new Set(toCode(';:@&='));
 const punctChars = new Set(toCode('!,.;?'));
 const mailtoChars = toCode('mailto:', true);
 const magnetChars = toCode('magnet:', true);
+const segmentChars = new Set<number>([
+    Codes.Percent, Codes.Slash, Codes.Tilde
+]);
 
 /**
  * Символы, допустимые в логине. Тут расходимся с RFC: разрешаем `:` для менее строгой
@@ -459,7 +462,7 @@ function segment(state: ParserState): boolean {
             if (bracketMatch === ConsumeResult.Skip) {
                 break;
             }
-        } else if (!(uchar(state) || state.consume(isSearch) || state.consume(Codes.Percent) || state.consume(Codes.Slash))) {
+        } else if (!(uchar(state) || state.consume(isSearch) || state.consume(isSegmentChar))) {
             break;
         }
     }
@@ -467,11 +470,15 @@ function segment(state: ParserState): boolean {
     return start !== state.pos;
 }
 
+function isSegmentChar(ch: number): boolean {
+    return segmentChars.has(ch);
+}
+
 /**
  * https://tools.ietf.org/html/rfc1738
  */
 function uchar(state: ParserState): boolean {
-    return hex(state) || state.consume(isUnreserved);
+    return hex(state) || unreserved(state);
 }
 
 /**
@@ -487,6 +494,34 @@ function hex(state: ParserState): boolean {
     state.pos = pos;
     return false;
 
+}
+
+function unreserved(state: ParserState): boolean {
+    const { pos } = state;
+    const ch = state.next();
+
+    // Отдельно обрабатываем кавычки: если они есть в предыдущем тексте,
+    // то, не делаем их частью ссылки
+    if (ch === Codes.SingleQuote && shouldSkipQuote(state, Quote.Single)) {
+        state.pos = pos;
+        return false;
+    }
+
+    if (ch === Codes.DoubleQuote && shouldSkipQuote(state, Quote.Double)) {
+        state.pos = pos;
+        return false;
+    }
+
+    state.pos = pos;
+    return state.consume(isUnreserved);
+}
+
+function shouldSkipQuote(state: ParserState, quote: Quote): boolean {
+    return state.hasQuote(quote) || isSegmentBound(state.peek());
+}
+
+function isSegmentBound(ch: number): boolean {
+    return isBound(ch) || isPunctuation(ch);
 }
 
 /**

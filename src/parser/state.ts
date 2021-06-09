@@ -1,8 +1,14 @@
 import { Emoji, Token, TokenFormat, TokenMarkdown, TokenText, TokenType, ParserOptions } from './types';
-import { isDelimiter, last, codePointAt, isBound } from './utils';
+import { isDelimiter, last, codePointAt, Codes } from './utils';
 
 type MatchFn = (ch: number) => boolean;
 export type Bracket = 'curly' | 'square' | 'round';
+
+export const enum Quote {
+    None = 0,
+    Single = 1 << 0,
+    Double = 1 << 1,
+}
 
 export default class ParserState {
     /** Опции, с которыми парсим текст */
@@ -38,6 +44,8 @@ export default class ParserState {
         square: 0,
         curly: 0,
     }
+
+    public quote: Quote = 0;
 
     /**
      * @param text Строка, которую нужно распарсить
@@ -183,7 +191,13 @@ export default class ParserState {
             this.textStart = this.textEnd = this.pos;
         }
 
-        this.next();
+        const ch = this.next();
+        if (ch === Codes.SingleQuote) {
+            this.quote ^= Quote.Single;
+        } else if (ch === Codes.DoubleQuote) {
+            this.quote ^= Quote.Double;
+        }
+
         this.textEnd = this.pos;
     }
 
@@ -207,6 +221,10 @@ export default class ParserState {
             this.tokens.push(token);
             this.textStart = this.textEnd = -1;
         }
+    }
+
+    hasQuote(quote: Quote): boolean {
+        return (this.quote & quote) === quote;
     }
 
     /**

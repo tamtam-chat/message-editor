@@ -85,6 +85,11 @@ function testLink(link: string, isEmail = false) {
     deepEqual(values(tokens), ['<img src="', link, '">'], `Values: "${link}" in HTML`);
     validate(1);
 
+    tokens = parse(`'${link}'`);
+    deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: '${link}' in text`);
+    deepEqual(values(tokens), ['\'', link, '\''], `Values: '${link}' in text`);
+    validate(1);
+
     // Знак вопроса в конце предложения
     tokens = parse(`Have you seen ${link}?`);
     deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" before questions sign at the end of sentence`);
@@ -198,6 +203,12 @@ describe('Link', () => {
         for (const url of urls) {
             testLink(url, false);
         }
+
+        // Отдельно парсим хитрую ссылку с кавычками, так как проверка на ординарные
+        // кавычки всё поломает
+        const tokens = parse('foo https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname bar');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['foo ', 'https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname', ' bar']);
     });
 
     it('invalid url', () => {
@@ -211,6 +222,8 @@ describe('Link', () => {
     });
 
     it.skip('debug', () => {
-        console.log(parse(`Go to mail.ru.`));
+        const tokens = parse('foo https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname bar');
+        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['foo ', 'https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname', ' bar']);
     });
 });
