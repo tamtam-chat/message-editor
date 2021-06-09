@@ -657,8 +657,8 @@ export default class Editor {
     /**
      * Возвращает текущее текстовое значение модели редактора
      */
-    getText(): string {
-        return getText(this.model);
+    getText(tokens = this.model): string {
+        return getText(tokens);
     }
 
     /**
