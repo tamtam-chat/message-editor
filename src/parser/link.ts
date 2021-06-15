@@ -55,7 +55,7 @@ const maxLabelSize = 63;
 /** Маска для парсинга доменного имени */
 const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
 const safeChars = new Set(toCode('$-_.+'));
-const extraChars = new Set(toCode('!*"\'()[],'));
+const extraChars = new Set(toCode('!*"\'()[],|'));
 const searchChars = new Set(toCode(';:@&='));
 const punctChars = new Set(toCode('!,.;?'));
 const mailtoChars = toCode('mailto:', true);

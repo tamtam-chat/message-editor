@@ -195,7 +195,8 @@ describe('Link', () => {
             '中国.中国',
             'xn--90adear.xn--p1ai',
             'https://vk.com/@superappkit-web-sdk',
-            'https://ok.ru/#/foo/bar'
+            'https://ok.ru/#/foo/bar',
+            'https://ok.ru/?a:b=c|d',
         ];
 
         // console.log(parse('Have you seen group_calls2.messenger.okdev.mail.msk?'));
