@@ -18,6 +18,9 @@ export interface EditorOptions {
     parse?: Partial<ParserOptions>;
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
 
+    /** Сбрасывать форматирование при вставке новой строки */
+    resetFormatOnNewline?: boolean;
+
     /** Функция для отрисовки эмоджи */
     emoji?: EmojiRender;
 }
@@ -325,9 +328,14 @@ export default class Editor {
      * Вставляет текст в указанную позицию
      */
     insertText(pos: number, text: string): Model {
-        const updated = this.isMarkdown
+        let updated = this.isMarkdown
             ? mdInsertText(this.model, pos, text, this.options.parse)
             : insertText(this.model, pos, text, this.options.parse);
+
+        if (this.options.resetFormatOnNewline && !this.isMarkdown && /^[\n\r]+$/.test(text)) {
+            updated = setFormat(updated, TokenFormat.None, pos, text.length);
+        }
+
         const result = this.updateModel(
             updated,
             DiffActionType.Insert,
