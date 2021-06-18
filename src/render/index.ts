@@ -69,6 +69,7 @@ const defaultOptions: RenderOptions = {
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
     const options: RenderOptions = opt ? { ...defaultOptions, ...opt }: defaultOptions;
     const state = new ReconcileState(elem, options);
+    let prevToken: Token | undefined;
 
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
@@ -100,13 +101,14 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
                 renderText(token, elem, options);
             }
         }
+
+        prevToken = token;
     }
 
-    if (options.fixTrailingLine && tokens.length) {
-        const lastToken = tokens[tokens.length - 1];
-        if (lastToken.value.slice(-1) === '\n') {
-            state.elem('br');
-        }
+    // NB: Проверяем именно `prevToken`, который мы обработали.
+    // Если брать последний, это может быть sticky-токен, который надо пропустить
+    if (options.fixTrailingLine && prevToken && prevToken.value.slice(-1) === '\n') {
+        state.elem('br');
     }
 
     state.trim();
