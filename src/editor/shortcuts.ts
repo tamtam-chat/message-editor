@@ -72,7 +72,7 @@ export default class Shortcuts<T> {
      */
     handle(evt: KeyboardEvent): boolean {
         const mask = maskFromEvent(evt);
-        const code = getCode(evt.code || evt.key);
+        const code = getCode(evt.key);
         let key = `${mask}:${code}`;
 
         if (!this.shortcuts[key] && mask) {
