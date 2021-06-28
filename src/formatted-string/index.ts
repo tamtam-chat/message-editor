@@ -341,7 +341,7 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
                 // Пограничный случай: полностью выделили ссылку и начинаем её заменять.
                 // В этом случае нужно выставить sticky-параметр у текста, чтобы
                 // ссылку можно было дописать
-                if (options?.stickyLink && isCustomLink(endToken) && end.offset === endToken.value.length) {
+                if (options?.stickyLink && (to - from >= startToken.value.length)) {
                     sticky = true;
                 }
 
