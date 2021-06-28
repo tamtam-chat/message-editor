@@ -166,7 +166,7 @@ export function slice(tokens: Token[], from: number, to?: number): Token[] {
 /**
  * Делает указанный диапазон ссылкой на `link`.
  */
-export function setLink(tokens: Token[], link: string | null, pos: number, len = 0): Token[] {
+export function setLink(tokens: Token[], link: string | null, pos: number, len = 0, sticky?: boolean): Token[] {
     const [start, end] = tokenRange(tokens, pos, pos + len);
 
     if (start.index === -1 || end.index === -1) {
@@ -179,7 +179,7 @@ export function setLink(tokens: Token[], link: string | null, pos: number, len =
 
     // Меняем промежуточные токены на ссылки
     for (let i = start.index + 1; i < end.index; i++) {
-        nextTokens[i] = toLinkOrText(nextTokens[i], link);
+        nextTokens[i] = toLinkOrText(nextTokens[i], link, sticky);
     }
 
     // Обновляем концевые токены
@@ -188,8 +188,7 @@ export function setLink(tokens: Token[], link: string | null, pos: number, len =
         token = nextTokens[start.index];
         const [left, _mid] = splitToken(token, start.offset);
         const [mid, right] = splitToken(_mid, end.offset - start.offset);
-        const next = toLinkOrText(mid, link);
-        next.sticky = len === 0;
+        const next = toLinkOrText(mid, link, sticky);
         nextTokens.splice(start.index, 1, left, next, right);
     } else {
         let left: Token;
@@ -197,11 +196,11 @@ export function setLink(tokens: Token[], link: string | null, pos: number, len =
 
         token = nextTokens[end.index];
         [left, right] = splitToken(token, end.offset);
-        nextTokens.splice(end.index, 1, toLinkOrText(left, link), right);
+        nextTokens.splice(end.index, 1, toLinkOrText(left, link, sticky), right);
 
         token = nextTokens[start.index];
         [left, right] = splitToken(token, start.offset);
-        nextTokens.splice(start.index, 1, left, toLinkOrText(right, link));
+        nextTokens.splice(start.index, 1, left, toLinkOrText(right, link, sticky));
     }
 
     return normalize(nextTokens);
@@ -315,16 +314,38 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         //   сохраним ссылку
         if (isCustomLink(startToken)) {
             const { link } = startToken;
+            let sticky: boolean | undefined;
 
             // Проверяем, куда пришло редактирование: если добавляем текст
             // в самом конце ссылки или в самом начале, то не распространяем
             // ссылку на этот текст
             if (start.offset === startToken.value.length) {
-                nextTokens = setLink(nextTokens, link, 0, start.offset);
+                let len = start.offset;
+                if (startToken.sticky) {
+                    // Включено sticky-форматирование: значит, мы дописываем ссылку.
+                    // Разрешаем сделать это до первого символа-раделителя
+                    const m = value.match(/[\s.,!?:;]/);
+                    if (m) {
+                        len += m.index || 0;
+                        sticky = false;
+                    } else {
+                        len += value.length;
+                        sticky = true;
+                    }
+                }
+
+                nextTokens = setLink(nextTokens, link, 0, len, sticky);
             } else if (start.offset === 0 && from === to) {
                 nextTokens = setLink(nextTokens, link, value.length, startToken.value.length);
             } else {
-                nextTokens = nextTokens.map(t => toLink(t, link));
+                // Пограничный случай: полностью выделили ссылку и начинаем её заменять.
+                // В этом случае нужно выставить sticky-параметр у текста, чтобы
+                // ссылку можно было дописать
+                if (options?.stickyLink && isCustomLink(endToken) && end.offset === endToken.value.length) {
+                    sticky = true;
+                }
+
+                nextTokens = nextTokens.map(t => toLink(t, link, sticky));
             }
         }
 
@@ -375,7 +396,7 @@ function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatU
 
         nextTokens = [left, mid, right];
         if (isSolidToken(token)) {
-            nextTokens = nextTokens.map(toText);
+            nextTokens = nextTokens.map(t => toText(t));
         }
         (nextTokens[1] as TokenText).sticky = len === 0;
     }
@@ -410,8 +431,8 @@ export function applyFormat(format: TokenFormat, update: TokenFormatUpdate | Tok
     return format;
 }
 
-function toLinkOrText(token: Token, link: string | null): TokenLink | TokenText {
-    return link ? toLink(token, link) : toText(token);
+function toLinkOrText(token: Token, link: string | null, sticky?: boolean): TokenLink | TokenText {
+    return link ? toLink(token, link, sticky) : toText(token);
 }
 
 function expandToken(token: Token): TokenText | TokenLink {

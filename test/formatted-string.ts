@@ -1,5 +1,5 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import { insertText, removeText, setFormat, slice, cutText, setLink } from '../src/formatted-string';
+import { insertText, removeText, setFormat, slice, cutText, setLink, replaceText } from '../src/formatted-string';
 import { createToken as token } from '../src/formatted-string/utils';
 import parse, { ParserOptions, Token, TokenFormat, TokenHashTag, TokenLink, TokenText, TokenType } from '../src/parser';
 
@@ -560,6 +560,46 @@ describe('Formatted String', () => {
             deepEqual(types(t4), [TokenType.HashTag, TokenType.Text, TokenType.HashTag, TokenType.Text, TokenType.HashTag]);
             deepEqual(values(t4), ['#foo', ' ', '#bar', ' ', '#baz']);
             deepEqual(t4.map(t => t.format), [TokenFormat.Bold, TokenFormat.Bold, TokenFormat.Bold, TokenFormat.None, TokenFormat.None]);
+        });
+
+        it('sticky links', () => {
+            // Поддержка sticky-ссылок: при замене текста ссылки разрешаем дописать туда текст
+            const opt2: Partial<ParserOptions> = {
+                stickyLink: true
+            };
+
+            let tokens = parse('a b c', opt2);
+            tokens = setLink(parse('a b c', opt2), '@foo', 2, 1);
+
+            let link = tokens[1] as TokenLink;
+            equal(link.type, TokenType.Link);
+            equal(link.value, 'b');
+            equal(link.sticky, false);
+
+            // sticky-ссылки включаются при полной замене текста
+            tokens = replaceText(tokens, 2, 1, 'dd', opt2);
+            link = tokens[1] as TokenLink;
+            equal(link.type, TokenType.Link);
+            equal(link.value, 'dd');
+            equal(link.sticky, true);
+
+            // Дописываем текст
+            tokens = insertText(tokens, 4, '1', opt2);
+            tokens = insertText(tokens, 5, '2', opt2);
+            link = tokens[1] as TokenLink;
+            equal(link.type, TokenType.Link);
+            equal(link.value, 'dd12');
+            equal(link.sticky, true);
+
+            // Завершаем sticky-форматирование символом-разделителем
+            tokens = insertText(tokens, 6, '.', opt2);
+            link = tokens[1] as TokenLink;
+            equal(link.type, TokenType.Link);
+            equal(link.value, 'dd12');
+            equal(link.sticky, false);
+
+            deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
+            deepEqual(values(tokens), ['a ', 'dd12', '. c']);
         });
     });
 });

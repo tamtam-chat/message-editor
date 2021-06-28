@@ -18,6 +18,7 @@ const defaultOptions: ParserOptions = {
     command: false,
     userSticker: false,
     link: false,
+    stickyLink: false
 };
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {

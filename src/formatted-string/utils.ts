@@ -207,20 +207,27 @@ export function clamp(value: number, min: number, max: number): number {
 /**
  * Конвертирует указанный токен в текст
  */
-export function toText(token: Token): TokenText {
+export function toText(token: Token, sticky?: boolean): TokenText {
+    if (sticky === undefined) {
+        sticky = 'sticky' in token ? token.sticky : false;
+    }
     return {
         type: TokenType.Text,
         format: token.format,
         value: token.value,
         emoji: token.emoji,
-        sticky: 'sticky' in token ? token.sticky : false
+        sticky
     };
 }
 
 /**
  * Конвертирует указанный токен в ссылку
  */
-export function toLink(token: Token, link: string): TokenLink {
+export function toLink(token: Token, link: string, sticky?: boolean): TokenLink {
+    if (sticky === undefined) {
+        sticky = 'sticky' in token ? token.sticky : false;
+    }
+
     return {
         type: TokenType.Link,
         format: token.format,
@@ -228,7 +235,7 @@ export function toLink(token: Token, link: string): TokenLink {
         emoji: token.emoji,
         link,
         auto: false,
-        sticky: 'sticky' in token ? token.sticky : false,
+        sticky,
     };
 }
 

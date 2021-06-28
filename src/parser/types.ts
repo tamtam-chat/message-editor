@@ -19,6 +19,9 @@ export interface ParserOptions {
 
     /** Находить ссылки в тексте */
     link: boolean;
+
+    /** Возможность делать sticky-ссылки при заменен текста ссылки */
+    stickyLink?: boolean;
 }
 
 export const enum TokenType {
