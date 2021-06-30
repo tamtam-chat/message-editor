@@ -96,10 +96,23 @@ function testLink(link: string, isEmail = false) {
     deepEqual(values(tokens), ['Have you seen ', link, '?'], `Values: "${link}" before questions sign at the end of sentence`);
     validate(1);
 
+    // Знак вопроса в конце предложения + перевод строки
+    tokens = parse(`Have you seen ${link}?\ntest`);
+    deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" before questions sign at the end of sentence with newline`);
+    deepEqual(values(tokens), ['Have you seen ', link, '?\ntest'], `Values: "${link}" before questions sign at the end of sentence with newline`);
+    validate(1);
+
     // Точка в конце предложения
     tokens = parse(`Go to ${link}.`);
     deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" before period at the end of sentence`);
     deepEqual(values(tokens), ['Go to ', link, '.'], `Values: "${link}" before period at the end of sentence`);
+    validate(1);
+
+    // Внутри скобок и текста
+
+    tokens = parse(`Был на сайте (${link}), не понравилось.`);
+    deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" in brackets in sentence`);
+    deepEqual(values(tokens), ['Был на сайте (', link, '), не понравилось.'], `Values: "${link}" in brackets in sentence`);
     validate(1);
 }
 
@@ -220,11 +233,5 @@ describe('Link', () => {
         tokens = parse('/ok.ru');
         deepEqual(types(tokens), [TokenType.Text]);
         deepEqual(values(tokens), ['/ok.ru']);
-    });
-
-    it.skip('debug', () => {
-        const tokens = parse('foo https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname bar');
-        deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
-        deepEqual(values(tokens), ['foo ', 'https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname', ' bar']);
     });
 });

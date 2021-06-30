@@ -10,7 +10,7 @@
 
 import ParserState, { Bracket, Quote } from './state';
 import { consumeTree, createTree } from './tree';
-import { Codes, consumeArray, isAlpha, isNumber, isWhitespace, isUnicodeAlpha, isDelimiter, toCode, isBound, isPunctuation } from './utils';
+import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isPunctuation } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenLink, TokenType } from './types';
 import { peekClosingMarkdown } from './markdown';
@@ -539,7 +539,8 @@ function excludes(result: FragmentMatch, test: FragmentMatch): boolean {
 }
 
 function atWordEdge(state: ParserState): boolean {
-    return !state.hasNext() || isWhitespace(state.peek());
+    const ch = state.peek();
+    return isBound(ch) || isPunct(ch);
 }
 
 function isEmailLocalPart(result: FragmentMatch): boolean {
@@ -610,10 +611,10 @@ function handleBracket(state: ParserState): ConsumeResult {
             // Попали на незакрытую скобку, смотрим, что делать: если она на
             // границе слов, то выносим её за пределы фрагмента
             return ConsumeResult.Yes;
-        } else {
-            state.pos = pos;
-            return ConsumeResult.Skip;
         }
+
+        state.pos = pos;
+        return ConsumeResult.Skip;
     }
 
     return ConsumeResult.No;
