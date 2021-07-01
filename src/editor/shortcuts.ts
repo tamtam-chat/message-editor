@@ -71,8 +71,11 @@ export default class Shortcuts<T> {
      * @returns Вернёт `true` если был найден и выполнен обработчик для указанного события
      */
     handle(evt: KeyboardEvent): boolean {
+        // Несмотря на то, что keyCode считается deprecated, пока что это
+        // единственный известный мне способ получить код клавиши, независимо
+        // от раскладки
+        const code = getCode(evt.keyCode ? String.fromCharCode(evt.keyCode) : evt.key);
         const mask = maskFromEvent(evt);
-        const code = getCode(evt.key);
         let key = `${mask}:${code}`;
 
         if (!this.shortcuts[key] && mask) {
