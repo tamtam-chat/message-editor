@@ -74,7 +74,7 @@ export default class Shortcuts<T> {
         // Несмотря на то, что keyCode считается deprecated, пока что это
         // единственный известный мне способ получить код клавиши, независимо
         // от раскладки
-        const code = getCode(evt.keyCode ? String.fromCharCode(evt.keyCode) : evt.key);
+        const code = getCode(evt.keyCode ? getKey(evt.keyCode) : evt.key);
         const mask = maskFromEvent(evt);
         let key = `${mask}:${code}`;
 
@@ -132,4 +132,16 @@ function parse(shortcut: string): string {
     });
 
     return `${mod}:${key}`;
+}
+
+function getKey(code: number): string {
+    if (code === 27) {
+        return 'Escape';
+    }
+
+    if (code === 13) {
+        return 'Enter';
+    }
+
+    return String.fromCharCode(code);
 }
