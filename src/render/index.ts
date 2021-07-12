@@ -58,6 +58,7 @@ const tokenTypeClass: Record<TokenType, string> = {
     [TokenType.Mention]: 'mention',
     [TokenType.Text]: '',
     [TokenType.UserSticker]: 'user-sticker',
+    [TokenType.Newline]: '',
 }
 
 const defaultOptions: RenderOptions = {
@@ -97,7 +98,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
                 getTokenTypeClass(token),
                 formatClassNames(token.format)
             ]);
-            if (token.type !== TokenType.UserSticker) {
+            if (token.type !== TokenType.UserSticker && token.type !== TokenType.Newline) {
                 renderText(token, elem, options);
             }
         }
@@ -374,6 +375,9 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
         elem.addEventListener('mouseleave', onLinkLeave);
     } else if (token.type === TokenType.UserSticker && state.options.emoji) {
         elem = state.emoji(token.value, token.value) as HTMLElement;
+    } else if (token.type === TokenType.Newline) {
+        elem = state.elem('br');
+        elem.setAttribute('data-raw', token.value);
     } else {
         elem = state.elem('span');
     }

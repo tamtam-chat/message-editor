@@ -8,6 +8,7 @@ import command from './command';
 import hashtag from './hashtag';
 import link from './link';
 import markdown from './markdown';
+import newline from './newline';
 import { normalize } from './utils';
 
 const defaultOptions: ParserOptions = {
@@ -26,7 +27,7 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     const state = new ParserState(text, options);
 
     while (state.hasNext()) {
-        markdown(state)
+        markdown(state) || newline(state)
             || emoji(state) || textEmoji(state) || userSticker(state)
             || mention(state) || command(state) || hashtag(state)
             || link(state)

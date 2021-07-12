@@ -47,7 +47,10 @@ export const enum TokenType {
     HashTag = 'hashtag',
 
     /** Символ форматирования Markdown */
-    Markdown = 'markdown'
+    Markdown = 'markdown',
+
+    /** Перенос строки */
+    Newline = 'newline'
 }
 
 export enum TokenFormat {
@@ -85,7 +88,7 @@ export enum TokenFormat {
 }
 
 export type Token = TokenText | TokenLink | TokenUserSticker | TokenMention
-    | TokenCommand | TokenHashTag | TokenMarkdown;
+    | TokenCommand | TokenHashTag | TokenMarkdown | TokenNewline;
 
 export interface TokenBase {
     /** Тип токена */
@@ -156,6 +159,10 @@ export interface TokenHashTag extends TokenBase {
 
 export interface TokenMarkdown extends TokenBase {
     type: TokenType.Markdown;
+}
+
+export interface TokenNewline extends TokenBase {
+    type: TokenType.Newline;
 }
 
 export interface Emoji {
