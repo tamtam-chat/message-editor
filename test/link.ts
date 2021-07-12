@@ -98,8 +98,8 @@ function testLink(link: string, isEmail = false) {
 
     // Знак вопроса в конце предложения + перевод строки
     tokens = parse(`Have you seen ${link}?\ntest`);
-    deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" before questions sign at the end of sentence with newline`);
-    deepEqual(values(tokens), ['Have you seen ', link, '?\ntest'], `Values: "${link}" before questions sign at the end of sentence with newline`);
+    deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text, TokenType.Newline, TokenType.Text], `Types: "${link}" before questions sign at the end of sentence with newline`);
+    deepEqual(values(tokens), ['Have you seen ', link, '?', '\n', 'test'], `Values: "${link}" before questions sign at the end of sentence with newline`);
     validate(1);
 
     // Точка в конце предложения

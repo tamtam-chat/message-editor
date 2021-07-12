@@ -2,7 +2,7 @@ import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '
 import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, setDOMRange, setRange } from './range';
+import { getTextRange, isElement, setDOMRange, setRange } from './range';
 import diffAction, { DiffAction, DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
@@ -31,7 +31,6 @@ interface PendingUpdate {
 }
 
 type Model = Token[];
-
 type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
 
 interface EditorEventDetails {
@@ -73,6 +72,7 @@ export default class Editor {
     private pendingDelete: TextRange | null = null;
     private caret: TextRange = [0, 0];
     private focused = false;
+    private expectEnter = false;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -90,7 +90,7 @@ export default class Editor {
         this._inited = true;
     }
 
-    private onKeyPress = (evt: KeyboardEvent) => {
+    private onKeyDown = (evt: KeyboardEvent) => {
         if (!evt.defaultPrevented && isInputEvent(evt)) {
             const range = getTextRange(this.element);
 
@@ -106,9 +106,13 @@ export default class Editor {
                 }
             }
         }
+
+        this.waitExpectedEnter(evt);
     }
 
     private onInput = () => {
+        this.expectEnter = false;
+
         // Обрабатываем перехваченный ввод — превентим, если был перехват
         if (this.inputHandled) {
             this.inputHandled = false;
@@ -285,16 +289,20 @@ export default class Editor {
      * переопределения
      */
     setup(): void {
-        this.element.contentEditable = 'true';
-        this.element.addEventListener('keypress', this.onKeyPress);
-        this.element.addEventListener('keydown', this.onHandleShortcut);
-        this.element.addEventListener('input', this.onInput);
-        this.element.addEventListener('cut', this.onCut);
-        this.element.addEventListener('copy', this.onCopy);
-        this.element.addEventListener('paste', this.onPaste);
-        this.element.addEventListener('click', this.onClick);
-        this.element.addEventListener('focus', this.onFocus);
-        this.element.addEventListener('blur', this.onBlur);
+        const { element } = this;
+
+        element.contentEditable = 'true';
+        // NB: логичнее было бы обрабатывать событие keypress, но в Firefox
+        // некоторые комбинации не долетают до этого события. Например, Alt+Enter
+        element.addEventListener('keydown', this.onKeyDown);
+        element.addEventListener('keydown', this.onHandleShortcut);
+        element.addEventListener('input', this.onInput);
+        element.addEventListener('cut', this.onCut);
+        element.addEventListener('copy', this.onCopy);
+        element.addEventListener('paste', this.onPaste);
+        element.addEventListener('click', this.onClick);
+        element.addEventListener('focus', this.onFocus);
+        element.addEventListener('blur', this.onBlur);
         document.addEventListener('selectionchange', this.onSelectionChange);
 
         const { shortcuts } = this.options;
@@ -308,7 +316,7 @@ export default class Editor {
      * Вызывается для того, чтобы удалить все связи редактора с DOM.
      */
     dispose(): void {
-        this.element.removeEventListener('keypress', this.onKeyPress);
+        this.element.removeEventListener('keydown', this.onKeyDown);
         this.element.removeEventListener('keydown', this.onHandleShortcut);
         this.element.removeEventListener('input', this.onInput);
         this.element.removeEventListener('cut', this.onCut);
@@ -886,6 +894,19 @@ export default class Editor {
         const maxIx = getLength(this.model);
         return [clamp(from, 0, maxIx), clamp(to, 0, maxIx)];
     }
+
+    private waitExpectedEnter(evt: KeyboardEvent): void {
+        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter') {
+            this.expectEnter = true;
+            requestAnimationFrame(() => {
+                if (this.expectEnter) {
+                    this.expectEnter = false;
+                    this.flushPendingUpdate();
+                    retainNewlineInViewport();
+                }
+            });
+        }
+    }
 }
 
 /**
@@ -948,4 +969,19 @@ export function htmlToText(html: string): string {
     }
 
     return result;
+}
+
+/**
+ * Вспомогательная функция, которая при необходимости подкручивает вьюпорт
+ * к текущему переводу строки
+ */
+function retainNewlineInViewport() {
+    const sel = window.getSelection();
+    const r = sel.getRangeAt(0);
+    if (r?.collapsed && isElement(r.startContainer)) {
+        const target = r.startContainer.childNodes[r.startOffset - 1];
+        if (target && isElement(target) && target.nodeName === 'BR') {
+            target.scrollIntoView(true);
+        }
+    }
 }

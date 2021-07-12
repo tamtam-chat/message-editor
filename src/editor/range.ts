@@ -145,12 +145,11 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
     let container: Node;
 
     while (container = walker.nextNode()) {
-        if (container.nodeType === Node.ELEMENT_NODE && !isEmoji(container)) {
-            // Пропускаем обёртки для текста
+        len = getNodeLength(container, false);
+
+        if (len === 0) {
             continue;
         }
-
-        len = getNodeLength(container);
 
         if (pos <= len) {
             if (isText(container)) {
@@ -186,10 +185,6 @@ function isValidRange(range: Range, container: HTMLElement): boolean {
     return container.contains(range.commonAncestorContainer);
 }
 
-function isEmoji(node: Node): node is HTMLElement {
-    return node.nodeName === 'IMG';
-}
-
 /**
  * Возвращает текстовую длину указанного узла
  */
@@ -212,11 +207,11 @@ function getNodeLength(node: Node, deep = false): number {
     return result;
 }
 
-function isText(node: Node): node is Text {
+export function isText(node: Node): node is Text {
     return node.nodeType === Node.TEXT_NODE;
 }
 
-function isElement(node: Node): node is Element {
+export function isElement(node: Node): node is Element {
     return node.nodeType === Node.ELEMENT_NODE;
 }
 
