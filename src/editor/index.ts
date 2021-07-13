@@ -91,6 +91,8 @@ export default class Editor {
     }
 
     private onKeyDown = (evt: KeyboardEvent) => {
+        this.onHandleShortcut(evt);
+
         if (!evt.defaultPrevented && isInputEvent(evt)) {
             const range = getTextRange(this.element);
 
@@ -295,7 +297,6 @@ export default class Editor {
         // NB: логичнее было бы обрабатывать событие keypress, но в Firefox
         // некоторые комбинации не долетают до этого события. Например, Alt+Enter
         element.addEventListener('keydown', this.onKeyDown);
-        element.addEventListener('keydown', this.onHandleShortcut);
         element.addEventListener('input', this.onInput);
         element.addEventListener('cut', this.onCut);
         element.addEventListener('copy', this.onCopy);
@@ -317,7 +318,6 @@ export default class Editor {
      */
     dispose(): void {
         this.element.removeEventListener('keydown', this.onKeyDown);
-        this.element.removeEventListener('keydown', this.onHandleShortcut);
         this.element.removeEventListener('input', this.onInput);
         this.element.removeEventListener('cut', this.onCut);
         this.element.removeEventListener('copy', this.onCopy);
