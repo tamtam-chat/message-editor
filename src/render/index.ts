@@ -1,5 +1,5 @@
 import { isAutoLink, isCustomLink } from '../formatted-string/utils';
-import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji } from '../parser';
+import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji, TokenCommand } from '../parser';
 
 declare global {
     interface Element {
@@ -430,6 +430,10 @@ function getTokenTypeClass(token: Token): string {
         return '';
     }
 
+    if (isPrefixedToken(token) && token.value.length === 1) {
+        return '';
+    }
+
     if (isRenderLink(token)) {
         let { type } = token;
         if (isCustomLink(token) && token.link[0] === '@') {
@@ -452,9 +456,17 @@ function isRenderLink(token: Token): boolean {
         // полные автоссылки (начинаются с протокола)
         return token.type === TokenType.Link && (!token.auto || /^[a-z+]+:\/\//i.test(token.value));
     }
+
+    if (isPrefixedToken(token)) {
+        return token.value.length > 1;
+    }
+
+    return token.type === TokenType.Link;
+}
+
+function isPrefixedToken(token: Token): token is TokenMention | TokenCommand | TokenHashTag {
     return token.type === TokenType.Mention
         || token.type === TokenType.Command
-        || token.type === TokenType.Link
         || token.type === TokenType.HashTag;
 }
 
