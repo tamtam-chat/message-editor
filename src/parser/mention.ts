@@ -40,5 +40,5 @@ function consumeMentionName(state: ParserState): boolean {
  * Упоминание является промежуточным
  */
 function isMentionName(ch: number): boolean {
-    return isNumber(ch) || isUnicodeAlpha(ch) || ch === Codes.Underscore;
+    return isNumber(ch) || isUnicodeAlpha(ch) || ch === Codes.Underscore || ch === Codes.Hyphen;
 }
