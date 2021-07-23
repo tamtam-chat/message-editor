@@ -208,7 +208,8 @@ const editor = new Editor(document.querySelector('#text-editor'), {
         stickyLink: true
     },
     emoji: renderEmoji,
-    resetFormatOnNewline: true
+    resetFormatOnNewline: true,
+    nowrap: true
 });
 editor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
@@ -225,7 +226,7 @@ const mdEditor = new Editor(document.querySelector('#md-editor'), {
         link: true,
         markdown: true
     },
-    emoji: renderEmoji,
+    emoji: renderEmoji
 });
 mdEditor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));

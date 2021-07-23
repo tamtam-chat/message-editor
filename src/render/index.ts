@@ -35,6 +35,9 @@ export interface RenderOptions {
 
     /** Заменять текстовые смайлы на эмоджи */
     replaceTextEmoji: boolean;
+
+    /** Заменяем все пробелы и переводы строк на неразрывный пробел */
+    nowrap?: boolean;
 }
 
 const formats: ClassFormat[] = [
@@ -120,7 +123,14 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
  * внутри токена
  */
 function renderText(token: Token, elem: HTMLElement, options: RenderOptions): void {
-    let { emoji } = token;
+    let { emoji, value } = token;
+
+    if (options.nowrap) {
+        value = value
+            .replace(/\r\n/g, '\n')
+            .replace(/[\s\n]/g, '\u00a0')
+    }
+
     if (emoji && options.emoji) {
         let offset = 0;
         const state = new ReconcileState(elem, options);
@@ -132,8 +142,8 @@ function renderText(token: Token, elem: HTMLElement, options: RenderOptions): vo
         }
 
         emoji.forEach(emojiToken => {
-            const text = token.value.slice(offset, emojiToken.from);
-            const rawEmoji = token.value.slice(emojiToken.from, emojiToken.to);
+            const text = value.slice(offset, emojiToken.from);
+            const rawEmoji = value.slice(emojiToken.from, emojiToken.to);
             const emoji = emojiToken.emoji || rawEmoji;
 
             if (text) {
@@ -144,14 +154,14 @@ function renderText(token: Token, elem: HTMLElement, options: RenderOptions): vo
             offset = emojiToken.to;
         });
 
-        const tail = token.value.slice(offset);
+        const tail = value.slice(offset);
         if (tail) {
             state.text(tail);
         }
 
         state.trim();
     } else {
-        setTextValue(elem, token.value);
+        setTextValue(elem, value);
     }
 }
 
