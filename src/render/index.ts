@@ -111,10 +111,11 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
 
     // NB: Проверяем именно `prevToken`, который мы обработали.
     // Если брать последний, это может быть sticky-токен, который надо пропустить
-    if (options.fixTrailingLine && prevToken && prevToken.value.slice(-1) === '\n') {
-        state.elem('br');
-    }
+    // if (options.fixTrailingLine && prevToken && prevToken.value.slice(-1) === '\n') {
+    //     state.elem('br');
+    // }
 
+    state.elem('br');
     state.trim();
 }
 

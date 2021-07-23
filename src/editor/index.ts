@@ -21,6 +21,9 @@ export interface EditorOptions {
     /** Сбрасывать форматирование при вставке новой строки */
     resetFormatOnNewline?: boolean;
 
+    /** Заменять все пробельные символы на неразрывные пробелы */
+    nowrap?: boolean;
+
     /** Функция для отрисовки эмоджи */
     emoji?: EmojiRender;
 }
@@ -241,6 +244,8 @@ export default class Editor {
                 ? fragment.length : getLength(fragment);
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
+
+            requestAnimationFrame(() => retainNewlineInViewport(this.element));
         }
     }
 
@@ -848,6 +853,7 @@ export default class Editor {
             fixTrailingLine: true,
             replaceTextEmoji: this.options.parse?.textEmoji,
             emoji: this.options.emoji,
+            nowrap: this.options.nowrap
         });
     }
 
@@ -902,7 +908,7 @@ export default class Editor {
                 if (this.expectEnter) {
                     this.expectEnter = false;
                     this.flushPendingUpdate();
-                    retainNewlineInViewport();
+                    retainNewlineInViewport(this.element);
                 }
             });
         }
@@ -975,13 +981,43 @@ export function htmlToText(html: string): string {
  * Вспомогательная функция, которая при необходимости подкручивает вьюпорт
  * к текущему переводу строки
  */
-function retainNewlineInViewport() {
+function retainNewlineInViewport(element: Element): void {
     const sel = window.getSelection();
     const r = sel.getRangeAt(0);
-    if (r?.collapsed && isElement(r.startContainer)) {
-        const target = r.startContainer.childNodes[r.startOffset - 1];
-        if (target && isElement(target) && target.nodeName === 'BR') {
-            target.scrollIntoView(true);
+
+    if (!r?.collapsed) {
+        return;
+    }
+
+    const rect = r.getClientRects().item(0);
+    if (rect && rect.height > 0) {
+        // Есть прямоугольник, к которому можем прицепиться: проверим, что он видим
+        // внутри элемента и если нет, подскроллимся к нему
+        const parentRect = element.getBoundingClientRect();
+        if (rect.bottom < parentRect.top || rect.top > parentRect.bottom) {
+            // Курсор за пределами вьюпорта
+            element.scrollTop += rect.top - (parentRect.top + parentRect.height / 2);
         }
+
+    } else if (r?.collapsed && isElement(r.startContainer)) {
+        const target = getScrollTarget(r);
+        if (target) {
+            target.scrollIntoView(false);
+        }
+    }
+}
+
+/**
+ * Вернёт элемент, к которому нужно подскроллится.
+ */
+function getScrollTarget(r: Range): Element | undefined {
+    let target = r.startContainer.childNodes[r.startOffset];
+    if (target?.nodeName === 'BR') {
+        return target as Element;
+    }
+
+    target = r.startContainer.childNodes[r.startOffset - 1];
+    if (target?.nodeName === 'BR') {
+        return target as Element;
     }
 }
