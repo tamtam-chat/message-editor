@@ -95,14 +95,14 @@ export default class Editor {
 
     private onKeyDown = (evt: KeyboardEvent) => {
         this.onHandleShortcut(evt);
+        const text = getTextFromKeyboardEvent(evt);
 
-        if (!evt.defaultPrevented && isInputEvent(evt)) {
+        if (!evt.defaultPrevented && isInputEvent(evt) && text) {
             const range = getTextRange(this.element);
 
             if (range) {
                 // Перехватываем обработку `input`, что бы потом красиво и плавно всё вставить
                 this.inputHandled = true;
-                const text = getTextFromKeyboardEvent(evt);
 
                 if (this.pendingUpdate) {
                     this.pendingUpdate.text += text;
@@ -926,13 +926,7 @@ function getText(tokens: Token[]): string {
  * Проверяет, является ли указанное событие с клавиатуры вводом символа
  */
 function isInputEvent(evt: KeyboardEvent): boolean {
-    if (evt.key === 'Enter') {
-        return true;
-    }
-
-    // NB Firefox также добавляет `.key` на системные клавиши, типа `ArrowDown`,
-    // поэтому фильтруем событие по `.charCode`
-    return evt.key && evt.charCode && !evt.metaKey && !evt.ctrlKey;
+    return evt.key && !evt.metaKey && !evt.ctrlKey;
 }
 
 function isCollapsed(range: TextRange): boolean {
@@ -940,7 +934,11 @@ function isCollapsed(range: TextRange): boolean {
 }
 
 function getTextFromKeyboardEvent(evt: KeyboardEvent): string {
-    return evt.key === 'Enter' ? '\n' : evt.key;
+    if (evt.key === 'Enter') {
+        return '\n';
+    }
+
+    return evt.key?.length === 1 ? evt.key : '';
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -989,20 +987,21 @@ function retainNewlineInViewport(element: Element): void {
         return;
     }
 
-    const rect = r.getClientRects().item(0);
+    let rect = r.getClientRects().item(0);
+    if ((!rect || !rect.height) && isElement(r.startContainer)) {
+        const target = getScrollTarget(r);
+        if (target) {
+            rect = target.getBoundingClientRect();
+        }
+    }
+
     if (rect && rect.height > 0) {
         // Есть прямоугольник, к которому можем прицепиться: проверим, что он видим
         // внутри элемента и если нет, подскроллимся к нему
         const parentRect = element.getBoundingClientRect();
-        if (rect.bottom < parentRect.top || rect.top > parentRect.bottom) {
+        if (rect.top < parentRect.top || rect.bottom > parentRect.bottom) {
             // Курсор за пределами вьюпорта
             element.scrollTop += rect.top - (parentRect.top + parentRect.height / 2);
-        }
-
-    } else if (r?.collapsed && isElement(r.startContainer)) {
-        const target = getScrollTarget(r);
-        if (target) {
-            target.scrollIntoView(false);
         }
     }
 }
