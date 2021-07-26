@@ -61,7 +61,7 @@ const tokenTypeClass: Record<TokenType, string> = {
     [TokenType.Mention]: 'mention',
     [TokenType.Text]: '',
     [TokenType.UserSticker]: 'user-sticker',
-    [TokenType.Newline]: '',
+    [TokenType.Newline]: 'newline',
 }
 
 const defaultOptions: RenderOptions = {
@@ -73,7 +73,7 @@ const defaultOptions: RenderOptions = {
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
     const options: RenderOptions = opt ? { ...defaultOptions, ...opt }: defaultOptions;
     const state = new ReconcileState(elem, options);
-    let prevToken: Token | undefined;
+    // let prevToken: Token | undefined;
 
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
@@ -101,12 +101,13 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
                 getTokenTypeClass(token),
                 formatClassNames(token.format)
             ]);
-            if (token.type !== TokenType.UserSticker && token.type !== TokenType.Newline) {
+
+            if (token.type !== TokenType.UserSticker && (token.type !== TokenType.Newline || options.nowrap)) {
                 renderText(token, elem, options);
             }
         }
 
-        prevToken = token;
+        // prevToken = token;
     }
 
     // NB: Проверяем именно `prevToken`, который мы обработали.
@@ -387,7 +388,7 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
     } else if (token.type === TokenType.UserSticker && state.options.emoji) {
         elem = state.emoji(token.value, token.value) as HTMLElement;
     } else if (token.type === TokenType.Newline) {
-        elem = state.elem('br');
+        elem = state.elem(state.options.nowrap ? 'span' : 'br');
         elem.setAttribute('data-raw', token.value);
     } else {
         elem = state.elem('span');
