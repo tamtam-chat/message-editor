@@ -938,7 +938,9 @@ function getTextFromKeyboardEvent(evt: KeyboardEvent): string {
         return '\n';
     }
 
-    return evt.key?.length === 1 ? evt.key : '';
+    // Пропускаем системные клавиши типа F1 или Escape,
+    const key = evt.key || '';
+    return /^[A-Z][a-z0-9]/.test(key) ? '' : key;
 }
 
 function clamp(value: number, min: number, max: number): number {
