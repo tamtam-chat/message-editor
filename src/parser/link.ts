@@ -10,7 +10,7 @@
 
 import ParserState, { Bracket, Quote } from './state';
 import { consumeTree, createTree } from './tree';
-import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isPunctuation } from './utils';
+import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenLink, TokenType } from './types';
 import { peekClosingMarkdown } from './markdown';
@@ -56,13 +56,9 @@ const maxLabelSize = 63;
 const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
 const safeChars = new Set(toCode('$-_.+'));
 const extraChars = new Set(toCode('!*"\'()[],|'));
-const searchChars = new Set(toCode(';:@&='));
 const punctChars = new Set(toCode('!,.;?'));
 const mailtoChars = toCode('mailto:', true);
 const magnetChars = toCode('magnet:', true);
-const segmentChars = new Set<number>([
-    Codes.Percent, Codes.Slash, Codes.Tilde
-]);
 
 /**
  * Символы, допустимые в логине. Тут расходимся с RFC: разрешаем `:` для менее строгой
@@ -440,17 +436,20 @@ function segment(state: ParserState): boolean {
     let { pos } = state;
     const start = pos;
     let bracketMatch: ConsumeResult;
+    let ch: number;
 
     while (state.hasNext()) {
         pos = state.pos;
+        ch = state.peek();
 
-        if (keycap(state)) {
-            // Нарвались на keycap-эмоджи, прекращаем парсинг
-            state.pos = pos;
-            break;
-        }
-
-        if (state.consume(isPunct)) {
+        // Отдельно обрабатываем кавычки: если они есть в предыдущем тексте,
+        // то, не делаем их частью ссылки
+        if (isQuote(ch)) {
+            if (shouldSkipQuote(state, ch)) {
+                break;
+            }
+            state.next();
+        } else if (state.consume(isPunct)) {
             // Определим пограничное состояние: знак препинания в конце URL
             // Это может быть как часть query string, так и терминатор слова:
             // `заходи на ok.ru/?send=1, там много интересного`
@@ -462,7 +461,7 @@ function segment(state: ParserState): boolean {
             if (bracketMatch === ConsumeResult.Skip) {
                 break;
             }
-        } else if (!(uchar(state) || state.consume(isSearch) || state.consume(isSegmentChar))) {
+        } else if (!state.consume(isSegmentChar)) {
             break;
         }
     }
@@ -471,7 +470,14 @@ function segment(state: ParserState): boolean {
 }
 
 function isSegmentChar(ch: number): boolean {
-    return segmentChars.has(ch);
+    // По спеке в сегментах может быть ограниченный набор символов, но по факту
+    // там может быть что угодно, включая эмоджи, русские символы и т.д.
+    return ch > 0 && ch === ch
+        && ch !== Codes.Question
+        && ch !== Codes.Hash
+        && ch !== Codes.SingleQuote
+        && ch !== Codes.DoubleQuote
+        && !isWhitespace(ch);
 }
 
 /**
@@ -497,31 +503,30 @@ function hex(state: ParserState): boolean {
 }
 
 function unreserved(state: ParserState): boolean {
-    const { pos } = state;
-    const ch = state.next();
-
     // Отдельно обрабатываем кавычки: если они есть в предыдущем тексте,
     // то, не делаем их частью ссылки
-    if (ch === Codes.SingleQuote && shouldSkipQuote(state, Quote.Single)) {
-        state.pos = pos;
+    if (shouldSkipQuote(state, state.peek())) {
         return false;
     }
 
-    if (ch === Codes.DoubleQuote && shouldSkipQuote(state, Quote.Double)) {
-        state.pos = pos;
-        return false;
-    }
-
-    state.pos = pos;
     return state.consume(isUnreserved);
 }
 
-function shouldSkipQuote(state: ParserState, quote: Quote): boolean {
-    return state.hasQuote(quote) || isSegmentBound(state.peek());
+function shouldSkipQuote(state: ParserState, ch: number): boolean {
+    return isQuote(ch) ? state.hasQuote(getQuoteType(ch)) : false;
+    // if (isQuote(ch)) {
+    //     return state.hasQuote((getQuoteType(ch))) || isSegmentBound(state.peek());
+    // }
+
+    // return false;
 }
 
-function isSegmentBound(ch: number): boolean {
-    return isBound(ch) || isPunctuation(ch);
+function isQuote(ch: number): boolean {
+    return ch === Codes.SingleQuote || ch === Codes.DoubleQuote;
+}
+
+function getQuoteType(ch: number): Quote {
+    return ch === Codes.SingleQuote ? Quote.Single : Quote.Double;
 }
 
 /**
@@ -589,10 +594,6 @@ function isHex(ch: number): boolean {
 
 function isPunct(ch: number): boolean {
     return punctChars.has(ch);
-}
-
-function isSearch(ch: number): boolean {
-    return searchChars.has(ch);
 }
 
 function handleBracket(state: ParserState): ConsumeResult {

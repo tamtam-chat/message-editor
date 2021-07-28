@@ -49,23 +49,25 @@ function testLink(link: string, isEmail = false) {
     deepEqual(values(tokens), [';', link], `Values: "${link}" after word bound`);
     validate(1);
 
-    // Сразу за эмоджи
-    tokens = parse(`${link}😍`);
-    deepEqual(types(tokens), [TokenType.Link, TokenType.Text], `Types: "${link}" before emoji`);
-    deepEqual(values(tokens), [link, '😍'], `Values: "${link}" before emoji`);
-    validate(0);
-
     // Перед эмоджи
+    // NB: Проверка больше не валидна, так как в жизни эмоджи также могут быть частью ссылки
+    // tokens = parse(`${link}😍`);
+    // deepEqual(types(tokens), [TokenType.Link, TokenType.Text], `Types: "${link}" before emoji`);
+    // deepEqual(values(tokens), [link, '😍'], `Values: "${link}" before emoji`);
+    // validate(0);
+
+    // За эмоджи
     tokens = parse(`👌🏻${link}`);
     deepEqual(types(tokens), [TokenType.Text, TokenType.Link], `Types: "${link}" after emoji`);
     deepEqual(values(tokens), ['👌🏻', link], `Values: "${link}" after emoji`);
     validate(1);
 
     // Перед keycap-эмоджи
-    tokens = parse(`${link}2️⃣`);
-    deepEqual(types(tokens), [TokenType.Link, TokenType.Text], `Types: "${link}" before keycap emoji`);
-    deepEqual(values(tokens), [link, '2️⃣'], `Values: "${link}" before keycap emoji`);
-    validate(0);
+    // NB: Проверка больше не валидна, так как в жизни эмоджи также могут быть частью ссылки
+    // tokens = parse(`${link}2️⃣`);
+    // deepEqual(types(tokens), [TokenType.Link, TokenType.Text], `Types: "${link}" before keycap emoji`);
+    // deepEqual(values(tokens), [link, '2️⃣'], `Values: "${link}" before keycap emoji`);
+    // validate(0);
 
     // Адрес в скобках
     tokens = parse(`(${link})`);
@@ -220,9 +222,13 @@ describe('Link', () => {
 
         // Отдельно парсим хитрую ссылку с кавычками, так как проверка на ординарные
         // кавычки всё поломает
-        const tokens = parse('foo https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname bar');
+        let tokens = parse('foo https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname bar');
         deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
         deepEqual(values(tokens), ['foo ', 'https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname', ' bar']);
+
+        tokens = parse('https://www.figma.com/file/ePu3frW916lhB89Sk5K6IQ/✅ОК-Поиск-фото-в-интернете?node-id=1%3A638')
+        deepEqual(types(tokens), [TokenType.Link]);
+        deepEqual(values(tokens), ['https://www.figma.com/file/ePu3frW916lhB89Sk5K6IQ/✅ОК-Поиск-фото-в-интернете?node-id=1%3A638']);
     });
 
     it('invalid url', () => {
