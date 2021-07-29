@@ -226,9 +226,9 @@ describe('Link', () => {
         deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
         deepEqual(values(tokens), ['foo ', 'https://www.tutorialspoint.com/how-to-use-xpath-in-selenium-webdriver-to-grab-svg-elements#:~:text=To%20create%20a%20xpath%20for,name()%3D\'svg\'%5D.&text=Here%2C%20data%2Dicon%20is%20an,child%20of%20the%20svg%20tagname', ' bar']);
 
-        tokens = parse('https://www.figma.com/file/ePu3frW916lhB89Sk5K6IQ/✅ОК-Поиск-фото-в-интернете?node-id=1%3A638')
+        tokens = parse('https://www.example.com/file/6lhB89Sk5K6IQ/✅sample?a=1%3A638')
         deepEqual(types(tokens), [TokenType.Link]);
-        deepEqual(values(tokens), ['https://www.figma.com/file/ePu3frW916lhB89Sk5K6IQ/✅ОК-Поиск-фото-в-интернете?node-id=1%3A638']);
+        deepEqual(values(tokens), ['https://www.example.com/file/6lhB89Sk5K6IQ/✅sample?a=1%3A638']);
     });
 
     it('invalid url', () => {
