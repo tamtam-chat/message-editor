@@ -115,8 +115,10 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
     // if (options.fixTrailingLine && prevToken && prevToken.value.slice(-1) === '\n') {
     //     state.elem('br');
     // }
+    if (options.fixTrailingLine) {
+        state.elem('br');
+    }
 
-    state.elem('br');
     state.trim();
 }
 
