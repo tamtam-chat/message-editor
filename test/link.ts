@@ -111,11 +111,16 @@ function testLink(link: string, isEmail = false) {
     validate(1);
 
     // Внутри скобок и текста
-
     tokens = parse(`Был на сайте (${link}), не понравилось.`);
     deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text], `Types: "${link}" in brackets in sentence`);
     deepEqual(values(tokens), ['Был на сайте (', link, '), не понравилось.'], `Values: "${link}" in brackets in sentence`);
     validate(1);
+
+    // Перед переводом строки
+    tokens = parse(`${link}\ntest`);
+    deepEqual(types(tokens), [TokenType.Link, TokenType.Newline, TokenType.Text], `Types: "${link}" before newline`);
+    deepEqual(values(tokens), [link, '\n', 'test'], `Values: "${link}" before newline`);
+    validate(0);
 }
 
 describe('Link', () => {

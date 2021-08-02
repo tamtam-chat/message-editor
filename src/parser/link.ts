@@ -10,7 +10,7 @@
 
 import ParserState, { Bracket, Quote } from './state';
 import { consumeTree, createTree } from './tree';
-import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace } from './utils';
+import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenLink, TokenType } from './types';
 import { peekClosingMarkdown } from './markdown';
@@ -477,7 +477,8 @@ function isSegmentChar(ch: number): boolean {
         && ch !== Codes.Hash
         && ch !== Codes.SingleQuote
         && ch !== Codes.DoubleQuote
-        && !isWhitespace(ch);
+        && !isWhitespace(ch)
+        && !isNewLine(ch);
 }
 
 /**

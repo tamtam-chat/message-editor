@@ -244,7 +244,7 @@ export default class ParserState {
 
         const lastToken = last(this.tokens);
         if (lastToken) {
-            return lastToken.type === TokenType.Markdown;
+            return lastToken.type === TokenType.Markdown || lastToken.type === TokenType.Newline;
         }
 
         return false;
