@@ -209,7 +209,6 @@ const editor = new Editor(document.querySelector('#text-editor'), {
     },
     emoji: renderEmoji,
     resetFormatOnNewline: true,
-    nowrap: true
 });
 editor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));

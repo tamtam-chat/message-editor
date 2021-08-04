@@ -923,9 +923,15 @@ function getText(tokens: Token[]): string {
 }
 
 /**
- * Проверяет, является ли указанное событие с клавиатуры вводом символа
+ * Проверяет, является ли указанное событие с клавиатуры вводом символа.
+ * Основная задача: отфильтровать шорткаты действий (типа сделать жирным)
+ * внутри инпута. Но на Enter особое поведение: пользователи хотят переводить строки
+ * по Cmd+Enter и Ctrl+Enter
  */
 function isInputEvent(evt: KeyboardEvent): boolean {
+    if (evt.key === 'Enter') {
+        return true;
+    }
     return evt.key && !evt.metaKey && !evt.ctrlKey;
 }
 
