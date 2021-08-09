@@ -3,7 +3,7 @@ import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, isElement, setDOMRange, setRange } from './range';
-import diffAction, { DiffAction, DiffActionType } from './diff';
+import { DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
     mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
@@ -26,11 +26,6 @@ export interface EditorOptions {
 
     /** Функция для отрисовки эмоджи */
     emoji?: EmojiRender;
-}
-
-interface PendingUpdate {
-    text: string;
-    range: TextRange;
 }
 
 type Model = Token[];
@@ -63,16 +58,25 @@ const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
+/**
+ * Типы событий `input`, которые надо игнорировать. В основном это нужно делать в Сафари
+ */
+const compositionInputTypes = [
+    'insertCompositionText',
+    'deleteCompositionText',
+    'insertFromComposition'
+];
+
 export default class Editor {
     public shortcuts: Shortcuts<Editor>;
     public history: History<Model>;
 
     private _model: Model;
     private _inited = false;
-    private inputHandled = false;
     private pendingSelChange = false;
-    private pendingUpdate: PendingUpdate | null = null;
-    private pendingDelete: TextRange | null = null;
+    private compositionRange: TextRange | null = null;
+    private inputStartRange: TextRange | null;
+    private inputStartLength = -1;
     private caret: TextRange = [0, 0];
     private focused = false;
     private expectEnter = false;
@@ -94,82 +98,67 @@ export default class Editor {
     }
 
     private onKeyDown = (evt: KeyboardEvent) => {
-        this.onHandleShortcut(evt);
-        const text = getTextFromKeyboardEvent(evt);
-
-        if (!evt.defaultPrevented && isInputEvent(evt) && text) {
-            const range = getTextRange(this.element);
-
-            if (range) {
-                // Перехватываем обработку `input`, что бы потом красиво и плавно всё вставить
-                this.inputHandled = true;
-
-                if (this.pendingUpdate) {
-                    this.pendingUpdate.text += text;
-                } else {
-                    this.pendingUpdate = { range, text };
-                }
-            }
+        if (!evt.defaultPrevented) {
+            this.shortcuts.handle(evt);
         }
-
         this.waitExpectedEnter(evt);
     }
 
-    private onInput = () => {
+    private onCompositionStart = () => {
+        this.compositionRange = getTextRange(this.element);
+    }
+
+    private onCompositionEnd = (evt: CompositionEvent) => {
+        if (this.compositionRange) {
+            this.insertOrReplaceText(this.compositionRange, evt.data);
+            this.compositionRange = null;
+        }
+    }
+
+    private onBeforeInput = (evt: InputEvent) => {
+        this.inputStartRange = getTextRange(this.element);
+        if (evt.inputType === 'deleteContentForward') {
+            this.inputStartLength = this.getInputText().length;
+        }
+    }
+
+    private onInput = (evt: InputEvent) => {
         this.expectEnter = false;
 
-        // Обрабатываем перехваченный ввод — превентим, если был перехват
-        if (this.inputHandled) {
-            this.inputHandled = false;
-            this.scheduleUpdate();
+        // Не обрабатываем composing-ввод, оставим это другим событиям
+        if (evt.isComposing || compositionInputTypes.includes(evt.inputType)) {
             return;
         }
 
-        // Если сработало событие input, значит, мы не смогли самостоятельно
-        // обработать ввод. Попробуем его вычислить
-        const range = getTextRange(this.element);
-        if (range && isCollapsed(range)) {
-            let payload: DiffAction;
-            const value = this.getText();
-            const inputValue = this.getInputText();
+        const range = this.inputStartRange;
 
-            if (this.pendingDelete) {
-                const from = Math.min(range[0], this.pendingDelete[0]);
-                payload = {
-                    action: DiffActionType.Remove,
-                    pos: from,
-                    text: value.slice(from, from + (value.length - inputValue.length))
+        if (/^insert/.test(evt.inputType)) {
+            let text = evt.data || '';
+            if (evt.inputType === 'insertLineBreak' || evt.inputType === 'insertParagraph') {
+                text = '\n';
+            }
+
+            requestAnimationFrame(() => this.insertOrReplaceText(range, text));
+        } else if (/^delete/.test(evt.inputType)) {
+            const curRange = getTextRange(this.element);
+            const from = Math.min(curRange[0], range[0]);
+            let to = Math.max(curRange[1], range[1]);
+            if (from === to && evt.inputType === 'deleteContentForward') {
+                const len = this.getInputText().length;
+                if (this.inputStartLength > len) {
+                    to += this.inputStartLength - len;
                 }
-                this.pendingDelete = null;
-            } else {
-                payload = diffAction(value, inputValue);
             }
 
-            if (!payload) {
-                return;
-            }
-
-            const from = payload.pos;
-            const to = payload.pos + ('oldText' in payload ? payload.oldText : payload.text).length;
-
-            switch (payload.action) {
-                case 'insert':
-                    this.insertText(from, payload.text);
-                    break;
-                case 'remove':
-                    this.removeText(from, to);
-
-                    // При удалении текста почему-то не срабатывает событие для `onSelectionChange`,
-                    // поэтому дёрнем его вручную
-                    this.onSelectionChange();
-                    break;
-                case 'replace':
-                    this.replaceText(from, to, payload.text);
-                    break;
-            }
-        } else if (range) {
-            console.warn('Unsupported input', range);
+            requestAnimationFrame(() => {
+                this.removeText(from, to);
+            });
+        } else {
+            console.warn('unknown input');
         }
+
+        this.inputStartRange = null;
+        this.inputStartLength = -1;
     }
 
     private onSelectionChange = () => {
@@ -198,21 +187,6 @@ export default class Editor {
             evt.preventDefault();
         }
     }
-
-    private onHandleShortcut = (evt: KeyboardEvent) => {
-        if (evt.defaultPrevented) {
-            return;
-        }
-
-        if (evt.key === 'Backspace' || evt.key === 'Delete') {
-            // NB: если есть накопленные изменения — сбрасываем их, так как ситуация
-            // с синхронным переходом в режим удаления может произойти из-за Punto Switcher
-            this.flushPendingUpdate();
-            this.pendingDelete = this.getSelection();
-        } else {
-            this.shortcuts.handle(evt);
-        }
-    };
 
     /**
      * Обработка события вставки текста
@@ -299,9 +273,11 @@ export default class Editor {
         const { element } = this;
 
         element.contentEditable = 'true';
-        // NB: логичнее было бы обрабатывать событие keypress, но в Firefox
-        // некоторые комбинации не долетают до этого события. Например, Alt+Enter
+
         element.addEventListener('keydown', this.onKeyDown);
+        element.addEventListener('compositionstart', this.onCompositionStart);
+        element.addEventListener('compositionend', this.onCompositionEnd);
+        element.addEventListener('beforeinput', this.onBeforeInput);
         element.addEventListener('input', this.onInput);
         element.addEventListener('cut', this.onCut);
         element.addEventListener('copy', this.onCopy);
@@ -323,6 +299,9 @@ export default class Editor {
      */
     dispose(): void {
         this.element.removeEventListener('keydown', this.onKeyDown);
+        this.element.removeEventListener('compositionstart', this.onCompositionStart);
+        this.element.removeEventListener('compositionend', this.onCompositionEnd);
+        this.element.removeEventListener('beforeinput', this.onBeforeInput);
         this.element.removeEventListener('input', this.onInput);
         this.element.removeEventListener('cut', this.onCut);
         this.element.removeEventListener('copy', this.onCopy);
@@ -331,8 +310,6 @@ export default class Editor {
         this.element.removeEventListener('focus', this.onFocus);
         this.element.removeEventListener('blur', this.onBlur);
         document.removeEventListener('selectionchange', this.onSelectionChange);
-        this.inputHandled = false;
-        this.pendingUpdate = null;
     }
 
     /////////// Публичные методы для работы с текстом ///////////
@@ -763,14 +740,6 @@ export default class Editor {
         return this;
     }
 
-    private scheduleUpdate() {
-        // Откладываем изменение модели, даём браузеру применить UI-изменения,
-        // а модель поменяем в качестве уведомления. Это сделает UX приятнее
-        // и нативнее, в частности, не будет сильно моргать браузерная
-        // проверка правописания
-        requestAnimationFrame(() => this.flushPendingUpdate());
-    }
-
     /**
      * Сохраняет указанный диапазон в текущей записи истории в качестве последнего
      * известного выделения
@@ -880,22 +849,6 @@ export default class Editor {
         }
     }
 
-    private flushPendingUpdate() {
-        if (this.pendingUpdate) {
-            const { range, text } = this.pendingUpdate;
-
-            if (isCollapsed(range)) {
-                this.insertText(range[0], text);
-            } else if (!text) {
-                this.removeText(range[0], range[1]);
-            } else {
-                this.replaceText(range[0], range[1], text);
-            }
-
-            this.pendingUpdate = null;
-        }
-    }
-
     private normalizeRange([from, to]: TextRange): TextRange {
         const maxIx = getLength(this.model);
         return [clamp(from, 0, maxIx), clamp(to, 0, maxIx)];
@@ -907,11 +860,17 @@ export default class Editor {
             requestAnimationFrame(() => {
                 if (this.expectEnter) {
                     this.expectEnter = false;
-                    this.flushPendingUpdate();
+                    this.insertOrReplaceText(getTextRange(this.element), '\n');
                     retainNewlineInViewport(this.element);
                 }
             });
         }
+    }
+
+    private insertOrReplaceText(range: TextRange, text: string): Model {
+        return isCollapsed(range)
+            ? this.insertText(range[0], text)
+            : this.replaceText(range[0], range[1], text);
     }
 }
 
@@ -922,31 +881,8 @@ function getText(tokens: Token[]): string {
     return tokens.map(t => t.value).join('');
 }
 
-/**
- * Проверяет, является ли указанное событие с клавиатуры вводом символа.
- * Основная задача: отфильтровать шорткаты действий (типа сделать жирным)
- * внутри инпута. Но на Enter особое поведение: пользователи хотят переводить строки
- * по Cmd+Enter и Ctrl+Enter
- */
-function isInputEvent(evt: KeyboardEvent): boolean {
-    if (evt.key === 'Enter') {
-        return true;
-    }
-    return evt.key && !evt.metaKey && !evt.ctrlKey;
-}
-
 function isCollapsed(range: TextRange): boolean {
     return range[0] === range[1];
-}
-
-function getTextFromKeyboardEvent(evt: KeyboardEvent): string {
-    if (evt.key === 'Enter') {
-        return '\n';
-    }
-
-    // Пропускаем системные клавиши типа F1 или Escape,
-    const key = evt.key || '';
-    return /^[A-Z][a-z0-9]/.test(key) ? '' : key;
 }
 
 function clamp(value: number, min: number, max: number): number {
