@@ -2,7 +2,7 @@ import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '
 import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, isElement, setDOMRange, setRange } from './range';
+import { getTextRange, isElement, rangeToLocation, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
@@ -10,6 +10,17 @@ import {
     TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
+
+interface SafariInputEvent extends InputEvent {
+    dataTransfer?: DataTransfer;
+    getTargetRanges?: () => [StaticRange];
+}
+
+interface InputPayload {
+    range: TextRange;
+    textLength?: number;
+    staticRange?: StaticRange;
+}
 
 export interface EditorOptions {
     /** Значение по умолчанию для редактора */
@@ -75,8 +86,7 @@ export default class Editor {
     private _inited = false;
     private pendingSelChange = false;
     private compositionRange: TextRange | null = null;
-    private inputStartRange: TextRange | null;
-    private inputStartLength = -1;
+    private beforeInput: Record<string, InputPayload> = {};
     private caret: TextRange = [0, 0];
     private focused = false;
     private expectEnter = false;
@@ -115,11 +125,22 @@ export default class Editor {
         }
     }
 
-    private onBeforeInput = (evt: InputEvent) => {
-        this.inputStartRange = getTextRange(this.element);
+    private onBeforeInput = (evt: SafariInputEvent) => {
+        const payload: InputPayload = {
+            range: getTextRange(this.element)
+        };
+
         if (evt.inputType === 'deleteContentForward') {
-            this.inputStartLength = this.getInputText().length;
+            payload.textLength = this.getInputText().length;
         }
+
+        if (typeof evt.getTargetRanges === 'function') {
+            payload.staticRange = evt.getTargetRanges()[0];
+        }
+
+        // NB: Safari может послать сразу несколько событий input, поэтому
+        // будем отслеживать их по типу
+        this.beforeInput[evt.inputType] = payload;
     }
 
     private onInput = (evt: InputEvent) => {
@@ -130,35 +151,45 @@ export default class Editor {
             return;
         }
 
-        const range = this.inputStartRange;
-
         if (/^insert/.test(evt.inputType)) {
-            let text = evt.data || '';
+            let text = getInputEventText(evt);
             if (evt.inputType === 'insertLineBreak' || evt.inputType === 'insertParagraph') {
                 text = '\n';
             }
 
+            const payload = this.beforeInput[evt.inputType];
+            let { range } = payload;
+            if (payload.staticRange) {
+                range = rangeToLocation(this.element, payload.staticRange as Range);
+            }
+
             requestAnimationFrame(() => this.insertOrReplaceText(range, text));
         } else if (/^delete/.test(evt.inputType)) {
-            const curRange = getTextRange(this.element);
-            const from = Math.min(curRange[0], range[0]);
-            let to = Math.max(curRange[1], range[1]);
-            if (from === to && evt.inputType === 'deleteContentForward') {
-                const len = this.getInputText().length;
-                if (this.inputStartLength > len) {
-                    to += this.inputStartLength - len;
+            const payload = this.beforeInput[evt.inputType];
+            let from = 0;
+            let to = 0;
+
+            if (payload.staticRange) {
+                const range = rangeToLocation(this.element, payload.staticRange as Range);
+                from = range[0];
+                to = range[1];
+            } else {
+                const range = getTextRange(this.element);
+                from = Math.min(range[0], payload.range[0]);
+                to = Math.max(range[1], payload.range[1]);
+
+                if (from === to && evt.inputType === 'deleteContentForward') {
+                    const len = this.getInputText().length;
+                    if (payload.textLength > len) {
+                        to += payload.textLength - len;
+                    }
                 }
             }
 
-            requestAnimationFrame(() => {
-                this.removeText(from, to);
-            });
+            requestAnimationFrame(() => this.removeText(from, to));
         } else {
             console.warn('unknown input');
         }
-
-        this.inputStartRange = null;
-        this.inputStartLength = -1;
     }
 
     private onSelectionChange = () => {
@@ -963,4 +994,18 @@ function getScrollTarget(r: Range): Element | undefined {
     if (target?.nodeName === 'BR') {
         return target as Element;
     }
+}
+
+function getInputEventText(evt: SafariInputEvent): string {
+    if (evt.data != null) {
+        return evt.data;
+    }
+
+    // Расширение для Safari, используется. например, для подстановки
+    // нового значения на длинное нажатие клавиши (е → ё)
+    if (evt.dataTransfer) {
+        return evt.dataTransfer.getData('text/plain');
+    }
+
+    return '';
 }
