@@ -163,7 +163,7 @@ export default class Editor {
                 range = rangeToLocation(this.element, payload.staticRange as Range);
             }
 
-            requestAnimationFrame(() => this.insertOrReplaceText(range, text));
+            this.insertOrReplaceText(range, text)
         } else if (/^delete/.test(evt.inputType)) {
             const payload = this.beforeInput[evt.inputType];
             let from = 0;
@@ -186,7 +186,7 @@ export default class Editor {
                 }
             }
 
-            requestAnimationFrame(() => this.removeText(from, to));
+            this.removeText(from, to);
         } else {
             console.warn('unknown input');
         }
