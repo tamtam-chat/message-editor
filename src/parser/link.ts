@@ -453,7 +453,7 @@ function segment(state: ParserState): boolean {
             // Определим пограничное состояние: знак препинания в конце URL
             // Это может быть как часть query string, так и терминатор слова:
             // `заходи на ok.ru/?send=1, там много интересного`
-            if (atWordEdge(state)) {
+            if (isBound(state.peek())) {
                 state.pos = pos;
                 break;
             }

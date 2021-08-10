@@ -217,6 +217,7 @@ describe('Link', () => {
             'https://vk.com/@superappkit-web-sdk',
             'https://ok.ru/#/foo/bar',
             'https://ok.ru/?a:b=c|d',
+            'https://ok.ru/foo/bar..5',
         ];
 
         // console.log(parse('Have you seen group_calls2.messenger.okdev.mail.msk?'));
