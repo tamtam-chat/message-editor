@@ -293,9 +293,11 @@ function updateToolbar(editor) {
         if (r) {
             const rect = r.getClientRects().item(0);
             const editorRect = editor.element.getBoundingClientRect();
-            toolbar.style.left = `${rect.left - editorRect.left - 5}px`;
-            toolbar.style.top = `${rect.top - editorRect.top - toolbar.offsetHeight - 5}px`;
-            updateToolbarState(editor);
+            if (rect && editorRect) {
+                toolbar.style.left = `${rect.left - editorRect.left - 5}px`;
+                toolbar.style.top = `${rect.top - editorRect.top - toolbar.offsetHeight - 5}px`;
+                updateToolbarState(editor);
+            }
         }
     }
 }

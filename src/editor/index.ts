@@ -2,7 +2,7 @@ import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '
 import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, isElement, rangeToLocation, setDOMRange, setRange } from './range';
+import { getTextRange, isElement, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
@@ -14,12 +14,6 @@ import Shortcuts, { ShortcutHandler } from './shortcuts';
 interface SafariInputEvent extends InputEvent {
     dataTransfer?: DataTransfer;
     getTargetRanges?: () => [StaticRange];
-}
-
-interface InputPayload {
-    range: TextRange;
-    textLength?: number;
-    staticRange?: StaticRange;
 }
 
 export interface EditorOptions {
@@ -62,6 +56,16 @@ interface PickLinkOptions {
     range?: TextRange;
 }
 
+interface InputState {
+    /**
+     * Флаг, указывающий, что сейчас работает композиция.
+     * NB свойство evt.isComposing не поддерживается в Safari
+     */
+    composing: boolean;
+    range: TextRange;
+    text: string;
+}
+
 /** MIME-тип для хранения отформатированной строки в буффере */
 const fragmentMIME = 'tamtam/fragment';
 
@@ -69,14 +73,8 @@ const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
-/**
- * Типы событий `input`, которые надо игнорировать. В основном это нужно делать в Сафари
- */
-const compositionInputTypes = [
-    'insertCompositionText',
-    'deleteCompositionText',
-    'insertFromComposition'
-];
+const blockElements = new Set<string>(['DIV', 'P', 'BLOCKQUOTE']);
+// const blockElements = new Set<string>(['BR']);
 
 export default class Editor {
     public shortcuts: Shortcuts<Editor>;
@@ -84,12 +82,10 @@ export default class Editor {
 
     private _model: Model;
     private _inited = false;
-    private pendingSelChange = false;
-    private compositionRange: TextRange | null = null;
-    private beforeInput: Record<string, InputPayload> = {};
     private caret: TextRange = [0, 0];
     private focused = false;
     private expectEnter = false;
+    private inputState: InputState | null = null;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -115,88 +111,25 @@ export default class Editor {
     }
 
     private onCompositionStart = () => {
-        this.compositionRange = getTextRange(this.element);
+        this.expectEnter = false;
+        this.handleBeforeInput(true);
     }
 
     private onCompositionEnd = (evt: CompositionEvent) => {
-        if (this.compositionRange) {
-            this.insertOrReplaceText(this.compositionRange, evt.data);
-            this.compositionRange = null;
-        }
+        this.handleInput(evt.data);
     }
 
-    private onBeforeInput = (evt: SafariInputEvent) => {
-        const payload: InputPayload = {
-            range: getTextRange(this.element)
-        };
-
-        if (evt.inputType === 'deleteContentForward') {
-            payload.textLength = this.getInputText().length;
+    private onBeforeInput = () => {
+        if (!this.inputState?.composing) {
+            this.handleBeforeInput();
         }
-
-        if (typeof evt.getTargetRanges === 'function') {
-            payload.staticRange = evt.getTargetRanges()[0];
-        }
-
-        // NB: Safari может послать сразу несколько событий input, поэтому
-        // будем отслеживать их по типу
-        this.beforeInput[evt.inputType] = payload;
     }
 
     private onInput = (evt: InputEvent) => {
         this.expectEnter = false;
 
-        // Не обрабатываем composing-ввод, оставим это другим событиям
-        if (evt.isComposing || compositionInputTypes.includes(evt.inputType)) {
-            return;
-        }
-
-        if (/^insert/.test(evt.inputType)) {
-            let text = getInputEventText(evt);
-            if (evt.inputType === 'insertLineBreak' || evt.inputType === 'insertParagraph') {
-                text = '\n';
-            }
-
-            const payload = this.beforeInput[evt.inputType];
-            let { range } = payload;
-            if (payload.staticRange) {
-                range = rangeToLocation(this.element, payload.staticRange as Range);
-            }
-
-            this.insertOrReplaceText(range, text)
-        } else if (/^delete/.test(evt.inputType)) {
-            const payload = this.beforeInput[evt.inputType];
-            let from = 0;
-            let to = 0;
-
-            if (!payload) {
-                // Баг в Хроме: для события deleteContentBackward вызывается
-                // событие `beforeinput` и типом deleteContentForward
-                [from, to] = this.getSelection();
-            } else if (!isCollapsed(payload.range)) {
-                [from, to] = payload.range;
-            } else if (payload.staticRange) {
-                [from, to] = rangeToLocation(this.element, payload.staticRange as Range);
-            } else {
-                const range = getTextRange(this.element);
-                from = Math.min(range[0], payload.range[0]);
-                to = Math.max(range[1], payload.range[1]);
-
-                if (from === to && evt.inputType === 'deleteContentForward') {
-                    const len = this.getInputText().length;
-                    if (payload.textLength > len) {
-                        to += payload.textLength - len;
-                    }
-                }
-            }
-
-            this.removeText(from, to);
-        } else {
-            console.warn('unknown input');
-        }
-
-        if (this.beforeInput[evt.inputType]) {
-            this.beforeInput[evt.inputType] = null;
+        if (!this.inputState?.composing) {
+            this.handleInput(getInputEventText(evt));
         }
     }
 
@@ -742,11 +675,15 @@ export default class Editor {
             if (node.nodeType === Node.TEXT_NODE) {
                 result += node.nodeValue;
             } else if (node.nodeType === Node.ELEMENT_NODE) {
-                raw = (node as Element).getAttribute('data-raw');
-                if (raw) {
-                    result += raw;
-                } else if (node.nodeName === 'BR') {
+                if (node.nodeName === 'BR') {
                     result += '\n';
+                } else {
+                    raw = (node as Element).getAttribute('data-raw');
+                    if (raw) {
+                        result += raw;
+                    } else if (blockElements.has(node.nodeName) && result.length > 0 && result.slice(-1) !== '\n') {
+                        result += '\n';
+                    }
                 }
             }
         }
@@ -892,6 +829,59 @@ export default class Editor {
             ? this.insertText(range[0], text)
             : this.replaceText(range[0], range[1], text);
     }
+
+    private handleBeforeInput(composing = false) {
+        const range = getTextRange(this.element);
+        if (range) {
+            this.inputState = {
+                range,
+                text: this.getInputText(),
+                composing
+            };
+        }
+    }
+
+    private handleInput(insert?: string) {
+        const { inputState } = this;
+        if (!inputState) {
+            return;
+        }
+
+        const range = getTextRange(this.element);
+        const insertFrom = Math.min(inputState.range[0], range[0]);
+        const removeFrom = insertFrom;
+        let insertTo = range[1];
+        let removeTo = inputState.range[1];
+
+        if (!insert) {
+            const text = this.getInputText();
+            if (isCollapsed(range) && insertFrom === removeFrom && insertTo === removeTo) {
+                const delta = inputState.text.length - text.length;
+                if (delta > 0) {
+                    // Удалили текст
+                    removeTo += delta;
+                } else if (delta < 0) {
+                    // Добавили текст, но почему-то не отследили (перевод строки?)
+                    insertTo -= delta;
+                }
+            }
+
+            insert = text.slice(insertFrom, insertTo);
+        }
+
+        if (insert) {
+            // Вставка текста
+            if (removeFrom !== removeTo) {
+                this.replaceText(removeFrom, removeTo, insert);
+            } else {
+                this.insertText(insertFrom, insert);
+            }
+        } else if (removeFrom !== removeTo) {
+            // Удаление текста
+            this.removeText(removeFrom, removeTo);
+        }
+        this.inputState = null;
+    }
 }
 
 /**
@@ -986,6 +976,10 @@ function getScrollTarget(r: Range): Element | undefined {
 }
 
 function getInputEventText(evt: SafariInputEvent): string {
+    if (evt.inputType === 'insertParagraph') {
+        return '\n';
+    }
+
     if (evt.data != null) {
         return evt.data;
     }
