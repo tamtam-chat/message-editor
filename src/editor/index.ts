@@ -169,10 +169,14 @@ export default class Editor {
             let from = 0;
             let to = 0;
 
-            if (payload.staticRange) {
-                const range = rangeToLocation(this.element, payload.staticRange as Range);
-                from = range[0];
-                to = range[1];
+            if (!payload) {
+                // Баг в Хроме: для события deleteContentBackward вызывается
+                // событие `beforeinput` и типом deleteContentForward
+                [from, to] = this.getSelection();
+            } else if (!isCollapsed(payload.range)) {
+                [from, to] = payload.range;
+            } else if (payload.staticRange) {
+                [from, to] = rangeToLocation(this.element, payload.staticRange as Range);
             } else {
                 const range = getTextRange(this.element);
                 from = Math.min(range[0], payload.range[0]);
@@ -190,14 +194,16 @@ export default class Editor {
         } else {
             console.warn('unknown input');
         }
+
+        if (this.beforeInput[evt.inputType]) {
+            this.beforeInput[evt.inputType] = null;
+        }
     }
 
     private onSelectionChange = () => {
-        if (!this.pendingSelChange) {
-            const range = getTextRange(this.element);
-            if (range) {
-                this.saveSelection(range);
-            }
+        const range = getTextRange(this.element);
+        if (range) {
+            this.saveSelection(range);
         }
     }
 
@@ -780,7 +786,7 @@ export default class Editor {
         this.caret = range;
         this.history.saveCaret(range);
         if (caret[0] !== range[0] || caret[1] !== range[1]) {
-            this.notifySelChange();
+            this.emit('editor-selectionchange');
         }
     }
 
@@ -860,23 +866,6 @@ export default class Editor {
     private emit(eventName: EventName): void {
         if (this._inited) {
             dispatch<EditorEventDetails>(this.element, eventName, { editor: this });
-        }
-    }
-
-    /**
-     * Отложенная нотификация об изменении позиции курсора.
-     * Учитывает особенности особенности обработки ввода в редакторе:
-     * чтобы лишний раз не моргать спеллчекером, обновление модели откладывается
-     * на момент отрисовки, поэтому если посылать уведомление сразу, выделение
-     * может указывать на позицию, которой нет в модели
-     */
-    private notifySelChange(): void {
-        if (!this.pendingSelChange) {
-            this.pendingSelChange = true;
-            requestAnimationFrame(() => {
-                this.pendingSelChange = false;
-                this.emit('editor-selectionchange');
-            });
         }
     }
 
