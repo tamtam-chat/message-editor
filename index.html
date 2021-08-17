@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editor example</title>
+    <style>
+    main {
+        margin: 120px auto 20px;
+        max-width: 600px;
+        font-family: 'PT Sans', Arial, sans-serif;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 20px 0;
+    }
+
+    .editor-wrap {
+        position: relative;
+        margin-bottom: 50px;
+    }
+
+    .editor {
+        font-family: 'PT Sans', Arial, sans-serif;
+        font-size: 20px;
+        padding: 10px;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+        border-radius: 5px;
+        white-space: pre-wrap;
+        outline: none;
+        line-height: 1.3;
+        min-height: 1.3em;
+        max-height: 3.9em;
+        overflow: auto;
+    }
+
+    .editor img {
+        width: 20px;
+        height: 20px;
+        width: 1em;
+        height: 1em;
+        font-size: 20px;
+        vertical-align: -.1em;
+        margin: -1px 0;
+    }
+
+    .editor .monospace {
+        color: #888;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .italic {
+        font-style: italic;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    .strike {
+        text-decoration: line-through;
+    }
+
+    .monospace {
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    .md-link-label {
+        color: #4385cc;
+    }
+
+    .mention {
+        display: inline-block;
+        padding: 2px 11px;
+        margin: -2px 0;
+        border-radius: 1em;
+        color: #fff;
+        background: #ff4ae8;
+        text-decoration: none;
+    }
+
+    .hashtag {
+        color: #999;
+        text-decoration: none;
+    }
+
+    .command {
+        color: green;
+        text-decoration: none;
+    }
+
+    .toolbar {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        border: 1px solid #070808;
+        background: #333437;
+        color: #d5dade;
+        border-radius: 6px;
+        padding: 3px 6px;
+        top: -40px;
+        left: 0;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+        font-family: serif;
+    }
+
+    .toolbar.hidden {
+        display: none;
+    }
+
+    .toolbar-btn {
+        display: block;
+        width: 26px;
+        height: 26px;
+        line-height: 26px;
+        text-align: center;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    .toolbar-btn:not(:first-of-type) {
+        margin-left: 2px;
+    }
+
+    .toolbar-btn.link {
+        width: auto;
+        padding-left: 4px;
+        padding-right: 4px;
+        font-family: 'PT Sans', Arial, sans-serif;
+    }
+
+    .toolbar-sep {
+        width: 1px;
+        height: 26px;
+        background: #4e4f52;
+        margin: 0 4px;
+    }
+
+    .toolbar-btn.selected {
+        background: #364458;
+        color: #25a6f7;
+        border-color: #4283db;
+    }
+    </style>
+</head>
+<body>
+    <main>
+        <p>Текстовый редактор</p>
+        <div class="editor-wrap">
+            <div id="text-editor" class="editor"></div>
+        </div>
+
+        <p>Markdown редактор</p>
+        <div class="editor-wrap">
+            <div id="md-editor" class="editor"></div>
+        </div>
+
+        <div class="toolbar hidden">
+            <span class="toolbar-btn bold selected" data-format="1">B</span>
+            <span class="toolbar-btn italic" data-format="2">I</span>
+            <span class="toolbar-btn strike" data-format="8">S</span>
+            <span class="toolbar-btn monospace" data-format="16">M</span>
+            <span class="toolbar-sep"></span>
+            <span class="toolbar-btn link">Ссылка</span>
+        </div>
+
+        <ul>
+            <li>⌘B — жирный</li>
+            <li>⌘I — курсив</li>
+            <li>⌘U — перечёркнутый</li>
+            <li>⌘K — моноширинный</li>
+            <li>^L — добавить ссылку (если указать пустое значение, ссылка удалится)</li>
+        </ul>
+    </main>
+<script type="module">
+import { Editor, TokenFormat } from './dist/editor.es.js';
+
+const shortcuts = {
+    'Cmd+Z': editor => editor.undo(),
+    'Cmd+Y': editor => editor.redo(),
+    'Cmd+Shift+Z': editor => editor.redo(),
+    'Cmd+B': editor => editor.toggleFormat(TokenFormat.Bold),
+    'Cmd+I': editor => editor.toggleFormat(TokenFormat.Italic),
+    'Cmd+U': editor => editor.toggleFormat(TokenFormat.Strike),
+    'Cmd+Shift+C': editor => editor.toggleFormat(TokenFormat.Monospace),
+    'Ctrl+L': editor => editor.pickLink(),
+};
+
+const toolbar = document.querySelector('.toolbar');
+let activeEditor;
+const editor = new Editor(document.querySelector('#text-editor'), {
+    value: 'Привет, мир! 😇',
+    shortcuts,
+    parse: {
+        textEmoji: true,
+        hashtag: true,
+        mention: true,
+        command: true,
+        userSticker: true,
+        link: true,
+        stickyLink: true
+    },
+    emoji: renderEmoji,
+    resetFormatOnNewline: true,
+});
+editor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
+    .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
+
+const mdEditor = new Editor(document.querySelector('#md-editor'), {
+    value: 'Привет, *markdown* мир! 😇',
+    shortcuts,
+    parse: {
+        textEmoji: true,
+        hashtag: true,
+        mention: true,
+        command: true,
+        userSticker: true,
+        link: true,
+        markdown: true
+    },
+    emoji: renderEmoji
+});
+mdEditor.on('editor-selectionchange', evt => onSelectionChange(evt.detail.editor))
+    .on('editor-formatchange', evt => updateToolbarState(evt.detail.editor));
+
+toolbar.addEventListener('mousedown', evt => {
+    const btn = evt.target.closest('.toolbar-btn');
+    if (btn) {
+        evt.preventDefault();
+        const format = btn.dataset.format;
+        if (format) {
+            activeEditor.toggleFormat(Number(format));
+        } else if (btn.classList.contains('link')) {
+            activeEditor.pickLink();
+        }
+    }
+});
+
+/**
+ * Тестовая функция для проверки вывода эмоджи как картинки
+ */
+function renderEmoji(emoji, elem) {
+    if (emoji == null) {
+        return;
+    }
+
+    const codePoints = [];
+    let i = 0;
+    let cp = 0;
+    while (i < emoji.length) {
+        cp = emoji.codePointAt(i);
+        i += cp > 0xFFFF ? 2 : 1;
+
+        if (cp !== 0xFE0F && cp !== 0x200D) {
+            codePoints.push(cp.toString(16));
+        }
+    }
+
+    const url = `//st.mycdn.me/static/emoji/3-1-1/20/${codePoints.join('-')}@2x.png`;
+    if (!elem) {
+        elem = document.createElement('img');
+    }
+
+    if (elem.getAttribute('src') !== url) {
+        elem.setAttribute('src', url);
+    }
+
+    return elem;
+};
+
+function onSelectionChange(editor) {
+    activeEditor = editor;
+    const sel = editor.getSelection();
+    if (sel[0] !== sel[1]) {
+        showToolbar(editor);
+        updateToolbar(editor);
+    } else {
+        hideToolbar();
+    }
+}
+
+function updateToolbar(editor) {
+    const sel = window.getSelection();
+    if (sel) {
+        const r = sel.getRangeAt(0);
+        if (r) {
+            const rect = r.getClientRects().item(0);
+            const editorRect = editor.element.getBoundingClientRect();
+            if (rect && editorRect) {
+                toolbar.style.left = `${rect.left - editorRect.left - 5}px`;
+                toolbar.style.top = `${rect.top - editorRect.top - toolbar.offsetHeight - 5}px`;
+                updateToolbarState(editor);
+            }
+        }
+    }
+}
+
+function updateToolbarState(editor) {
+    if (toolbar.classList.contains('hidden')) {
+        return;
+    }
+
+    const token = editor.tokenForPos(editor.getSelection()[0]);
+    for (const btn of toolbar.querySelectorAll('.toolbar-btn')) {
+        const format = Number(btn.dataset.format || '0');
+        if (format) {
+            btn.classList.toggle('selected', token.format & format);
+        }
+
+        if (btn.classList.contains('link')) {
+            btn.classList.toggle('selected', (token.type === 'link' && !token.auto) || (token.format & 128));
+        }
+    }
+}
+
+function hideToolbar() {
+    toolbar.classList.add('hidden');
+}
+
+function showToolbar(editor) {
+    toolbar.classList.remove('hidden');
+    if (toolbar.parentElement !== editor.element.parentElement) {
+        editor.element.parentElement.appendChild(toolbar);
+    }
+}
+
+window.editor = editor;
+window.mdEditor = mdEditor;
+</script>
+</body>
+</html>
