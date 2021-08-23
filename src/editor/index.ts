@@ -2,7 +2,7 @@ import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '
 import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, isElement, setDOMRange, setRange } from './range';
+import { getTextRange, isElement, rangeToLocation, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
@@ -86,6 +86,7 @@ export default class Editor {
     private focused = false;
     private expectEnter = false;
     private inputState: InputState | null = null;
+    private pendingRenderId: number;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -119,8 +120,8 @@ export default class Editor {
         this.handleInput(evt.data);
     }
 
-    private onBeforeInput = () => {
-        if (!this.inputState?.composing) {
+    private onBeforeInput = (evt: SafariInputEvent) => {
+        if (!this.inputState?.composing && !this.handleInputFromEvent(evt)) {
             this.handleBeforeInput();
         }
     }
@@ -134,9 +135,11 @@ export default class Editor {
     }
 
     private onSelectionChange = () => {
-        const range = getTextRange(this.element);
-        if (range) {
-            this.saveSelection(range);
+        if (!this.pendingRenderId) {
+            const range = getTextRange(this.element);
+            if (range) {
+                this.saveSelection(range);
+            }
         }
     }
 
@@ -882,6 +885,49 @@ export default class Editor {
         }
         this.inputState = null;
     }
+
+    /**
+     * Обработка ввода из указанного события. Вернёт `true` если событие удалось обработать
+     */
+    private handleInputFromEvent(evt: SafariInputEvent): boolean {
+        if (!evt.getTargetRanges) {
+            return false;
+        }
+
+        const range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
+        const text = getInputEventText(evt);
+        const tokens = this.model;
+        // console.log('apply update', {
+        //     origin: getText(tokens),
+        //     data: text,
+        //     targetRange: range,
+        //     currentRange: getTextRange(this.element),
+        //     action: evt.inputType
+        // });
+
+        if (evt.inputType.startsWith('insert')) {
+            this._model = replaceText(tokens, range[0], range[1] - range[0], text, this.options.parse);
+        } else if (evt.inputType.startsWith('delete')) {
+            this._model = removeText(tokens, range[0], range[1] - range[0], this.options.parse);
+        } else {
+            console.log('unknown action type', evt.inputType);
+            return false;
+        }
+
+        this.scheduleRender();
+        return true;
+    }
+
+    private scheduleRender() {
+        if (!this.pendingRenderId) {
+            this.pendingRenderId = requestAnimationFrame(() => {
+                this.pendingRenderId = 0;
+                const range = getTextRange(this.element);
+                this.render();
+                this.setSelection(range[0], range[1]);
+            });
+        }
+    }
 }
 
 /**
@@ -976,7 +1022,7 @@ function getScrollTarget(r: Range): Element | undefined {
 }
 
 function getInputEventText(evt: SafariInputEvent): string {
-    if (evt.inputType === 'insertParagraph') {
+    if (evt.inputType === 'insertParagraph' || evt.inputType === 'insertLineBreak') {
         return '\n';
     }
 

@@ -193,8 +193,14 @@ function getNodeLength(node: Node, deep = false): number {
         return node.nodeValue.length;
     }
 
-    if (isElement(node) && node.hasAttribute('data-raw')) {
-        return (node.getAttribute('data-raw') || '').length;
+    if (isElement(node)) {
+        if (node.nodeName === 'BR') {
+            return 1; /* длина `\n` */
+        }
+
+        if (node.hasAttribute('data-raw')) {
+            return (node.getAttribute('data-raw') || '').length;
+        }
     }
 
     let result = 0;
