@@ -213,8 +213,15 @@ export default class Editor {
         }
     }
 
-    private onFocus = () => this.focused = true;
-    private onBlur = () => this.focused = false;
+    private onFocus = () => {
+        this.focused = true;
+        document.addEventListener('selectionchange', this.onSelectionChange);
+    }
+
+    private onBlur = () => {
+        this.focused = false;
+        document.removeEventListener('selectionchange', this.onSelectionChange);
+    }
 
     get model(): Model {
         return this._model;
@@ -243,6 +250,7 @@ export default class Editor {
         const { element } = this;
 
         element.contentEditable = 'true';
+        element.translate = false;
 
         element.addEventListener('keydown', this.onKeyDown);
         element.addEventListener('compositionstart', this.onCompositionStart);
@@ -255,7 +263,6 @@ export default class Editor {
         element.addEventListener('click', this.onClick);
         element.addEventListener('focus', this.onFocus);
         element.addEventListener('blur', this.onBlur);
-        document.addEventListener('selectionchange', this.onSelectionChange);
 
         const { shortcuts } = this.options;
 
@@ -568,7 +575,7 @@ export default class Editor {
      */
     setSelection(from: number, to = from): void {
         const maxIx = getLength(this.model);
-        [from ,to] = this.normalizeRange([from, to]);
+        [from, to] = this.normalizeRange([from, to]);
         this.saveSelection([from, to]);
 
         if (from === maxIx && to === maxIx) {
@@ -582,6 +589,17 @@ export default class Editor {
             //    поведению других браузеров
             // Поэтому для многострочного ввода, если в конце есть перевод строки,
             // мы будем выставлять диапазон перед фиктивным `<br>`
+
+            const curRange = getTextRange(this.element);
+            if (from === curRange[0] && to === curRange[1]) {
+                // NB несмотря на то, что в методе setDOMRange()
+                // есть проверка на необходимость менять диапазон, в данном случае
+                // она не сработает, поэтому сделаем проверку по текстовому
+                // диапазону. В противном случае на маках с тачбаром будет неприятный
+                // артефакт в виде постоянного мерцания тачбара
+                return;
+            }
+
             const { lastChild } = this.element;
             if (lastChild && lastChild.nodeName === 'BR') {
                 const offset = this.element.childNodes.length - 1;
