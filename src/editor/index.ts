@@ -87,6 +87,7 @@ export default class Editor {
     private expectEnter = false;
     private inputState: InputState | null = null;
     private pendingRenderId: number;
+    private asyncRender = false;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -233,8 +234,12 @@ export default class Editor {
     set model(value: Model) {
         if (this._model !== value) {
             this._model = value;
-            this.render();
             this.emit('editor-update');
+            if (this.asyncRender) {
+                this.scheduleRender();
+            } else {
+                this.render();
+            }
         }
     }
 
@@ -312,7 +317,9 @@ export default class Editor {
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
-        this.setSelection(pos + text.length);
+        if (!this.asyncRender) {
+            this.setSelection(pos + text.length);
+        }
         return result;
     }
 
@@ -328,7 +335,9 @@ export default class Editor {
             DiffActionType.Remove,
             [from, to]);
 
-        this.setSelection(from);
+        if (!this.asyncRender) {
+            this.setSelection(from);
+        }
         return result;
     }
 
@@ -337,7 +346,9 @@ export default class Editor {
      */
     replaceText(from: number, to: number, text: string): Model {
         const result = this.paste(text, from, to);
-        this.setSelection(from + text.length);
+        if (!this.asyncRender) {
+            this.setSelection(from + text.length);
+        }
         return result;
     }
 
@@ -713,8 +724,7 @@ export default class Editor {
      * в записи в истории
      */
     private updateModel(value: Model, action?: string | false, range?: TextRange): Model {
-        const prev = this.model;
-        if (value !== prev) {
+        if (value !== this.model) {
             if (typeof action === 'string') {
                 this.history.push(value, action, range);
             }
@@ -905,7 +915,7 @@ export default class Editor {
 
         const range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
         const text = getInputEventText(evt);
-        const tokens = this.model;
+        // const tokens = this.model;
         // console.log('apply update', {
         //     origin: getText(tokens),
         //     tokens,
@@ -916,9 +926,11 @@ export default class Editor {
         // });
 
         if (evt.inputType.startsWith('insert')) {
-            this._model = replaceText(tokens, range[0], range[1] - range[0], text, this.options.parse);
+            this.asyncRender = true;
+            this.insertOrReplaceText(range, text);
         } else if (evt.inputType.startsWith('delete')) {
-            this._model = removeText(tokens, range[0], range[1] - range[0], this.options.parse);
+            this.asyncRender = true;
+            this.removeText(range[0], range[1]);
         } else {
             console.warn('unknown action type', evt.inputType);
             return false;
@@ -932,6 +944,7 @@ export default class Editor {
         if (!this.pendingRenderId) {
             this.pendingRenderId = requestAnimationFrame(() => {
                 this.pendingRenderId = 0;
+                this.asyncRender = false;
                 const range = getTextRange(this.element);
                 this.render();
                 this.setSelection(range[0], range[1]);
