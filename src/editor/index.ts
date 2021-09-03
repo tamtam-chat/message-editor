@@ -580,42 +580,6 @@ export default class Editor {
     setSelection(from: number, to = from): void {
         [from, to] = this.normalizeRange([from, to]);
         this.saveSelection([from, to]);
-
-        // const maxIx = getLength(this.model);
-        // if (from === maxIx && to === maxIx) {
-        //     // Ставим позицию в самый конец поля ввода.
-        //     // Если в тексте есть несколько строк, браузеры будут немного тупить:
-        //     // 1. Если `\n` есть в конце ввода, браузеры его не отобразят, поэтому
-        //     //    внутри функции `render()` мы принудительно добавляем `<br>`
-        //     //    в конце (см. fixNewLine)
-        //     // 2. В случае с Firefox не получится правильно спозиционировать каретку,
-        //     //    ему зачем-то нужна позиция перед `\n`, что не соответствует
-        //     //    поведению других браузеров
-        //     // Поэтому для многострочного ввода, если в конце есть перевод строки,
-        //     // мы будем выставлять диапазон перед фиктивным `<br>`
-
-        //     const curRange = getTextRange(this.element);
-        //     if (from === curRange[0] && to === curRange[1]) {
-        //         // NB несмотря на то, что в методе setDOMRange()
-        //         // есть проверка на необходимость менять диапазон, в данном случае
-        //         // она не сработает, поэтому сделаем проверку по текстовому
-        //         // диапазону. В противном случае на маках с тачбаром будет неприятный
-        //         // артефакт в виде постоянного мерцания тачбара
-        //         return;
-        //     }
-
-        //     const { lastChild } = this.element;
-        //     if (lastChild && lastChild.nodeName === 'BR') {
-        //         const offset = this.element.childNodes.length - 1;
-        //         const range = document.createRange();
-        //         range.setStart(this.element, offset);
-        //         range.setEnd(this.element, offset);
-        //         setDOMRange(range);
-        //         return;
-        //     }
-        // }
-
-        console.log('set range', { from, to });
         setRange(this.element, from, to);
     }
 
@@ -857,7 +821,6 @@ export default class Editor {
     private handleInput(insert?: string) {
         const { inputState } = this;
         if (!inputState) {
-            console.log('no input state');
             return;
         }
 
@@ -866,8 +829,6 @@ export default class Editor {
         const removeFrom = insertFrom;
         let insertTo = range[1];
         let removeTo = inputState.range[1];
-
-        console.log('handle input', { insert, range });
 
         if (!insert) {
             const text = this.getInputText();
@@ -911,7 +872,6 @@ export default class Editor {
         if (evt.inputType.startsWith('format')) {
             // Применяем форматирование: скорее всего это Safari с тачбаром
             const [from, to] = getTextRange(this.element);
-            console.log('apply format', evt.inputType, evt.data, from, to);
             switch (evt.inputType) {
                 case 'formatBold':
                     this.toggleFormat(TokenFormat.Bold, from, to);
@@ -942,26 +902,24 @@ export default class Editor {
             return false;
         }
 
-        console.log('handle input', evt);
-
         const range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
         const text = getInputEventText(evt);
         const tokens = this.model;
-        console.log('apply update', {
-            origin: getText(tokens),
-            tokens,
-            data: text,
-            targetRange: range,
-            currentRange: getTextRange(this.element),
-            action: evt.inputType
-        });
+        // console.log('apply update', {
+        //     origin: getText(tokens),
+        //     tokens,
+        //     data: text,
+        //     targetRange: range,
+        //     currentRange: getTextRange(this.element),
+        //     action: evt.inputType
+        // });
 
         if (evt.inputType.startsWith('insert')) {
             this._model = replaceText(tokens, range[0], range[1] - range[0], text, this.options.parse);
         } else if (evt.inputType.startsWith('delete')) {
             this._model = removeText(tokens, range[0], range[1] - range[0], this.options.parse);
         } else {
-            console.log('unknown action type', evt.inputType);
+            console.warn('unknown action type', evt.inputType);
             return false;
         }
 
@@ -974,8 +932,6 @@ export default class Editor {
             this.pendingRenderId = requestAnimationFrame(() => {
                 this.pendingRenderId = 0;
                 const range = getTextRange(this.element);
-                console.log('schedule render', range);
-
                 this.render();
                 this.setSelection(range[0], range[1]);
             });
