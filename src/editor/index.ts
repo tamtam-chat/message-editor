@@ -69,6 +69,13 @@ const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
+const skipInputTypes = new Set<string>([
+    'insertOrderedList',
+    'insertUnorderedList',
+    'deleteOrderedList',
+    'deleteUnorderedList'
+]);
+
 export default class Editor {
     public shortcuts: Shortcuts<Editor>;
     public history: History<Model>;
@@ -896,9 +903,46 @@ export default class Editor {
      * Обработка ввода из указанного события. Вернёт `true` если событие удалось обработать
      */
     private handleInputFromEvent(evt: InputEvent): boolean {
+        if (skipInputTypes.has(evt.inputType)) {
+            evt.preventDefault();
+            return true;
+        }
+
+        if (evt.inputType.startsWith('format')) {
+            // Применяем форматирование: скорее всего это Safari с тачбаром
+            const [from, to] = getTextRange(this.element);
+            console.log('apply format', evt.inputType, evt.data, from, to);
+            switch (evt.inputType) {
+                case 'formatBold':
+                    this.toggleFormat(TokenFormat.Bold, from, to);
+                    break;
+                case 'formatItalic':
+                    this.toggleFormat(TokenFormat.Italic, from, to);
+                    break;
+                case 'formatUnderline':
+                    this.toggleFormat(TokenFormat.Underline, from, to);
+                    break;
+                case 'formatStrikeThrough':
+                    this.toggleFormat(TokenFormat.Strike, from, to);
+                    break;
+                case 'formatFontColor':
+                    const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
+                        ? { remove: TokenFormat.Marked}
+                        : { add: TokenFormat.Marked }
+
+                    this.updateFormat(update, from, to);
+                    break;
+            }
+
+            evt.preventDefault();
+            return true;
+        }
+
         if (!evt.getTargetRanges) {
             return false;
         }
+
+        console.log('handle input', evt);
 
         const range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
         const text = getInputEventText(evt);
