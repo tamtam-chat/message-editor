@@ -321,7 +321,14 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
             // ссылку на этот текст
             if (start.offset === startToken.value.length) {
                 let len = start.offset;
-                if (startToken.sticky) {
+
+                // Пограничный случай: ссылка, внутри которой есть форматирование
+                // и мы пишем в конец форматирования
+                // <a>foo <b>bar</b>| baz</a>
+                const nextSibling = tokens[start.index + 1];
+                if (nextSibling?.type === TokenType.Link && nextSibling.link === startToken.link) {
+                    len += value.length;
+                } else if (startToken.sticky) {
                     // Включено sticky-форматирование: значит, мы дописываем ссылку.
                     // Разрешаем сделать это до первого символа-раделителя
                     const m = value.match(/[\s.,!?:;]/);

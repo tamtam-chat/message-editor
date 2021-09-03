@@ -465,6 +465,15 @@ describe('Formatted String', () => {
         deepEqual(values(tokens), ['a', 'foo']);
     });
 
+    it('insert text inside link at format bound', () => {
+        let tokens = setLink(parse('foo bar baz'), 'ok.ru', 0, 11);
+        tokens = setFormat(tokens, TokenFormat.Bold, 4, 3);
+
+        tokens = insertText(tokens, 7, 'a', { link: true });
+        deepEqual(types(tokens), [TokenType.Link, TokenType.Link, TokenType.Link]);
+        deepEqual(values(tokens), ['foo ', 'bara', ' baz']);
+    });
+
     describe('Solid tokens', () => {
         it('link', () => {
             const source = parse('http://ok.ru mail.ru ', { link: true });
