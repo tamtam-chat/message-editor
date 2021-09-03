@@ -237,15 +237,17 @@ function getNodeLength(node: Node, deep = false): number {
 }
 
 function getLineBlockLength(elem: Element): number {
-    // NB у блока строки может не быть атрибута data-raw, если его только
-    // что отрисовал браузер
-    const len = getRawValue(elem).length;
-    if (len > 0) {
-        return len;
+    // У первой строки не может быть своего символа перевода. В некоторых случаях
+    // Firefox при редактировании может перенести содержимое первой строки во вторую,
+    // тем самым оставив там data-raw атрибут. Поэтому принудительно проверяем,
+    // чтобы у первой строки не было перевода
+    if (elem.previousSibling) {
+        // NB у блока строки может не быть атрибута data-raw, если его только
+        // что отрисовал браузер
+        return getRawValue(elem).length || 1;
     }
 
-    // У первой строки не может быть своего символа перевода
-    return elem.previousSibling ? 1 : 0;
+    return 0;
 }
 
 /**

@@ -19,6 +19,13 @@ export function getRawValue(node: Node): string {
     }
 
     if (isElement(node)) {
+        // NB: Firefox может вставлять <br> в середину строки. Например, на Shift+Enter.
+        // Но нам надо убедиться, что это именно середина строки, а не заглушка
+        // в пустой строке
+        if (node.nodeName === 'BR' && (node.previousSibling || node.nextSibling)) {
+            return '\n';
+        }
+
         return node.getAttribute('data-raw') || '';
     }
 

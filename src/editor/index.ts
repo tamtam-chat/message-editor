@@ -655,15 +655,15 @@ export default class Editor {
     getInputText(): string {
         let result = '';
         let node: Node;
-        let raw: string | undefined;
 
         for (let i = 0; i < this.element.childNodes.length; i++) {
             const line = this.element.childNodes[i] as HTMLElement;
-            raw = getRawValue(line);
-            if (raw) {
-                result += raw;
-            } else if (i > 0) {
-                result += '\n';
+
+            // Учитываем случай с Firefox, который при обновлении DOM
+            // может перенести содержимое первой строки во вторую, в которой есть
+            // data-raw
+            if (i > 0) {
+                result += getRawValue(line) || '\n';
             }
 
             const walker = createWalker(line);
@@ -886,6 +886,7 @@ export default class Editor {
                     this.toggleFormat(TokenFormat.Strike, from, to);
                     break;
                 case 'formatFontColor':
+                    // eslint-disable-next-line no-case-declarations
                     const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
                         ? { remove: TokenFormat.Marked}
                         : { add: TokenFormat.Marked }

@@ -85,6 +85,10 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
         state.trim();
     };
 
+    // На случай непредвиденных модификаций дерева убедимся, что у первой строки
+    // всегда отсутствует атрибут data-raw
+    state.container.removeAttribute('data-raw');
+
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         if (!token.value) {
@@ -110,7 +114,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
             while (i <= groupEnd) {
                 const innerToken = tokens[i];
                 if (innerToken.format === baseFormat) {
-                    renderText2(innerToken, innerState);
+                    renderText(innerToken, innerState);
                 } else {
                     const innerElem = innerState.elem('span');
                     innerElem.className = formatClassNames(innerToken.format);
@@ -121,7 +125,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
             i = groupEnd;
             innerState.trim();
         } else if (isPlainText(token)) {
-            renderText2(token, state);
+            renderText(token, state);
         } else {
             const elem = renderTokenContainer(token, state);
 
@@ -137,7 +141,7 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
 
 function renderTextToken(target: HTMLElement, token: Token, state: ReconcileState): void {
     state.prepare(target);
-    renderText2(token, state);
+    renderText(token, state);
     state.trim();
 }
 
@@ -145,7 +149,7 @@ function renderTextToken(target: HTMLElement, token: Token, state: ReconcileStat
  * Отрисовка текстового содержимого в указанном контейнере с учётом наличия эмоджи
  * внутри токена
  */
-function renderText2(token: Token, state: ReconcileState): void {
+function renderText(token: Token, state: ReconcileState): void {
     let { emoji } = token;
     const { value } = token;
     const { options } = state;
