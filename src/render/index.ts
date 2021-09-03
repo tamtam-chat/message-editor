@@ -1,5 +1,5 @@
 import { isAutoLink, isCustomLink } from '../formatted-string/utils';
-import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji, TokenCommand } from '../parser';
+import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji, TokenCommand, TokenText } from '../parser';
 
 declare global {
     interface Element {
@@ -71,54 +71,73 @@ const defaultOptions: RenderOptions = {
 }
 
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
-    const options: RenderOptions = opt ? { ...defaultOptions, ...opt }: defaultOptions;
-    const state = new ReconcileState(elem, options);
-    // let prevToken: Token | undefined;
+    const options: RenderOptions = opt ? { ...defaultOptions, ...opt } : defaultOptions;
+    const lineState = new ReconcileState(elem, options);
+    const line = () => lineState.elem('div');
+    const state = new ReconcileState(line(), options);
+    const innerState = new ReconcileState(elem, options);
+    const innerState2 = new ReconcileState(elem, options);
+    const finalizeLine = () => {
+        if (state.pos === 0) {
+            // Пустая строка, оставляем <br>, чтобы строка отобразилась
+            state.elem('br');
+        }
+        state.trim();
+    };
 
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         if (!token.value) {
+            // Скорее всего sticky-токен, пропускаем
             continue;
         }
 
-        const elem = renderTokenContainer(token, state);
+        if (token.type === TokenType.Newline) {
+            // Переход на новую строку
+            finalizeLine();
+            state.prepare(line());
+            state.container.setAttribute('data-raw', token.value);
+            continue;
+        }
+
         const groupEnd = nextInGroup(tokens, i);
         if (groupEnd !== i) {
             // Можем схлопнуть несколько токенов в один
-            elem.className = getTokenTypeClass(token);
-            const innerState = new ReconcileState(elem, options);
+            const elem = renderTokenContainer(token, state);
+            innerState.prepare(elem);
+            const baseFormat = token.format;
 
             while (i <= groupEnd) {
-                const innerElem = innerState.elem('span');
-                innerElem.className = formatClassNames(tokens[i].format);
-                renderText(tokens[i], innerElem, options);
+                const innerToken = tokens[i];
+                if (innerToken.format === baseFormat) {
+                    renderText2(innerToken, innerState);
+                } else {
+                    const innerElem = innerState.elem('span');
+                    innerElem.className = formatClassNames(innerToken.format);
+                    renderTextToken(innerElem, innerToken, innerState2);
+                }
                 i++;
             }
             i = groupEnd;
             innerState.trim();
+        } else if (isPlainText(token)) {
+            renderText2(token, state);
         } else {
-            elem.className = joinClassNames([
-                getTokenTypeClass(token),
-                formatClassNames(token.format)
-            ]);
+            const elem = renderTokenContainer(token, state);
 
-            if (token.type !== TokenType.UserSticker && (token.type !== TokenType.Newline || options.nowrap)) {
-                renderText(token, elem, options);
+            if (token.type !== TokenType.UserSticker) {
+                renderTextToken(elem, token, innerState);
             }
         }
-
-        // prevToken = token;
     }
 
-    // NB: Проверяем именно `prevToken`, который мы обработали.
-    // Если брать последний, это может быть sticky-токен, который надо пропустить
-    // if (options.fixTrailingLine && prevToken && prevToken.value.slice(-1) === '\n') {
-    //     state.elem('br');
-    // }
-    if (options.fixTrailingLine && tokens.length) {
-        state.elem('br');
-    }
+    finalizeLine();
+    lineState.trim();
+}
 
+function renderTextToken(target: HTMLElement, token: Token, state: ReconcileState): void {
+    state.prepare(target);
+    renderText2(token, state);
     state.trim();
 }
 
@@ -126,18 +145,16 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
  * Отрисовка текстового содержимого в указанном контейнере с учётом наличия эмоджи
  * внутри токена
  */
-function renderText(token: Token, elem: HTMLElement, options: RenderOptions): void {
-    let { emoji, value } = token;
-
-    if (options.nowrap) {
-        value = value
-            .replace(/\r\n/g, '\n')
-            .replace(/[\s\n]/g, '\u00a0')
-    }
+function renderText2(token: Token, state: ReconcileState): void {
+    let { emoji } = token;
+    const { value } = token;
+    const { options } = state;
 
     if (emoji && options.emoji) {
+        // Есть эмоджи, нужно назбить текстовый узел на фрагменты и заменить эмоджи
+        // на элементы
+
         let offset = 0;
-        const state = new ReconcileState(elem, options);
 
         if (!options.replaceTextEmoji || (token.format & TokenFormat.Monospace)) {
             // Для monospace не заменяем текстовые эмоджи, также не заменяем их,
@@ -165,7 +182,7 @@ function renderText(token: Token, elem: HTMLElement, options: RenderOptions): vo
 
         state.trim();
     } else {
-        setTextValue(elem, value);
+        state.text(value);
     }
 }
 
@@ -200,43 +217,6 @@ function joinClassNames(classNames: string[]): string {
     return result;
 }
 
-function setTextValue(node: Node, text: string): void {
-    if (isElement(node)) {
-        // В элементе могут быть в том числе картинки с эмоджи, которые не отобразятся
-        // в node.textContent. Поэтому сделаем проверку: если есть потомок и
-        // он только один, то меняем `textContent`, иначе очищаем узел
-        let ptr = node.firstChild;
-        let next: ChildNode;
-        let updated = false;
-
-        // Чтобы меньше моргала подсветка спеллчекера, попробуем
-        // найти ближайший текстовый узел и обновить его, попутно удаляя все
-        // промежуточные узлы
-        while (ptr) {
-            if (ptr.nodeType === Node.TEXT_NODE) {
-                setTextValue(ptr, text);
-                updated = true;
-
-                // Удаляем оставшиеся узлы
-                while (ptr.nextSibling) {
-                    ptr.nextSibling.remove();
-                }
-                break;
-            } else {
-                next = ptr.nextSibling;
-                ptr.remove();
-                ptr = next;
-            }
-        }
-
-        if (!updated) {
-            node.textContent = text;
-        }
-    } else if (node.textContent !== text) {
-        node.textContent = text;
-    }
-}
-
 /**
  * Добавляет указанный узел `node` в позицию `pos` потомков `elem`
  */
@@ -264,7 +244,7 @@ function remove(node: ChildNode, emoji?: EmojiRender): void {
 class ReconcileState {
     /** Указатель на текущую позицию потомка внутри `container` */
     public pos = 0;
-    constructor(public container: HTMLElement, public options: RenderOptions) {}
+    constructor(public container: HTMLElement, public options: RenderOptions) { }
 
     /**
      * Ожидает текстовый узел в позиции `pos`. Если его нет, то автоматически создаст
@@ -332,6 +312,11 @@ class ReconcileState {
             remove(this.container.childNodes[this.pos], emoji);
         }
     }
+
+    prepare(container: HTMLElement) {
+        this.container = container;
+        this.pos = 0;
+    }
 }
 
 function isElement(node?: Node): node is HTMLElement {
@@ -341,20 +326,16 @@ function isElement(node?: Node): node is HTMLElement {
 /**
  * Возвращает позицию элемента, до которого можно сделать единую с элементом
  * в позиции `pos` группу. Используется, например, для того, чтобы сгруппировать
- * в единый `<a>`-элемент ссылку с внутренним форматированием
+ * в единый `<a>` элемент ссылку с внутренним форматированием
  */
 function nextInGroup(tokens: Token[], pos: number): number {
     const cur = tokens[pos];
-    let nextPos = pos;
 
-    while (nextPos < tokens.length - 1) {
-        if (!canGroup(cur, tokens[nextPos + 1])) {
-            break;
-        }
-        nextPos++;
+    while (pos < tokens.length - 1 && canGroup(cur, tokens[pos + 1])) {
+        pos++;
     }
 
-    return nextPos;
+    return pos;
 }
 
 /**
@@ -389,12 +370,14 @@ function renderTokenContainer(token: Token, state: ReconcileState): HTMLElement 
         elem.addEventListener('mouseleave', onLinkLeave);
     } else if (token.type === TokenType.UserSticker && state.options.emoji) {
         elem = state.emoji(token.value, token.value) as HTMLElement;
-    } else if (token.type === TokenType.Newline) {
-        elem = state.elem(state.options.nowrap ? 'span' : 'br');
-        elem.setAttribute('data-raw', token.value);
     } else {
         elem = state.elem('span');
     }
+
+    elem.className = joinClassNames([
+        getTokenTypeClass(token),
+        formatClassNames(token.format)
+    ]);
 
     return elem;
 }
@@ -482,6 +465,10 @@ function isPrefixedToken(token: Token): token is TokenMention | TokenCommand | T
     return token.type === TokenType.Mention
         || token.type === TokenType.Command
         || token.type === TokenType.HashTag;
+}
+
+function isPlainText(token: Token): token is TokenText {
+    return token.type === TokenType.Text && token.format === TokenFormat.None;
 }
 
 function onLinkEnter(evt: MouseEvent) {

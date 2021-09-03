@@ -2,7 +2,7 @@ import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '
 import render, { dispatch, isEmoji, EmojiRender } from '../render';
 import { TextRange } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, isElement, rangeToLocation, setDOMRange, setRange } from './range';
+import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
 import {
     insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
@@ -10,11 +10,7 @@ import {
     TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
-
-interface SafariInputEvent extends InputEvent {
-    dataTransfer?: DataTransfer;
-    getTargetRanges?: () => [StaticRange];
-}
+import { createWalker, getRawValue, isElement, isText } from './utils';
 
 export interface EditorOptions {
     /** Значение по умолчанию для редактора */
@@ -73,9 +69,6 @@ const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
-const blockElements = new Set<string>(['DIV', 'P', 'BLOCKQUOTE']);
-// const blockElements = new Set<string>(['BR']);
-
 export default class Editor {
     public shortcuts: Shortcuts<Editor>;
     public history: History<Model>;
@@ -93,7 +86,7 @@ export default class Editor {
      */
     constructor(public element: HTMLElement, public options: EditorOptions = {}) {
         const value = options.value || '';
-        this.model = parse(value, options.parse);
+        this.model = parse(this.sanitizeText(value), options.parse);
         this.history = new History({
             compactActions: [DiffActionType.Insert, DiffActionType.Remove]
         });
@@ -120,7 +113,7 @@ export default class Editor {
         this.handleInput(evt.data);
     }
 
-    private onBeforeInput = (evt: SafariInputEvent) => {
+    private onBeforeInput = (evt: InputEvent) => {
         if (!this.inputState?.composing && !this.handleInputFromEvent(evt)) {
             this.handleBeforeInput();
         }
@@ -298,6 +291,7 @@ export default class Editor {
      * Вставляет текст в указанную позицию
      */
     insertText(pos: number, text: string): Model {
+        text = this.sanitizeText(text);
         let updated = this.isMarkdown
             ? mdInsertText(this.model, pos, text, this.options.parse)
             : insertText(this.model, pos, text, this.options.parse);
@@ -356,7 +350,7 @@ export default class Editor {
      * Вставка текста в указанную позицию
      */
     paste(text: string | Model, from: number, to: number): Model {
-        const value = typeof text === 'string' ? text : getText(text);
+        const value = this.sanitizeText(typeof text === 'string' ? text : getText(text));
         let next = this.isMarkdown
             ? mdReplaceText(this.model, from, to - from, value, this.options.parse)
             : replaceText(this.model, from, to - from, value, this.options.parse);
@@ -577,43 +571,44 @@ export default class Editor {
      * Указывает текущее выделение текста или позицию каретки
      */
     setSelection(from: number, to = from): void {
-        const maxIx = getLength(this.model);
         [from, to] = this.normalizeRange([from, to]);
         this.saveSelection([from, to]);
 
-        if (from === maxIx && to === maxIx) {
-            // Ставим позицию в самый конец поля ввода.
-            // Если в тексте есть несколько строк, браузеры будут немного тупить:
-            // 1. Если `\n` есть в конце ввода, браузеры его не отобразят, поэтому
-            //    внутри функции `render()` мы принудительно добавляем `<br>`
-            //    в конце (см. fixNewLine)
-            // 2. В случае с Firefox не получится правильно спозиционировать каретку,
-            //    ему зачем-то нужна позиция перед `\n`, что не соответствует
-            //    поведению других браузеров
-            // Поэтому для многострочного ввода, если в конце есть перевод строки,
-            // мы будем выставлять диапазон перед фиктивным `<br>`
+        // const maxIx = getLength(this.model);
+        // if (from === maxIx && to === maxIx) {
+        //     // Ставим позицию в самый конец поля ввода.
+        //     // Если в тексте есть несколько строк, браузеры будут немного тупить:
+        //     // 1. Если `\n` есть в конце ввода, браузеры его не отобразят, поэтому
+        //     //    внутри функции `render()` мы принудительно добавляем `<br>`
+        //     //    в конце (см. fixNewLine)
+        //     // 2. В случае с Firefox не получится правильно спозиционировать каретку,
+        //     //    ему зачем-то нужна позиция перед `\n`, что не соответствует
+        //     //    поведению других браузеров
+        //     // Поэтому для многострочного ввода, если в конце есть перевод строки,
+        //     // мы будем выставлять диапазон перед фиктивным `<br>`
 
-            const curRange = getTextRange(this.element);
-            if (from === curRange[0] && to === curRange[1]) {
-                // NB несмотря на то, что в методе setDOMRange()
-                // есть проверка на необходимость менять диапазон, в данном случае
-                // она не сработает, поэтому сделаем проверку по текстовому
-                // диапазону. В противном случае на маках с тачбаром будет неприятный
-                // артефакт в виде постоянного мерцания тачбара
-                return;
-            }
+        //     const curRange = getTextRange(this.element);
+        //     if (from === curRange[0] && to === curRange[1]) {
+        //         // NB несмотря на то, что в методе setDOMRange()
+        //         // есть проверка на необходимость менять диапазон, в данном случае
+        //         // она не сработает, поэтому сделаем проверку по текстовому
+        //         // диапазону. В противном случае на маках с тачбаром будет неприятный
+        //         // артефакт в виде постоянного мерцания тачбара
+        //         return;
+        //     }
 
-            const { lastChild } = this.element;
-            if (lastChild && lastChild.nodeName === 'BR') {
-                const offset = this.element.childNodes.length - 1;
-                const range = document.createRange();
-                range.setStart(this.element, offset);
-                range.setEnd(this.element, offset);
-                setDOMRange(range);
-                return;
-            }
-        }
+        //     const { lastChild } = this.element;
+        //     if (lastChild && lastChild.nodeName === 'BR') {
+        //         const offset = this.element.childNodes.length - 1;
+        //         const range = document.createRange();
+        //         range.setStart(this.element, offset);
+        //         range.setEnd(this.element, offset);
+        //         setDOMRange(range);
+        //         return;
+        //     }
+        // }
 
+        console.log('set range', { from, to });
         setRange(this.element, from, to);
     }
 
@@ -623,7 +618,7 @@ export default class Editor {
      */
     setValue(value: string | Model, selection?: TextRange): void {
         if (typeof value === 'string') {
-            value = parse(value, this.options.parse);
+            value = parse(this.sanitizeText(value), this.options.parse);
         }
 
         if (!selection) {
@@ -687,33 +682,23 @@ export default class Editor {
      * Возвращает строковое содержимое поля ввода
      */
     getInputText(): string {
-        const walker = this.element.ownerDocument.createTreeWalker(this.element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
         let result = '';
         let node: Node;
         let raw: string | undefined;
 
-        while (node = walker.nextNode()) {
-            if (node.nodeType === Node.TEXT_NODE) {
-                result += node.nodeValue;
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-                if (node.nodeName === 'BR') {
-                    result += '\n';
-                } else {
-                    raw = (node as Element).getAttribute('data-raw');
-                    if (raw) {
-                        result += raw;
-                    } else if (blockElements.has(node.nodeName) && result.length > 0 && result.slice(-1) !== '\n') {
-                        result += '\n';
-                    }
-                }
+        for (let i = 0; i < this.element.childNodes.length; i++) {
+            const line = this.element.childNodes[i] as HTMLElement;
+            raw = getRawValue(line);
+            if (raw) {
+                result += raw;
+            } else if (i > 0) {
+                result += '\n';
             }
-        }
 
-        if (result.slice(-1) === '\n') {
-            // С учётом костыля рендеринга переводов строк в конце:
-            // в методе `render()` добавляется ещё один для правильной отрисовки.
-            // Мы его тут удалим
-            result = result.slice(0, -1);
+            const walker = createWalker(line);
+            while (node = walker.nextNode()) {
+                result += getRawValue(node);
+            }
         }
 
         return result;
@@ -865,6 +850,7 @@ export default class Editor {
     private handleInput(insert?: string) {
         const { inputState } = this;
         if (!inputState) {
+            console.log('no input state');
             return;
         }
 
@@ -873,6 +859,8 @@ export default class Editor {
         const removeFrom = insertFrom;
         let insertTo = range[1];
         let removeTo = inputState.range[1];
+
+        console.log('handle input', { insert, range });
 
         if (!insert) {
             const text = this.getInputText();
@@ -907,7 +895,7 @@ export default class Editor {
     /**
      * Обработка ввода из указанного события. Вернёт `true` если событие удалось обработать
      */
-    private handleInputFromEvent(evt: SafariInputEvent): boolean {
+    private handleInputFromEvent(evt: InputEvent): boolean {
         if (!evt.getTargetRanges) {
             return false;
         }
@@ -915,13 +903,14 @@ export default class Editor {
         const range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
         const text = getInputEventText(evt);
         const tokens = this.model;
-        // console.log('apply update', {
-        //     origin: getText(tokens),
-        //     data: text,
-        //     targetRange: range,
-        //     currentRange: getTextRange(this.element),
-        //     action: evt.inputType
-        // });
+        console.log('apply update', {
+            origin: getText(tokens),
+            tokens,
+            data: text,
+            targetRange: range,
+            currentRange: getTextRange(this.element),
+            action: evt.inputType
+        });
 
         if (evt.inputType.startsWith('insert')) {
             this._model = replaceText(tokens, range[0], range[1] - range[0], text, this.options.parse);
@@ -941,10 +930,23 @@ export default class Editor {
             this.pendingRenderId = requestAnimationFrame(() => {
                 this.pendingRenderId = 0;
                 const range = getTextRange(this.element);
+                console.log('schedule render', range);
+
                 this.render();
                 this.setSelection(range[0], range[1]);
             });
         }
+    }
+
+    /**
+     * При необходимости удаляет из текста ненужные данные, исходя из текущих настроек
+     */
+    private sanitizeText(text: string): string {
+        if (this.options.nowrap) {
+            text = text.replace(/[\r\n]/g, ' ');
+        }
+
+        return text;
     }
 }
 
@@ -984,7 +986,7 @@ export function htmlToText(html: string): string {
     while (node) {
         if (node.nodeName === 'INPUT') {
             result += (node as HTMLInputElement).value;
-        } else if (node.nodeType === node.TEXT_NODE) {
+        } else if (isText(node)) {
             result += node.nodeValue;
         }
         node = walker.nextNode();
@@ -1039,7 +1041,7 @@ function getScrollTarget(r: Range): Element | undefined {
     }
 }
 
-function getInputEventText(evt: SafariInputEvent): string {
+function getInputEventText(evt: InputEvent): string {
     if (evt.inputType === 'insertParagraph' || evt.inputType === 'insertLineBreak') {
         return '\n';
     }

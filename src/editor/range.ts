@@ -1,4 +1,6 @@
-import { TextRange } from './types';
+import type { TextRange } from './types';
+import { createWalker, getRawValue, isElement, isText } from './utils';
+import { clamp } from '../formatted-string/utils';
 
 interface RangeBound {
     container: Node;
@@ -96,37 +98,40 @@ export function locationToRange(ctx: HTMLElement, from: number, to?: number): Ra
  * Возвращает позицию символа в тексте `ctx`, на который указывает граница
  * диапазона (DOM Range), определяемая параметрами `container` и `offset`
  */
-export function rangeBoundToLocation(root: HTMLElement, node: Node, offset: number): number {
+export function rangeBoundToLocation(root: HTMLElement, bound: Node, pos: number): number {
     let result = 0;
 
-    if (isText(node)) {
-        result = offset;
-    } else {
-        const nodeLen = getNodeLength(node, false);
-        if (nodeLen) {
-            // Сам узел является представлением какого-то токена.
-            // Если смещение больше 0, значит диапазон выставили внутри токена
-            // и его надо поглотить
-            if (offset > 0) {
-                result += nodeLen;
-            }
-        } else {
-            let i = 0;
-            while (i < offset) {
-                result += getNodeLength(node.childNodes[i++], true);
-            }
-            result += getNodeLength(node, false);
+    if (root === bound) {
+        // Пограничный случай: граница где-то между строками
+        pos = clamp(pos, 0, root.childNodes.length);
+        for (let i = 0; i < pos; i++) {
+            result += getLineLength(root.childNodes[i] as Element);
         }
-    }
+    } else {
+        for (let i = 0; i < root.childNodes.length; i++) {
+            const line = root.childNodes[i] as HTMLElement;
+            if (line.contains(bound)) {
+                // Граница находится внутри текущей строки: нужно получить только
+                // фрагмент строки
+                result += getLineBlockLength(line);
+                if (line === bound) {
+                    result += getFragmentLength(line, pos);
+                } else {
+                    const walker = createWalker(line);
+                    let n: Node;
+                    while ((n = walker.nextNode()) && n !== bound) {
+                        result += getNodeLength(n, false);
+                    }
 
-    if (root !== node) {
-        // Tree walker идёт по узлам в их порядке следования в DOM. Соответственно,
-        // как только мы дойдём до указанного контейнера, мы посчитаем весь предыдущий
-        // контент
-        const walker = createWalker(root);
-        let n: Node;
-        while ((n = walker.nextNode()) && n !== node) {
-            result += getNodeLength(n);
+                    result += isText(bound)
+                        ? pos
+                        : getFragmentLength(bound, pos)
+                }
+
+                break;
+            }
+
+            result += getLineLength(line);
         }
     }
 
@@ -140,49 +145,73 @@ export function rangeBoundToLocation(root: HTMLElement, node: Node, offset: numb
  * для узла модели
  */
 export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound {
-    const walker = createWalker(root);
-    let len: number
-    let container: Node;
-
-    while (container = walker.nextNode()) {
-        len = getNodeLength(container, false);
-
-        if (len === 0) {
-            continue;
+    for (let i = 0; i < root.childNodes.length; i++) {
+        const line = root.childNodes[i] as HTMLElement;
+        pos -= getLineBlockLength(line);
+        if (pos <= 0) {
+            // Попали в начало строки
+            return {
+                container: line,
+                offset: 0
+            };
         }
 
-        if (pos <= len) {
-            if (isText(container)) {
-                return { container, offset: pos };
+        // Обходим содержимое строки
+        const walker = createWalker(line);
+        let len: number
+        let container: Node;
+
+        while (container = walker.nextNode()) {
+            len = getNodeLength(container, false);
+
+            if (len === 0) {
+                continue;
             }
 
-            // Если попали в элемент (например, эмоджи), делаем адресацию относительно
-            // его родителя.
-            // Учитываем захват элемента в зависимости того, попадает ли позиция
-            // внутрь токена (pos > 0) или нет
-            let offset = pos === 0 ? 0 : 1;
-            let node = container;
-            while (node = node.previousSibling) {
-                offset++;
+            if (pos <= len) {
+                if (isText(container)) {
+                    return { container, offset: pos };
+                }
+
+                if (pos === 0) {
+                    return { container, offset: 0 };
+                }
+
+                // Если попали в элемент (например, эмоджи), делаем адресацию относительно
+                // его родителя.
+                // Учитываем захват элемента в зависимости того, попадает ли позиция
+                // внутрь токена (pos > 0) или нет
+                let offset = pos === 0 ? 0 : 1;
+                let node = container;
+                while (node = node.previousSibling) {
+                    offset++;
+                }
+
+                return { container: container.parentNode, offset };
             }
 
-            return { container: container.parentNode, offset };
+            pos -= len;
         }
-
-        pos -= len;
     }
 
     return {
         container: root,
-        offset: 0
+        offset: root.childNodes.length
     };
 }
 
-/**
- * Проверяет, является ли указанный диапазон допустимым, с которым можно работать
- */
-function isValidRange(range: Range, container: HTMLElement): boolean {
-    return container.contains(range.commonAncestorContainer);
+function getFragmentLength(parent: Node, pos: number): number {
+    let result = 0;
+    pos = clamp(pos, 0, parent.childNodes.length);
+    for (let i = 0; i < pos; i++) {
+        result += getNodeLength(parent.childNodes[i], true);
+    }
+
+    return result;
+}
+
+function getLineLength(line: Element): number {
+    return getLineBlockLength(line) + getFragmentLength(line, line.childNodes.length);
 }
 
 /**
@@ -193,34 +222,35 @@ function getNodeLength(node: Node, deep = false): number {
         return node.nodeValue.length;
     }
 
-    if (isElement(node)) {
-        if (node.nodeName === 'BR') {
-            return 1; /* длина `\n` */
-        }
-
-        if (node.hasAttribute('data-raw')) {
-            return (node.getAttribute('data-raw') || '').length;
-        }
-    }
-
     let result = 0;
-    if (deep) {
-        for (let i = 0; i < node.childNodes.length; i++) {
-            result += getNodeLength(node.childNodes[i], true);
+    if (isElement(node)) {
+        result = getRawValue(node).length;
+
+        if (deep) {
+            for (let i = 0; i < node.childNodes.length; i++) {
+                result += getNodeLength(node.childNodes[i], true);
+            }
         }
     }
 
     return result;
 }
 
-export function isText(node: Node): node is Text {
-    return node.nodeType === Node.TEXT_NODE;
+function getLineBlockLength(elem: Element): number {
+    // NB у блока строки может не быть атрибута data-raw, если его только
+    // что отрисовал браузер
+    const len = getRawValue(elem).length;
+    if (len > 0) {
+        return len;
+    }
+
+    // У первой строки не может быть своего символа перевода
+    return elem.previousSibling ? 1 : 0;
 }
 
-export function isElement(node: Node): node is Element {
-    return node.nodeType === Node.ELEMENT_NODE;
-}
-
-function createWalker(elem: HTMLElement): TreeWalker {
-    return elem.ownerDocument.createTreeWalker(elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT)
+/**
+ * Проверяет, является ли указанный диапазон допустимым, с которым можно работать
+ */
+function isValidRange(range: Range, container: HTMLElement): boolean {
+    return container.contains(range.commonAncestorContainer);
 }
