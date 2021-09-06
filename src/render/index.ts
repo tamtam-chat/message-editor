@@ -38,7 +38,13 @@ export interface RenderOptions {
 
     /** Заменяем все пробелы и переводы строк на неразрывный пробел */
     nowrap?: boolean;
+
+    /** Отрисовать содержимое в контексте инлайн-блока
+     * (без переводов строк и блочных элементов) */
+    inline?: boolean;
 }
+
+type ReconcileStateStack = [elem: HTMLElement, pos: number];
 
 const formats: ClassFormat[] = [
     [TokenFormat.Bold, 'bold'],
@@ -72,11 +78,15 @@ const defaultOptions: RenderOptions = {
 
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
     const options: RenderOptions = opt ? { ...defaultOptions, ...opt } : defaultOptions;
+
+    if (options.inline) {
+        renderInline(elem, tokens, options);
+        return;
+    }
+
     const lineState = new ReconcileState(elem, options);
     const line = () => lineState.elem('div');
     const state = new ReconcileState(line(), options);
-    const innerState = new ReconcileState(elem, options);
-    const innerState2 = new ReconcileState(elem, options);
     const finalizeLine = () => {
         if (state.pos === 0) {
             // Пустая строка, оставляем <br>, чтобы строка отобразилась
@@ -91,47 +101,14 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
 
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
-        if (!token.value) {
-            // Скорее всего sticky-токен, пропускаем
-            continue;
-        }
 
         if (token.type === TokenType.Newline) {
             // Переход на новую строку
             finalizeLine();
             state.prepare(line());
             state.container.setAttribute('data-raw', token.value);
-            continue;
-        }
-
-        const groupEnd = nextInGroup(tokens, i);
-        if (groupEnd !== i) {
-            // Можем схлопнуть несколько токенов в один
-            const elem = renderTokenContainer(token, state);
-            innerState.prepare(elem);
-            const baseFormat = token.format;
-
-            while (i <= groupEnd) {
-                const innerToken = tokens[i];
-                if (innerToken.format === baseFormat) {
-                    renderText(innerToken, innerState);
-                } else {
-                    const innerElem = innerState.elem('span');
-                    innerElem.className = formatClassNames(innerToken.format);
-                    renderTextToken(innerElem, innerToken, innerState2);
-                }
-                i++;
-            }
-            i = groupEnd;
-            innerState.trim();
-        } else if (isPlainText(token)) {
-            renderText(token, state);
         } else {
-            const elem = renderTokenContainer(token, state);
-
-            if (token.type !== TokenType.UserSticker) {
-                renderTextToken(elem, token, innerState);
-            }
+            i = renderTokens(tokens, i, state);
         }
     }
 
@@ -139,10 +116,62 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
     lineState.trim();
 }
 
-function renderTextToken(target: HTMLElement, token: Token, state: ReconcileState): void {
-    state.prepare(target);
-    renderText(token, state);
+function renderInline(elem: HTMLElement, tokens: Token[], options: RenderOptions) {
+    const state = new ReconcileState(elem, options);
+    for (let i = 0; i < tokens.length; i++) {
+        i = renderTokens(tokens, i, state);
+    }
     state.trim();
+}
+
+function renderTokens(tokens: Token[], i: number, state: ReconcileState): number {
+    const token = tokens[i];
+    if (!token.value) {
+        // Скорее всего sticky-токен, пропускаем
+        return i;
+    }
+
+    const groupEnd = nextInGroup(tokens, i);
+    if (groupEnd !== i) {
+        // Можем схлопнуть несколько токенов в один
+        const baseFormat = token.format;
+        state.enter(renderTokenContainer(token, state));
+
+        while (i <= groupEnd) {
+            const innerToken = tokens[i];
+            if (innerToken.format === baseFormat) {
+                renderText(innerToken, state);
+            } else {
+                const innerElem = state.elem('span');
+                innerElem.className = formatClassNames(innerToken.format);
+                renderTextToken(innerElem, innerToken, state);
+            }
+            i++;
+        }
+
+        state.exit();
+        return groupEnd;
+    }
+
+    if (token.type === TokenType.Newline) {
+        state.text(token.value);
+    } else if (isPlainText(token)) {
+        renderText(token, state);
+    } else {
+        const elem = renderTokenContainer(token, state);
+
+        if (token.type !== TokenType.UserSticker) {
+            renderTextToken(elem, token, state);
+        }
+    }
+
+    return i;
+}
+
+function renderTextToken(target: HTMLElement, token: Token, state: ReconcileState): void {
+    state.enter(target);
+    renderText(token, state);
+    state.exit();
 }
 
 /**
@@ -248,6 +277,7 @@ function remove(node: ChildNode, emoji?: EmojiRender): void {
 class ReconcileState {
     /** Указатель на текущую позицию потомка внутри `container` */
     public pos = 0;
+    private stack: ReconcileStateStack[] = [];
     constructor(public container: HTMLElement, public options: RenderOptions) { }
 
     /**
@@ -304,6 +334,28 @@ class ReconcileState {
             return next;
         } else if (isCurEmoji) {
             remove(node, emoji);
+        }
+    }
+
+    save(): void {
+        this.stack.push([this.container, this.pos]);
+    }
+
+    enter(elem: HTMLElement): void {
+        this.save();
+        this.prepare(elem);
+    }
+
+    exit(): void {
+        this.trim();
+        this.restore();
+    }
+
+    restore(): void {
+        const entry = this.stack.pop();
+        if (entry) {
+            this.container = entry[0];
+            this.pos = entry[1];
         }
     }
 

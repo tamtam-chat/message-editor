@@ -957,7 +957,7 @@ export default class Editor {
      */
     private sanitizeText(text: string): string {
         if (this.options.nowrap) {
-            text = text.replace(/[\r\n]/g, ' ');
+            text = text.replace(/\r\n|\r|\n/g, ' ');
         }
 
         return text;
