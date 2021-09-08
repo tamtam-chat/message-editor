@@ -956,8 +956,10 @@ export default class Editor {
      * При необходимости удаляет из текста ненужные данные, исходя из текущих настроек
      */
     private sanitizeText(text: string): string {
+        text = text.replace(/\r\n?/g, '\n');
+
         if (this.options.nowrap) {
-            text = text.replace(/\r\n|\r|\n/g, ' ');
+            text = text.replace(/\n/g, ' ');
         }
 
         return text;
