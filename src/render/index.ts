@@ -118,9 +118,11 @@ export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial
 
 function renderInline(elem: HTMLElement, tokens: Token[], options: RenderOptions) {
     const state = new ReconcileState(elem, options);
+    state.enter(state.elem('span'));
     for (let i = 0; i < tokens.length; i++) {
         i = renderTokens(tokens, i, state);
     }
+    state.exit();
     state.trim();
 }
 
