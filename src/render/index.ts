@@ -182,8 +182,16 @@ function renderTextToken(target: HTMLElement, token: Token, state: ReconcileStat
  */
 function renderText(token: Token, state: ReconcileState): void {
     let { emoji } = token;
-    const { value } = token;
+    let { value } = token;
     const { options } = state;
+
+    if (options.nowrap) {
+        // Для однострочных полей всегда заменяем пробельные символы на
+        // на nbsp
+        value = value
+            .replace(/\r\n?/g, '\n')
+            .replace(/[\s\n]/g, '\u00a0');
+    }
 
     if (emoji && options.emoji) {
         // Есть эмоджи, нужно назбить текстовый узел на фрагменты и заменить эмоджи
