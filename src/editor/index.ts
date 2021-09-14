@@ -831,6 +831,11 @@ export default class Editor {
     private handleInput(insert?: string) {
         const { inputState } = this;
         if (!inputState) {
+            // Обработка пограниченого случая в Safari: при пустой строке нажали на Backspace.
+            // В этом случае не отработает событие `beforeinput` и мы не получим
+            // `inputState`. Из-за этого удалится блок со строкой и неправильно
+            // восстановится позиция курсора.
+            this.scheduleRender();
             return;
         }
 
