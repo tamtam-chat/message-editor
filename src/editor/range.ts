@@ -107,33 +107,44 @@ export function rangeBoundToLocation(root: HTMLElement, bound: Node, pos: number
         for (let i = 0; i < pos; i++) {
             result += getLineLength(root.childNodes[i] as Element);
         }
-    } else {
+    } else if (isValidLineMarkup(root)) {
         for (let i = 0; i < root.childNodes.length; i++) {
             const line = root.childNodes[i] as HTMLElement;
             if (line.contains(bound)) {
                 // Граница находится внутри текущей строки: нужно получить только
                 // фрагмент строки
                 result += getLineBlockLength(line);
-                if (line === bound) {
-                    result += getFragmentLength(line, pos);
-                } else {
-                    const walker = createWalker(line);
-                    let n: Node;
-                    while ((n = walker.nextNode()) && n !== bound) {
-                        result += getNodeLength(n, false);
-                    }
-
-                    result += isText(bound)
-                        ? pos
-                        : getFragmentLength(bound, pos)
-                }
+                result += line === bound
+                    ? getFragmentLength(line, pos)
+                    : sumNodesLength(line, bound, pos);
 
                 break;
             }
 
             result += getLineLength(line);
         }
+    } else {
+        // На случай, если попалась незнакомая структура, например, при использовании
+        // Punto Switcher начинаем писать текст при пустом значении инпута (важно!).
+        // В этом случае мы не доберёмся до рендеринга, а браузер сделает свою
+        // разметку, которая не соответствует ожидаемой
+        result += sumNodesLength(root, bound, pos);
     }
+
+    return result;
+}
+
+function sumNodesLength(root: HTMLElement, bound: Node, pos: number): number {
+    let result = 0;
+    const walker = createWalker(root);
+    let n: Node;
+    while ((n = walker.nextNode()) && n !== bound) {
+        result += getNodeLength(n, false);
+    }
+
+    result += isText(bound)
+        ? pos
+        : getFragmentLength(bound, pos);
 
     return result;
 }
@@ -255,4 +266,13 @@ function getLineBlockLength(elem: Element): number {
  */
 function isValidRange(range: Range, container: HTMLElement): boolean {
     return container.contains(range.commonAncestorContainer);
+}
+
+function isValidLineMarkup(container: HTMLElement): boolean {
+    const node = container.firstChild;
+    if (node && isElement(node)) {
+        return node.nodeName === 'DIV' || node.nodeName === 'P';
+    }
+
+    return false;
 }
