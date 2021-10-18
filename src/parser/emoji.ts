@@ -28,7 +28,7 @@ const emojiLow = new Set([0x203c, 0x2049, 0x2122, 0x2139, 0x2328, 0x23cf, 0x24c2
  */
 export default function parseEmoji(state: ParserState): boolean {
     const { pos } = state;
-    if (consumeEmoji(state)) {
+    if (!state.options.skipEmoji && consumeEmoji(state)) {
         state.pushEmoji(pos, state.pos);
         return true;
     }

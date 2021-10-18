@@ -22,6 +22,9 @@ export interface ParserOptions {
 
     /** Возможность делать sticky-ссылки при заменен текста ссылки */
     stickyLink?: boolean;
+
+    /** Нужно ли отключить парсинг эмоджи в тексте */
+    skipEmoji?: boolean;
 }
 
 export const enum TokenType {
