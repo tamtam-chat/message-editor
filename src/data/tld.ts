@@ -709,6 +709,7 @@ const tld = new Set([
     'tax',
     'tc',
     'td',
+    'team',
     'tech',
     'technology',
     'tel',
