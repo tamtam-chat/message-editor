@@ -244,7 +244,7 @@ function address(state: ParserState, prefix: FragmentMatch, start: number): bool
         consumeHash(state);
 
         const value = state.substring(start);
-        state.push(linkToken(value, !/^[a-z0-9+-.]+:/i.test(value) ? `http://${value}` : value));
+        state.push(linkToken(value, !/^[a-z0-9+-]+:/i.test(value) ? `http://${value}` : value));
         return true;
     }
 

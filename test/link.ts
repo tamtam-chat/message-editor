@@ -26,7 +26,7 @@ function testLink(link: string, isEmail = false) {
             let linkValue = link;
             if (/^\/\//.test(linkValue)) {
                 linkValue = `http:${linkValue}`;
-            } else if (!/^[a-z0-9+-.]+:/i.test(linkValue)) {
+            } else if (!/^[a-z0-9+-]+:/i.test(linkValue)) {
                 linkValue = `http://${linkValue}`;
             }
 
