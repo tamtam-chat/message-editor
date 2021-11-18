@@ -621,6 +621,15 @@ export default class Editor {
     }
 
     /**
+     * То же самое, что `setValue`, но без отправки событий об изменении контента
+     */
+    replaceValue(value: string | Model, selection?: TextRange): void {
+        this._inited = false;
+        this.setValue(value, selection);
+        this._inited = true;
+    }
+
+    /**
      * Возвращает текущее текстовое значение модели редактора
      */
     getText(tokens = this.model): string {
