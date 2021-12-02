@@ -20,7 +20,7 @@ export default class ParserState {
     /** Текстовая строка, которую нужно парсить */
     public string: string;
 
-    /** Текущий аккумулированный MD-формат  */
+    /** Текущий аккумулированный формат  */
     public format: TokenFormat = 0;
 
     /** Список распаршенных токенов */
@@ -177,7 +177,7 @@ export default class ParserState {
     }
 
     /**
-     * Добавляет указанный тип форматирования из состояния
+     * Удаляет указанный тип форматирования из состояния
      */
     removeFormat(format: TokenFormat): void {
         this.format ^= this.format & format;
@@ -209,7 +209,7 @@ export default class ParserState {
             // TODO использовать функцию-фабрику для сохранения шэйпа
             const token: TokenText = {
                 type: TokenType.Text,
-                format: TokenFormat.None,
+                format: this.options.useFormat ? this.format : TokenFormat.None,
                 value: this.substring(this.textStart, this.textEnd),
                 sticky: false,
             };

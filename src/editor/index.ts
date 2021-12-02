@@ -10,7 +10,9 @@ import {
     TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
-import { createWalker, getRawValue, isElement, isText } from './utils';
+import { createWalker, getRawValue, isElement } from './utils';
+import parseHTML from '../parser/html';
+import toHTML from '../render/html';
 
 export interface EditorOptions {
     /** Значение по умолчанию для редактора */
@@ -167,21 +169,15 @@ export default class Editor {
      */
     private onPaste = (evt: ClipboardEvent) => {
         const range = getTextRange(this.element);
-        let fragment: string | Token[] = evt.clipboardData.getData(fragmentMIME);
+        const parsed = getFormattedString(evt.clipboardData);
+        let fragment: string | Token[];
 
-        if (fragment) {
-            fragment = JSON.parse(fragment) as Token[];
+        if (parsed) {
+            fragment = parsed;
         } else if (evt.clipboardData.types.includes('Files')) {
             // TODO обработать вставку файлов
         } else {
             fragment = evt.clipboardData.getData('text/plain');
-
-            if (!fragment) {
-                const html = evt.clipboardData.getData('text/html');
-                if (html) {
-                    fragment = htmlToText(html);
-                }
-            }
         }
 
         if (fragment && range) {
@@ -756,6 +752,8 @@ export default class Editor {
                 : this.slice(range[0], range[1]);
 
             clipboard.setData('text/plain', getText(fragment));
+            clipboard.setData('text/html', toHTML(fragment));
+
             if (!this.isMarkdown) {
                 clipboard.setData(fragmentMIME, JSON.stringify(fragment));
             }
@@ -996,36 +994,6 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Парсинг HTML-содержимого буффера обмена в обычный текст.
- * Используется для некоторых редких кейсов в Safari.
- * Например, есть сайт https://emojifinder.com, в котором результаты поиска
- * по эмоджи выводится как набор `<input>` элементов.
- * Если копировать такой результат, то Chrome правильно сделает plain-text представление
- * результата, а Safari — нет. В итоге в Safari мы получим пустой текст, а вставленный
- * HTML неправильно обработается и уронит вкладку. В этом методе мы попробуем
- * достать текст из такого HTML-представления
- */
-export function htmlToText(html: string): string {
-    const elem = document.createElement('template');
-    elem.innerHTML = html;
-
-    const walker = document.createTreeWalker(elem.content || elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
-    let node = walker.currentNode;
-    let result = '';
-
-    while (node) {
-        if (node.nodeName === 'INPUT') {
-            result += (node as HTMLInputElement).value;
-        } else if (isText(node)) {
-            result += node.nodeValue;
-        }
-        node = walker.nextNode();
-    }
-
-    return result;
-}
-
-/**
  * Вспомогательная функция, которая при необходимости подкручивает вьюпорт
  * к текущему переводу строки
  */
@@ -1087,4 +1055,19 @@ function getInputEventText(evt: InputEvent): string {
     }
 
     return '';
+}
+
+function getFormattedString(data: DataTransfer): Token[] | undefined {
+    const internalData = data.getData(fragmentMIME);
+
+    if (internalData) {
+        return typeof internalData === 'string'
+            ? JSON.parse(internalData) as Token[]
+            : internalData
+    }
+
+    const html = data.getData('text/html');
+    if (html) {
+        return parseHTML(html);
+    }
 }

@@ -9,18 +9,7 @@ import hashtag from './hashtag';
 import link from './link';
 import markdown from './markdown';
 import newline from './newline';
-import { normalize } from './utils';
-
-const defaultOptions: ParserOptions = {
-    markdown: false,
-    textEmoji: false,
-    hashtag: false,
-    mention: false,
-    command: false,
-    userSticker: false,
-    link: false,
-    stickyLink: false
-};
+import { normalize, defaultOptions } from './utils';
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
     const options: ParserOptions = { ...defaultOptions, ...opt };

@@ -25,6 +25,13 @@ export interface ParserOptions {
 
     /** Нужно ли отключить парсинг эмоджи в тексте */
     skipEmoji?: boolean;
+
+    /**
+     * Использовать текущий формат парсера при добавлении текстового токена
+     * XXX: опция странная, но нужна для html-парсера и md-парсера. Постараться
+     * избавиться от неё
+     */
+    useFormat?: boolean;
 }
 
 export const enum TokenType {

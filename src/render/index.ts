@@ -394,7 +394,7 @@ function isElement(node?: Node): node is HTMLElement {
  * в позиции `pos` группу. Используется, например, для того, чтобы сгруппировать
  * в единый `<a>` элемент ссылку с внутренним форматированием
  */
-function nextInGroup(tokens: Token[], pos: number): number {
+export function nextInGroup(tokens: Token[], pos: number): number {
     const cur = tokens[pos];
 
     while (pos < tokens.length - 1 && canGroup(cur, tokens[pos + 1])) {
@@ -513,7 +513,7 @@ function getTokenTypeClass(token: Token): string {
  * Если указанный токен является ссылкой, вернёт `true`, если его можно нарисовать
  * как ссылку
  */
-function isRenderLink(token: Token): boolean {
+export function isRenderLink(token: Token): boolean {
     if ((token.format & TokenFormat.Monospace)) {
         // Внутри моноширинного текста разрешаем только «ручные» ссылки либо
         // полные автоссылки (начинаются с протокола)
@@ -533,7 +533,7 @@ function isPrefixedToken(token: Token): token is TokenMention | TokenCommand | T
         || token.type === TokenType.HashTag;
 }
 
-function isPlainText(token: Token): token is TokenText {
+export function isPlainText(token: Token): token is TokenText {
     return token.type === TokenType.Text && token.format === TokenFormat.None;
 }
 

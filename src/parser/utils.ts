@@ -1,4 +1,5 @@
-import { Emoji, Token, TokenFormat, TokenLink, TokenType } from './types';
+import { TokenFormat, TokenType } from './types';
+import type { ParserOptions, Emoji, Token, TokenLink } from './types';
 import ParserState from './state';
 
 export const enum Codes {
@@ -41,6 +42,10 @@ export const enum Codes {
     CurlyBracketOpen = 123,
     /** } */
     CurlyBracketClose = 125,
+    /** `<` */
+    LeftAngle = 60,
+    /** `>` */
+    RightAngle = 62,
     /** - */
     Hyphen = 45,
     /** &ndash; */
@@ -99,6 +104,17 @@ const punctuation = new Set<number>([
 const delimiterPunctuation = new Set<number>([
     Codes.Exclamation, Codes.Comma, Codes.Dot, Codes.SemiColon, Codes.Question
 ]);
+
+export const defaultOptions: ParserOptions = {
+    markdown: false,
+    textEmoji: false,
+    hashtag: false,
+    mention: false,
+    command: false,
+    userSticker: false,
+    link: false,
+    stickyLink: false
+};
 
 export function isPunctuation(ch: number): boolean {
     return boundPunctuation.has(ch) || punctuation.has(ch);

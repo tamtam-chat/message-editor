@@ -63,7 +63,7 @@ export default function split(rawTokens: Token[], chunkSize: number): Token[][] 
 /**
  * Удаляет пробелы в начале и в конце строки
  */
-function trim(tokens: Token[]): { text: string, tokens: Token[] } {
+export function trim(tokens: Token[]): { text: string, tokens: Token[] } {
     let text = getText(tokens);
     const m1 = text.match(/^\s+/);
     if (m1) {
