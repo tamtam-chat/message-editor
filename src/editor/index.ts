@@ -61,8 +61,7 @@ export default class Editor {
     private _inited = false;
     private caret: TextRange = [0, 0];
     private focused = false;
-    private pendingRenderId: number;
-    private asyncRender = false;
+    private expectEnter = false;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -84,9 +83,11 @@ export default class Editor {
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
         }
+        this.waitExpectedEnter(evt);
     }
 
     private onCompositionStart = () => {
+        this.expectEnter = false;
         this.composition = this.model;
     }
 
@@ -118,6 +119,7 @@ export default class Editor {
     }
 
     private onInput = (evt: InputEvent) => {
+        this.expectEnter = false;
         const nextModel = updateFromInputEvent(this.composition || this.model, this.startRange, evt, this.options);
         if (this.composition) {
             // Находимся в режиме композиции: накапливаем изменения
@@ -135,11 +137,9 @@ export default class Editor {
     }
 
     private onSelectionChange = () => {
-        if (!this.pendingRenderId) {
-            const range = getTextRange(this.element);
-            if (range) {
-                this.saveSelection(range);
-            }
+        const range = getTextRange(this.element);
+        if (range) {
+            this.saveSelection(range);
         }
     }
 
@@ -228,11 +228,7 @@ export default class Editor {
         if (this._model !== value) {
             this._model = value;
             this.emit('editor-update');
-            if (this.asyncRender) {
-                this.scheduleRender();
-            } else {
-                this.render();
-            }
+            this.render();
         }
     }
 
@@ -745,16 +741,23 @@ export default class Editor {
         return [clamp(from, 0, maxIx), clamp(to, 0, maxIx)];
     }
 
-    private scheduleRender() {
-        if (!this.pendingRenderId) {
-            this.pendingRenderId = requestAnimationFrame(() => {
-                this.pendingRenderId = 0;
-                this.asyncRender = false;
-                const range = getTextRange(this.element);
-                this.render();
-                this.setSelection(range[0], range[1]);
+    private waitExpectedEnter(evt: KeyboardEvent): void {
+        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter') {
+            this.expectEnter = true;
+            requestAnimationFrame(() => {
+                if (this.expectEnter) {
+                    this.expectEnter = false;
+                    this.insertOrReplaceText(getTextRange(this.element), '\n');
+                    retainNewlineInViewport(this.element);
+                }
             });
         }
+    }
+
+    private insertOrReplaceText(range: TextRange, text: string): Model {
+        return isCollapsed(range)
+            ? this.insertText(range[0], text)
+            : this.replaceText(range[0], range[1], text);
     }
 
     /**
