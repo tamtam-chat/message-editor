@@ -116,6 +116,14 @@ export default class Editor {
         if (!this.startRange) {
             this.startRange = getTextRange(this.element);
         }
+
+        if (evt.inputType === 'insertLineBreak' && evt.data == null) {
+            // В Chrome если сразу после написания текста нажать Shift+Enter,
+            // в событии 'beforeinput' будет тип 'insertLineBreak', а в 'input'
+            // будет 'insertText' и пустое значение. Обработаем эту ситуацию, чтобы
+            // запустился waitExpectedEnter
+            evt.preventDefault();
+        }
     }
 
     private onInput = (evt: InputEvent) => {

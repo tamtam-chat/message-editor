@@ -161,7 +161,10 @@ export function updateFromInputEvent(model: Model, range: TextRange, evt: InputE
     }
 
     if (evt.inputType.startsWith('insert')) {
-        return replaceText(model, getInputEventText(evt), from, to, options);
+        const text = getInputEventText(evt);
+        return text
+            ? replaceText(model, text, from, to, options)
+            : model;
     }
 
     if (evt.inputType.startsWith('delete')) {
