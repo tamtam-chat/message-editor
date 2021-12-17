@@ -1,6 +1,6 @@
 import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
 import render, { dispatch, isEmoji, EmojiRender } from '../render';
-import { TextRange } from './types';
+import type { BaseEditorOptions, TextRange } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
@@ -13,22 +13,12 @@ import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { createWalker, getRawValue, isElement } from './utils';
 import parseHTML from '../parser/html';
 import toHTML from '../render/html';
+import { updateFromInputEvent } from './update';
 
-export interface EditorOptions {
+export interface EditorOptions extends BaseEditorOptions {
     /** Значение по умолчанию для редактора */
     value?: string;
-    /** Параметры для парсера текста */
-    parse?: Partial<ParserOptions>;
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
-
-    /** Сбрасывать форматирование при вставке новой строки */
-    resetFormatOnNewline?: boolean;
-
-    /** Заменять все пробельные символы на неразрывные пробелы */
-    nowrap?: boolean;
-
-    /** Функция для отрисовки эмоджи */
-    emoji?: EmojiRender;
 }
 
 type Model = Token[];
@@ -111,25 +101,34 @@ export default class Editor {
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
         }
-        this.waitExpectedEnter(evt);
+        // this.waitExpectedEnter(evt);
     }
 
-    private onCompositionStart = () => {
+
+    private onCompositionStart = (evt: CompositionEvent) => {
+        console.log('composition start', evt);
         this.expectEnter = false;
         this.handleBeforeInput(true);
     }
 
     private onCompositionEnd = (evt: CompositionEvent) => {
-        this.handleInput(evt.data);
+        console.log('composition end', evt);
+        if (this.inputState?.composing) {
+            this.inputState.composing = false;
+        }
+        // this.handleInput(evt.data);
     }
 
     private onBeforeInput = (evt: InputEvent) => {
+        console.log('before input', evt);
         if (!this.inputState?.composing && !this.handleInputFromEvent(evt)) {
             this.handleBeforeInput();
         }
     }
 
     private onInput = (evt: InputEvent) => {
+        console.log('input', evt);
+
         this.expectEnter = false;
 
         if (!this.inputState?.composing) {
@@ -256,11 +255,105 @@ export default class Editor {
         element.contentEditable = 'true';
         element.translate = false;
 
+        // Чек-лист для проверки ввода
+        // * Пишем текст в позицию
+        // * Выделяем текст и начинаем писать новый
+        // * Удаление в пустой строке (Backspace)
+        // * Долго зажимаем зажимаем клавишу (е → ё)
+        // * Автозамена при написании текста (Safari)
+        // * Пишем текст в китайской раскладке
+        // * Автоподстановка слов (iOS, Android)
+        // * Punto Switcher
+        // * Изменение форматирования из тачбара на Маке
+
+        const debugState = () => {
+            const range = getTextRange(this.element);
+            if (range) {
+                const text = this.getInputText();
+                console.log('state', {
+                    text,
+                    range: range.join(','),
+                    rangeText: text.slice(range[0], range[1])
+                });
+            }
+        };
+
+        let composing: Model | null = null;
+        let startRange: TextRange | null = null;
+
+        element.addEventListener('compositionstart', evt => {
+            console.group('composition start');
+            composing = this.model;
+            debugState();
+            console.groupEnd();
+        });
+
+        element.addEventListener('compositionend', evt => {
+            console.group('composition end');
+            if (composing) {
+                const range = getTextRange(this.element);
+                this.updateModel(
+                    composing,
+                    DiffActionType.Compose,
+                    range
+                );
+                this.setSelection(range[0], range[1]);
+                console.log('apply pending updates');
+                composing = null;
+            }
+            debugState();
+            console.groupEnd();
+        });
+
+        element.addEventListener('beforeinput', evt => {
+            console.group('before input');
+            startRange = null;
+            if (evt.getTargetRanges) {
+                const ranges = evt.getTargetRanges();
+                console.log('ranges', ranges);
+                if (ranges.length) {
+                    startRange = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
+                }
+            }
+
+            if (!startRange) {
+                startRange = getTextRange(this.element);
+            }
+
+            console.log({ type: evt.inputType, data: evt.data, range: startRange.join(',') });
+            debugState();
+            console.groupEnd();
+        });
+
+        element.addEventListener('input', (evt: InputEvent) => {
+            console.group('input');
+            console.log({ type: evt.inputType, data: evt.data, startRange });
+            const nextModel = updateFromInputEvent(composing || this.model, startRange, evt, this.options);
+            if (composing) {
+                // Находимся в режиме композиции: накапливаем изменения
+                composing = nextModel;
+                console.log('update pending model');
+            } else {
+                // Обычное изменение, сразу применяем результат к UI
+                const range = getTextRange(this.element);
+                this.updateModel(
+                    nextModel,
+                    getDiffTypeFromEvent(evt),
+                    range
+                );
+                this.setSelection(range[0], range[1]);
+                console.log('apply model changes');
+            }
+
+            debugState();
+            console.groupEnd();
+        });
+
         element.addEventListener('keydown', this.onKeyDown);
-        element.addEventListener('compositionstart', this.onCompositionStart);
-        element.addEventListener('compositionend', this.onCompositionEnd);
-        element.addEventListener('beforeinput', this.onBeforeInput);
-        element.addEventListener('input', this.onInput);
+        // element.addEventListener('compositionstart', this.onCompositionStart);
+        // element.addEventListener('compositionend', this.onCompositionEnd);
+        // element.addEventListener('beforeinput', this.onBeforeInput);
+        // element.addEventListener('input', this.onInput);
         element.addEventListener('cut', this.onCut);
         element.addEventListener('copy', this.onCopy);
         element.addEventListener('paste', this.onPaste);
@@ -300,22 +393,12 @@ export default class Editor {
      */
     insertText(pos: number, text: string): Model {
         text = this.sanitizeText(text);
-        let updated = this.isMarkdown
-            ? mdInsertText(this.model, pos, text, this.options.parse)
-            : insertText(this.model, pos, text, this.options.parse);
-
-        if (this.options.resetFormatOnNewline && !this.isMarkdown && /^[\n\r]+$/.test(text)) {
-            updated = setFormat(updated, TokenFormat.None, pos, text.length);
-        }
-
         const result = this.updateModel(
-            updated,
+            this._insertText(this.model, pos, text),
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
-        if (!this.asyncRender) {
-            this.setSelection(pos + text.length);
-        }
+        this.setSelection(pos + text.length);
         return result;
     }
 
@@ -323,17 +406,12 @@ export default class Editor {
      * Удаляет указанный диапазон текста
      */
     removeText(from: number, to: number): Model {
-        const updated = this.isMarkdown
-            ? mdRemoveText(this.model, from, to - from, this.options.parse)
-            : removeText(this.model, from, to - from, this.options.parse);
         const result = this.updateModel(
-            updated,
+            this._removeText(this.model, from, to),
             DiffActionType.Remove,
             [from, to]);
 
-        if (!this.asyncRender) {
-            this.setSelection(from);
-        }
+        this.setSelection(from);
         return result;
     }
 
@@ -342,9 +420,7 @@ export default class Editor {
      */
     replaceText(from: number, to: number, text: string): Model {
         const result = this.paste(text, from, to);
-        if (!this.asyncRender) {
-            this.setSelection(from + text.length);
-        }
+        this.setSelection(from + text.length);
         return result;
     }
 
@@ -365,28 +441,8 @@ export default class Editor {
      */
     paste(text: string | Model, from: number, to: number): Model {
         const value = this.sanitizeText(typeof text === 'string' ? text : getText(text));
-        let next = this.isMarkdown
-            ? mdReplaceText(this.model, from, to - from, value, this.options.parse)
-            : replaceText(this.model, from, to - from, value, this.options.parse);
-
-        // Применяем форматирование из фрагмента
-        if (Array.isArray(text)) {
-            let offset = from;
-            text.forEach(token => {
-                const len = token.value.length;
-                if (token.format) {
-                    next = this.setFormat(next, { add: token.format }, [offset, len]);
-                }
-
-                if (isCustomLink(token)) {
-                    next = setLink(next, token.link, offset, len)
-                }
-
-                offset += len;
-            });
-        }
-
-        return this.updateModel(next, 'paste', [from, to]);
+        const nextModel = this._replaceText(this.model, value, from, to);
+        return this.updateModel(nextModel, 'paste', [from, to]);
     }
 
     /**
@@ -424,26 +480,16 @@ export default class Editor {
             to = from;
         }
 
-        let source: Token | undefined;
-        if (from !== to) {
-            const fragment = slice(this.model, from, to);
-            source = fragment[0];
-        } else {
-            const pos = tokenForPos(this.model, from, LocationType.Start);
-            if (pos.index !== -1) {
-                source = this.model[pos.index];
-            }
-        }
+        const model = this._toggleFormat(this.model, format, from, to);
+        const result = this.updateModel(
+            model,
+            'format',
+            [from, to]
+        );
 
-        if (source) {
-            const update: TokenFormatUpdate = source.format & format
-                ? { remove: format } : { add: format };
-            return this.updateFormat(update, from, to);
-        } else if (!this.model.length && format) {
-            return this.updateFormat({ add: format }, 0, 0);
-        }
-
-        return this.model;
+        setRange(this.element, from, to);
+        this.emit('editor-formatchange');
+        return result;
     }
 
     /**
@@ -707,6 +753,121 @@ export default class Editor {
         return this;
     }
 
+    private _insertText(model: Model, pos: number, text: string): Model {
+        let updated = this.isMarkdown
+            ? mdInsertText(model, pos, text, this.options.parse)
+            : insertText(model, pos, text, this.options.parse);
+
+        if (this.options.resetFormatOnNewline && !this.isMarkdown && /^[\n\r]+$/.test(text)) {
+            updated = setFormat(updated, TokenFormat.None, pos, text.length);
+        }
+
+        return updated;
+    }
+
+    private _removeText(model: Model, from: number, to: number): Model {
+        return this.isMarkdown
+            ? mdRemoveText(model, from, to - from, this.options.parse)
+            : removeText(model, from, to - from, this.options.parse);
+    }
+
+    private _replaceText(model: Model, text: Model | string, from: number, to: number): Model {
+        const value = typeof text === 'string' ? text : getText(text);
+        model = this.isMarkdown
+            ? mdReplaceText(model, from, to - from, value, this.options.parse)
+            : replaceText(model, from, to - from, value, this.options.parse);
+
+        // Применяем форматирование из фрагмента
+        if (Array.isArray(text)) {
+            model = this.applyFormatFromFragment(model, text, from);
+        }
+
+        return model;
+    }
+
+    private _toggleFormat(model: Model, format: TokenFormat, from: number, to: number): Model {
+        let source: Token | undefined;
+        if (from !== to) {
+            const fragment = slice(model, from, to);
+            source = fragment[0];
+        } else {
+            const pos = tokenForPos(model, from, LocationType.Start);
+            if (pos.index !== -1) {
+                source = model[pos.index];
+            }
+        }
+
+        if (source) {
+            const update: TokenFormatUpdate = source.format & format
+                ? { remove: format }
+                : { add: format };
+
+            return this.setFormat(model, update, [from, to - from]);
+        }
+
+        if (!model.length && format) {
+            return this.setFormat(model, { add: format }, [0, 0]);
+        }
+
+        return model;
+    }
+
+    private updateFromInputEvent(model: Model, range: TextRange, evt: InputEvent): Model {
+        if (skipInputTypes.has(evt.inputType)) {
+            evt.preventDefault();
+            return model;
+        }
+
+        if (evt.inputType.startsWith('format')) {
+            // Применяем форматирование: скорее всего это Safari с тачбаром
+            const [from, to] = getTextRange(this.element);
+            switch (evt.inputType) {
+                case 'formatBold':
+                    this.toggleFormat(TokenFormat.Bold, from, to);
+                    break;
+                case 'formatItalic':
+                    this.toggleFormat(TokenFormat.Italic, from, to);
+                    break;
+                case 'formatUnderline':
+                    this.toggleFormat(TokenFormat.Underline, from, to);
+                    break;
+                case 'formatStrikeThrough':
+                    this.toggleFormat(TokenFormat.Strike, from, to);
+                    break;
+                case 'formatFontColor':
+                    // eslint-disable-next-line no-case-declarations
+                    const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
+                        ? { remove: TokenFormat.Marked }
+                        : { add: TokenFormat.Marked }
+
+                    this.updateFormat(update, from, to);
+                    break;
+            }
+
+            evt.preventDefault();
+            return model;
+        }
+    }
+
+    private applyFormatFromFragment(model: Model, fragment: Model, offset = 0): Model {
+        fragment.forEach(token => {
+            const len = token.value.length;
+            if (token.format) {
+                model = this.setFormat(model, { add: token.format }, [offset, len]);
+            }
+
+            if (isCustomLink(token)) {
+                model = setLink(model, token.link, offset, len)
+            }
+
+            offset += len;
+        });
+
+        return model;
+    }
+
+
+
     /**
      * Сохраняет указанный диапазон в текущей записи истории в качестве последнего
      * известного выделения
@@ -734,6 +895,7 @@ export default class Editor {
                 this.history.push(value, action, range);
             }
             this.model = value;
+            console.log('updated model', this.model);
         }
 
         return this.model;
@@ -827,9 +989,16 @@ export default class Editor {
     private handleBeforeInput(composing = false) {
         const range = getTextRange(this.element);
         if (range) {
+            const text = this.getInputText();
+            console.log('before input', {
+                text,
+                range,
+                rangeText: text.slice(range[0], range[1])
+            });
+
             this.inputState = {
                 range,
-                text: this.getInputText(),
+                text,
                 composing
             };
         }
@@ -1070,4 +1239,21 @@ function getFormattedString(data: DataTransfer): Token[] | undefined {
     if (html) {
         return parseHTML(html);
     }
+}
+
+function getDiffTypeFromEvent(evt: InputEvent): DiffActionType | string {
+    const { inputType } = evt;
+    if (inputType.startsWith('insert')) {
+        return DiffActionType.Insert;
+    }
+
+    if (inputType.startsWith('delete')) {
+        return DiffActionType.Remove;
+    }
+
+    if (inputType.startsWith('format')) {
+        return 'format';
+    }
+
+    return 'update';
 }

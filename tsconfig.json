@@ -8,6 +8,7 @@
     "outDir": "./out",
     "resolveJsonModule": true,
     "esModuleInterop": true,
+    "noImplicitThis": true,
     "sourceMap": true,
     "declaration": true
   },

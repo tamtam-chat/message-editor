@@ -3,7 +3,8 @@ import { codePointAt } from '../parser';
 export const enum DiffActionType {
     Insert = 'insert',
     Remove = 'remove',
-    Replace = 'replace'
+    Replace = 'replace',
+    Compose = 'compose'
 }
 
 export interface DiffActionBase {
