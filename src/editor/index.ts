@@ -1,19 +1,15 @@
-import parse, { getLength, ParserOptions, Token, TokenFormat, TokenType } from '../parser';
-import render, { dispatch, isEmoji, EmojiRender } from '../render';
-import type { BaseEditorOptions, TextRange } from './types';
+import parse, { getLength, Token, TokenFormat, TokenType } from '../parser';
+import render, { dispatch, isEmoji } from '../render';
+import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
-import {
-    insertText, removeText, replaceText, cutText, setFormat, setLink, slice,
-    mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
-    TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
-import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
+import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent } from './update';
+import { setLink, slice, mdToText, textToMd,TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { createWalker, getRawValue, isElement } from './utils';
 import parseHTML from '../parser/html';
 import toHTML from '../render/html';
-import { updateFromInputEvent } from './update';
 
 export interface EditorOptions extends BaseEditorOptions {
     /** Значение по умолчанию для редактора */
@@ -21,7 +17,6 @@ export interface EditorOptions extends BaseEditorOptions {
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
 }
 
-type Model = Token[];
 type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
 
 interface EditorEventDetails {
@@ -44,16 +39,6 @@ interface PickLinkOptions {
     range?: TextRange;
 }
 
-interface InputState {
-    /**
-     * Флаг, указывающий, что сейчас работает композиция.
-     * NB свойство evt.isComposing не поддерживается в Safari
-     */
-    composing: boolean;
-    range: TextRange;
-    text: string;
-}
-
 /** MIME-тип для хранения отформатированной строки в буффере */
 const fragmentMIME = 'tamtam/fragment';
 
@@ -61,23 +46,21 @@ const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
-const skipInputTypes = new Set<string>([
-    'insertOrderedList',
-    'insertUnorderedList',
-    'deleteOrderedList',
-    'deleteUnorderedList'
-]);
-
 export default class Editor {
     public shortcuts: Shortcuts<Editor>;
     public history: History<Model>;
 
     private _model: Model;
+    /**
+     * Модель, которая накапливает изменения в режиме композиции.
+     * Если есть это свойство, значит, мы сейчас находимся в режиме композиции
+     * */
+    private composition: Model | null = null;
+    /** Диапазон, который сейчас будет обновляться на событие ввода */
+    private startRange: TextRange | null = null;
     private _inited = false;
     private caret: TextRange = [0, 0];
     private focused = false;
-    private expectEnter = false;
-    private inputState: InputState | null = null;
     private pendingRenderId: number;
     private asyncRender = false;
 
@@ -101,38 +84,53 @@ export default class Editor {
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
         }
-        // this.waitExpectedEnter(evt);
     }
 
-
-    private onCompositionStart = (evt: CompositionEvent) => {
-        console.log('composition start', evt);
-        this.expectEnter = false;
-        this.handleBeforeInput(true);
+    private onCompositionStart = () => {
+        this.composition = this.model;
     }
 
-    private onCompositionEnd = (evt: CompositionEvent) => {
-        console.log('composition end', evt);
-        if (this.inputState?.composing) {
-            this.inputState.composing = false;
+    private onCompositionEnd = () => {
+        if (this.composition) {
+            const range = getTextRange(this.element);
+            this.updateModel(
+                this.composition,
+                DiffActionType.Compose,
+                range
+            );
+            this.setSelection(range[0], range[1]);
+            this.composition = null;
         }
-        // this.handleInput(evt.data);
     }
 
     private onBeforeInput = (evt: InputEvent) => {
-        console.log('before input', evt);
-        if (!this.inputState?.composing && !this.handleInputFromEvent(evt)) {
-            this.handleBeforeInput();
+        this.startRange = null;
+        if (evt.getTargetRanges) {
+            const ranges = evt.getTargetRanges();
+            if (ranges.length) {
+                this.startRange = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
+            }
+        }
+
+        if (!this.startRange) {
+            this.startRange = getTextRange(this.element);
         }
     }
 
     private onInput = (evt: InputEvent) => {
-        console.log('input', evt);
-
-        this.expectEnter = false;
-
-        if (!this.inputState?.composing) {
-            this.handleInput(getInputEventText(evt));
+        const nextModel = updateFromInputEvent(this.composition || this.model, this.startRange, evt, this.options);
+        if (this.composition) {
+            // Находимся в режиме композиции: накапливаем изменения
+            this.composition = nextModel;
+        } else {
+            // Обычное изменение, сразу применяем результат к UI
+            const range = getTextRange(this.element);
+            this.updateModel(
+                nextModel,
+                getDiffTypeFromEvent(evt),
+                range
+            );
+            this.setSelection(range[0], range[1]);
         }
     }
 
@@ -265,95 +263,11 @@ export default class Editor {
         // * Автоподстановка слов (iOS, Android)
         // * Punto Switcher
         // * Изменение форматирования из тачбара на Маке
-
-        const debugState = () => {
-            const range = getTextRange(this.element);
-            if (range) {
-                const text = this.getInputText();
-                console.log('state', {
-                    text,
-                    range: range.join(','),
-                    rangeText: text.slice(range[0], range[1])
-                });
-            }
-        };
-
-        let composing: Model | null = null;
-        let startRange: TextRange | null = null;
-
-        element.addEventListener('compositionstart', evt => {
-            console.group('composition start');
-            composing = this.model;
-            debugState();
-            console.groupEnd();
-        });
-
-        element.addEventListener('compositionend', evt => {
-            console.group('composition end');
-            if (composing) {
-                const range = getTextRange(this.element);
-                this.updateModel(
-                    composing,
-                    DiffActionType.Compose,
-                    range
-                );
-                this.setSelection(range[0], range[1]);
-                console.log('apply pending updates');
-                composing = null;
-            }
-            debugState();
-            console.groupEnd();
-        });
-
-        element.addEventListener('beforeinput', evt => {
-            console.group('before input');
-            startRange = null;
-            if (evt.getTargetRanges) {
-                const ranges = evt.getTargetRanges();
-                console.log('ranges', ranges);
-                if (ranges.length) {
-                    startRange = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
-                }
-            }
-
-            if (!startRange) {
-                startRange = getTextRange(this.element);
-            }
-
-            console.log({ type: evt.inputType, data: evt.data, range: startRange.join(',') });
-            debugState();
-            console.groupEnd();
-        });
-
-        element.addEventListener('input', (evt: InputEvent) => {
-            console.group('input');
-            console.log({ type: evt.inputType, data: evt.data, startRange });
-            const nextModel = updateFromInputEvent(composing || this.model, startRange, evt, this.options);
-            if (composing) {
-                // Находимся в режиме композиции: накапливаем изменения
-                composing = nextModel;
-                console.log('update pending model');
-            } else {
-                // Обычное изменение, сразу применяем результат к UI
-                const range = getTextRange(this.element);
-                this.updateModel(
-                    nextModel,
-                    getDiffTypeFromEvent(evt),
-                    range
-                );
-                this.setSelection(range[0], range[1]);
-                console.log('apply model changes');
-            }
-
-            debugState();
-            console.groupEnd();
-        });
-
         element.addEventListener('keydown', this.onKeyDown);
-        // element.addEventListener('compositionstart', this.onCompositionStart);
-        // element.addEventListener('compositionend', this.onCompositionEnd);
-        // element.addEventListener('beforeinput', this.onBeforeInput);
-        // element.addEventListener('input', this.onInput);
+        element.addEventListener('compositionstart', this.onCompositionStart);
+        element.addEventListener('compositionend', this.onCompositionEnd);
+        element.addEventListener('beforeinput', this.onBeforeInput);
+        element.addEventListener('input', this.onInput);
         element.addEventListener('cut', this.onCut);
         element.addEventListener('copy', this.onCopy);
         element.addEventListener('paste', this.onPaste);
@@ -394,7 +308,7 @@ export default class Editor {
     insertText(pos: number, text: string): Model {
         text = this.sanitizeText(text);
         const result = this.updateModel(
-            this._insertText(this.model, pos, text),
+            insertText(this.model, pos, text, this.options),
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
@@ -407,7 +321,7 @@ export default class Editor {
      */
     removeText(from: number, to: number): Model {
         const result = this.updateModel(
-            this._removeText(this.model, from, to),
+            removeText(this.model, from, to, this.options),
             DiffActionType.Remove,
             [from, to]);
 
@@ -429,9 +343,7 @@ export default class Editor {
      * @returns Вырезанный фрагмент модели
      */
     cut(from: number, to: number): Model {
-        const result = this.isMarkdown
-            ? mdCutText(this.model, from, to, this.options.parse)
-            : cutText(this.model, from, to, this.options.parse);
+        const result = cutText(this.model, from, to, this.options);
         this.updateModel(result.tokens, 'cut', [from, to]);
         return result.cut;
     }
@@ -440,8 +352,8 @@ export default class Editor {
      * Вставка текста в указанную позицию
      */
     paste(text: string | Model, from: number, to: number): Model {
-        const value = this.sanitizeText(typeof text === 'string' ? text : getText(text));
-        const nextModel = this._replaceText(this.model, value, from, to);
+        text = this.sanitizeText(text);
+        const nextModel = replaceText(this.model, text, from, to, this.options);
         return this.updateModel(nextModel, 'paste', [from, to]);
     }
 
@@ -457,13 +369,12 @@ export default class Editor {
      * Обновляет форматирование у указанного диапазона
      */
     updateFormat(format: TokenFormat | TokenFormatUpdate, from: number, to = from): Model {
-        const range: Rng = [from, to - from];
         const result = this.updateModel(
-            this.setFormat(this.model, format, range),
+            setFormat(this.model, format, from, to, this.options),
             'format',
             [from, to]
         );
-        setRange(this.element, range[0], range[0] + range[1]);
+        setRange(this.element, from, to);
         this.emit('editor-formatchange');
         return result;
     }
@@ -480,7 +391,7 @@ export default class Editor {
             to = from;
         }
 
-        const model = this._toggleFormat(this.model, format, from, to);
+        const model = toggleFormat(this.model, format, from, to, this.options);
         const result = this.updateModel(
             model,
             'format',
@@ -753,121 +664,6 @@ export default class Editor {
         return this;
     }
 
-    private _insertText(model: Model, pos: number, text: string): Model {
-        let updated = this.isMarkdown
-            ? mdInsertText(model, pos, text, this.options.parse)
-            : insertText(model, pos, text, this.options.parse);
-
-        if (this.options.resetFormatOnNewline && !this.isMarkdown && /^[\n\r]+$/.test(text)) {
-            updated = setFormat(updated, TokenFormat.None, pos, text.length);
-        }
-
-        return updated;
-    }
-
-    private _removeText(model: Model, from: number, to: number): Model {
-        return this.isMarkdown
-            ? mdRemoveText(model, from, to - from, this.options.parse)
-            : removeText(model, from, to - from, this.options.parse);
-    }
-
-    private _replaceText(model: Model, text: Model | string, from: number, to: number): Model {
-        const value = typeof text === 'string' ? text : getText(text);
-        model = this.isMarkdown
-            ? mdReplaceText(model, from, to - from, value, this.options.parse)
-            : replaceText(model, from, to - from, value, this.options.parse);
-
-        // Применяем форматирование из фрагмента
-        if (Array.isArray(text)) {
-            model = this.applyFormatFromFragment(model, text, from);
-        }
-
-        return model;
-    }
-
-    private _toggleFormat(model: Model, format: TokenFormat, from: number, to: number): Model {
-        let source: Token | undefined;
-        if (from !== to) {
-            const fragment = slice(model, from, to);
-            source = fragment[0];
-        } else {
-            const pos = tokenForPos(model, from, LocationType.Start);
-            if (pos.index !== -1) {
-                source = model[pos.index];
-            }
-        }
-
-        if (source) {
-            const update: TokenFormatUpdate = source.format & format
-                ? { remove: format }
-                : { add: format };
-
-            return this.setFormat(model, update, [from, to - from]);
-        }
-
-        if (!model.length && format) {
-            return this.setFormat(model, { add: format }, [0, 0]);
-        }
-
-        return model;
-    }
-
-    private updateFromInputEvent(model: Model, range: TextRange, evt: InputEvent): Model {
-        if (skipInputTypes.has(evt.inputType)) {
-            evt.preventDefault();
-            return model;
-        }
-
-        if (evt.inputType.startsWith('format')) {
-            // Применяем форматирование: скорее всего это Safari с тачбаром
-            const [from, to] = getTextRange(this.element);
-            switch (evt.inputType) {
-                case 'formatBold':
-                    this.toggleFormat(TokenFormat.Bold, from, to);
-                    break;
-                case 'formatItalic':
-                    this.toggleFormat(TokenFormat.Italic, from, to);
-                    break;
-                case 'formatUnderline':
-                    this.toggleFormat(TokenFormat.Underline, from, to);
-                    break;
-                case 'formatStrikeThrough':
-                    this.toggleFormat(TokenFormat.Strike, from, to);
-                    break;
-                case 'formatFontColor':
-                    // eslint-disable-next-line no-case-declarations
-                    const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
-                        ? { remove: TokenFormat.Marked }
-                        : { add: TokenFormat.Marked }
-
-                    this.updateFormat(update, from, to);
-                    break;
-            }
-
-            evt.preventDefault();
-            return model;
-        }
-    }
-
-    private applyFormatFromFragment(model: Model, fragment: Model, offset = 0): Model {
-        fragment.forEach(token => {
-            const len = token.value.length;
-            if (token.format) {
-                model = this.setFormat(model, { add: token.format }, [offset, len]);
-            }
-
-            if (isCustomLink(token)) {
-                model = setLink(model, token.link, offset, len)
-            }
-
-            offset += len;
-        });
-
-        return model;
-    }
-
-
-
     /**
      * Сохраняет указанный диапазон в текущей записи истории в качестве последнего
      * известного выделения
@@ -895,7 +691,6 @@ export default class Editor {
                 this.history.push(value, action, range);
             }
             this.model = value;
-            console.log('updated model', this.model);
         }
 
         return this.model;
@@ -930,23 +725,6 @@ export default class Editor {
         return false;
     }
 
-    /**
-     * Применяет новый формат к указанному диапазону и возвращает новый набор токенов
-     */
-    private setFormat(tokens: Model, format: TokenFormat | TokenFormatUpdate, range: Rng): Model {
-        if (this.isMarkdown) {
-            // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
-            // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
-            // Полученный результат обрамим MD-символами для получения нужного результата
-            // и заново распарсим
-            const text = mdToText(tokens, range);
-            const updated = setFormat(text, format, range[0], range[1]);
-            return parse(textToMd(updated, range), this.options.parse);
-        }
-
-        return setFormat(tokens, format, range[0], range[1]);
-    }
-
     private render(): void {
         render(this.element, this.model, {
             fixTrailingLine: true,
@@ -967,160 +745,6 @@ export default class Editor {
         return [clamp(from, 0, maxIx), clamp(to, 0, maxIx)];
     }
 
-    private waitExpectedEnter(evt: KeyboardEvent): void {
-        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter') {
-            this.expectEnter = true;
-            requestAnimationFrame(() => {
-                if (this.expectEnter) {
-                    this.expectEnter = false;
-                    this.insertOrReplaceText(getTextRange(this.element), '\n');
-                    retainNewlineInViewport(this.element);
-                }
-            });
-        }
-    }
-
-    private insertOrReplaceText(range: TextRange, text: string): Model {
-        return isCollapsed(range)
-            ? this.insertText(range[0], text)
-            : this.replaceText(range[0], range[1], text);
-    }
-
-    private handleBeforeInput(composing = false) {
-        const range = getTextRange(this.element);
-        if (range) {
-            const text = this.getInputText();
-            console.log('before input', {
-                text,
-                range,
-                rangeText: text.slice(range[0], range[1])
-            });
-
-            this.inputState = {
-                range,
-                text,
-                composing
-            };
-        }
-    }
-
-    private handleInput(insert?: string) {
-        const { inputState } = this;
-        if (!inputState) {
-            // Обработка пограниченого случая в Safari: при пустой строке нажали на Backspace.
-            // В этом случае не отработает событие `beforeinput` и мы не получим
-            // `inputState`. Из-за этого удалится блок со строкой и неправильно
-            // восстановится позиция курсора.
-            this.scheduleRender();
-            return;
-        }
-
-        const range = getTextRange(this.element);
-        const insertFrom = Math.min(inputState.range[0], range[0]);
-        const removeFrom = insertFrom;
-        let insertTo = range[1];
-        let removeTo = inputState.range[1];
-
-        if (!insert) {
-            const text = this.getInputText();
-            if (isCollapsed(range) && insertFrom === removeFrom && insertTo === removeTo) {
-                const delta = inputState.text.length - text.length;
-                if (delta > 0) {
-                    // Удалили текст
-                    removeTo += delta;
-                } else if (delta < 0) {
-                    // Добавили текст, но почему-то не отследили (перевод строки?)
-                    insertTo -= delta;
-                }
-            }
-
-            insert = text.slice(insertFrom, insertTo);
-        }
-
-        if (insert) {
-            // Вставка текста
-            if (removeFrom !== removeTo) {
-                this.replaceText(removeFrom, removeTo, insert);
-            } else {
-                this.insertText(insertFrom, insert);
-            }
-        } else if (removeFrom !== removeTo) {
-            // Удаление текста
-            this.removeText(removeFrom, removeTo);
-        }
-        this.inputState = null;
-    }
-
-    /**
-     * Обработка ввода из указанного события. Вернёт `true` если событие удалось обработать
-     */
-    private handleInputFromEvent(evt: InputEvent): boolean {
-        if (skipInputTypes.has(evt.inputType)) {
-            evt.preventDefault();
-            return true;
-        }
-
-        if (evt.inputType.startsWith('format')) {
-            // Применяем форматирование: скорее всего это Safari с тачбаром
-            const [from, to] = getTextRange(this.element);
-            switch (evt.inputType) {
-                case 'formatBold':
-                    this.toggleFormat(TokenFormat.Bold, from, to);
-                    break;
-                case 'formatItalic':
-                    this.toggleFormat(TokenFormat.Italic, from, to);
-                    break;
-                case 'formatUnderline':
-                    this.toggleFormat(TokenFormat.Underline, from, to);
-                    break;
-                case 'formatStrikeThrough':
-                    this.toggleFormat(TokenFormat.Strike, from, to);
-                    break;
-                case 'formatFontColor':
-                    // eslint-disable-next-line no-case-declarations
-                    const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
-                        ? { remove: TokenFormat.Marked}
-                        : { add: TokenFormat.Marked }
-
-                    this.updateFormat(update, from, to);
-                    break;
-            }
-
-            evt.preventDefault();
-            return true;
-        }
-
-        if (!evt.getTargetRanges) {
-            return false;
-        }
-
-        const range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
-        const text = getInputEventText(evt);
-        // const tokens = this.model;
-        // console.log('apply update', {
-        //     origin: getText(tokens),
-        //     tokens,
-        //     data: text,
-        //     targetRange: range,
-        //     currentRange: getTextRange(this.element),
-        //     action: evt.inputType
-        // });
-
-        if (evt.inputType.startsWith('insert')) {
-            this.asyncRender = true;
-            this.insertOrReplaceText(range, text);
-        } else if (evt.inputType.startsWith('delete')) {
-            this.asyncRender = true;
-            this.removeText(range[0], range[1]);
-        } else {
-            console.warn('unknown action type', evt.inputType);
-            return false;
-        }
-
-        this.scheduleRender();
-        return true;
-    }
-
     private scheduleRender() {
         if (!this.pendingRenderId) {
             this.pendingRenderId = requestAnimationFrame(() => {
@@ -1136,22 +760,13 @@ export default class Editor {
     /**
      * При необходимости удаляет из текста ненужные данные, исходя из текущих настроек
      */
-    private sanitizeText(text: string): string {
-        text = text.replace(/\r\n?/g, '\n');
+    private sanitizeText<T extends string | Model>(text: T): T {
+        const { nowrap } = this.options;
 
-        if (this.options.nowrap) {
-            text = text.replace(/\n/g, ' ');
-        }
-
-        return text;
+        return typeof text === 'string'
+            ? sanitize(text, nowrap) as T
+            : text.map(t => ({ ...t, value: sanitize(t.value, nowrap) })) as T;
     }
-}
-
-/**
- * Возвращает текстовое содержимое указанных токенов
- */
-function getText(tokens: Token[]): string {
-    return tokens.map(t => t.value).join('');
 }
 
 function isCollapsed(range: TextRange): boolean {
@@ -1208,24 +823,6 @@ function getScrollTarget(r: Range): Element | undefined {
     }
 }
 
-function getInputEventText(evt: InputEvent): string {
-    if (evt.inputType === 'insertParagraph' || evt.inputType === 'insertLineBreak') {
-        return '\n';
-    }
-
-    if (evt.data != null) {
-        return evt.data;
-    }
-
-    // Расширение для Safari, используется. например, для подстановки
-    // нового значения на длинное нажатие клавиши (е → ё)
-    if (evt.dataTransfer) {
-        return evt.dataTransfer.getData('text/plain');
-    }
-
-    return '';
-}
-
 function getFormattedString(data: DataTransfer): Token[] | undefined {
     const internalData = data.getData(fragmentMIME);
 
@@ -1256,4 +853,10 @@ function getDiffTypeFromEvent(evt: InputEvent): DiffActionType | string {
     }
 
     return 'update';
+}
+
+function sanitize(text: string, nowrap?: boolean): string {
+    return nowrap
+        ? text.replace(/[\r\n?|\n]/g, ' ')
+        : text.replace(/\r\n?/g, '\n');
 }

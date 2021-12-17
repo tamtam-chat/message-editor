@@ -4,14 +4,10 @@ import {
     insertText as plainInsertText, removeText as plainRemoveText, replaceText as plainReplaceText,
     mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
     cutText as plainCutText, setFormat as plainSetFormat, setLink, slice,
-    TokenFormatUpdate,
-    CutText
+    TokenFormatUpdate, CutText
 } from '../formatted-string';
 import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
-import type { BaseEditorOptions, TextRange } from './types';
-import { rangeToLocation } from './range';
-
-type Model = Token[];
+import type { BaseEditorOptions, TextRange, Model } from './types';
 
 const skipInputTypes = new Set<string>([
     'insertOrderedList',
@@ -179,7 +175,7 @@ export function updateFromInputEvent(model: Model, range: TextRange, evt: InputE
 /**
  * Возвращает текстовое содержимое указанных токенов
  */
-function getText(tokens: Token[]): string {
+export function getText(tokens: Token[]): string {
     return tokens.map(t => t.value).join('');
 }
 
