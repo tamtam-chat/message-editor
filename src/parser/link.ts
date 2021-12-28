@@ -84,6 +84,7 @@ const supportedProtocols = createTree([
     'tt://',
     'tg://',
     'ftp://',
+    'contact://',
     '//'
 ], true);
 
