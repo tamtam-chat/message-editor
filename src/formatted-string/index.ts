@@ -312,7 +312,8 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         // Проверяем пограничные случаи:
         // — начало изменяемого диапазона находится в пользовательской ссылке:
         //   сохраним ссылку
-        if (isCustomLink(startToken)) {
+        const tokenRemoved = start.offset === 0 && to - from > startToken.value.length;
+        if (isCustomLink(startToken) && !tokenRemoved) {
             const { link } = startToken;
             let sticky: boolean | undefined;
 
@@ -340,9 +341,9 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
                         sticky = true;
                     }
                 }
-
                 nextTokens = setLink(nextTokens, link, 0, len, sticky);
             } else if (start.offset === 0 && from === to) {
+                // Пишем текст в самом начале ссылки
                 nextTokens = setLink(nextTokens, link, value.length, startToken.value.length);
             } else {
                 // Пограничный случай: полностью выделили ссылку и начинаем её заменять.

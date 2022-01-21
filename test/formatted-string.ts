@@ -438,6 +438,12 @@ describe('Formatted String', () => {
         tokens = insertText(tokens, 3, 'f', opt);
         deepEqual(types(tokens), [TokenType.Text, TokenType.Link, TokenType.Text]);
         deepEqual(values(tokens), ['aa f', 'beb', 'd cc']);
+
+        // Целиком удаляем ссылку, выходя за её пределы справа
+        const t1 = setLink(parse('foo bar'), '@foo', 0, 3);
+        const t2 = removeText(t1, 0, 4, opt);
+        deepEqual(types(t2), [TokenType.Text]);
+        deepEqual(values(t2), ['bar']);
         // console.log(tokens);
     });
 
