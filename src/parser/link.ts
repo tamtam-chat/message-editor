@@ -10,7 +10,7 @@
 
 import ParserState, { Bracket, Quote } from './state';
 import { consumeTree, createTree } from './tree';
-import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine } from './utils';
+import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine, isQuote } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenLink, TokenType } from './types';
 import { peekClosingMarkdown } from './markdown';
@@ -521,10 +521,6 @@ function shouldSkipQuote(state: ParserState, ch: number): boolean {
     // }
 
     // return false;
-}
-
-function isQuote(ch: number): boolean {
-    return ch === Codes.SingleQuote || ch === Codes.DoubleQuote;
 }
 
 function getQuoteType(ch: number): Quote {

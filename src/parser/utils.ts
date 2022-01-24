@@ -26,7 +26,7 @@ export const enum Codes {
     Dot = 46,
     /** : */
     Colon = 58,
-    /** : */
+    /** ; */
     SemiColon = 59,
     /** ? */
     Question = 63,
@@ -246,6 +246,10 @@ export function isAlpha(code: number): boolean {
  */
 export function isAlphaNumeric(code: number): boolean {
     return isNumber(code) || isAlpha(code);
+}
+
+export function isQuote(ch: number): boolean {
+    return ch === Codes.SingleQuote || ch === Codes.DoubleQuote;
 }
 
 /**

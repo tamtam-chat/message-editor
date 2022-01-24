@@ -2,7 +2,7 @@
  * @description
  * Минималистичный парсер HTML, который выдаёт результат в виде форматированной строки
  */
-import { TokenFormat } from './types';
+import { TokenFormat, TokenType } from './types';
 import type { Token } from './types';
 import ParserState from './state';
 import emoji from './emoji';
@@ -13,7 +13,7 @@ import command from './command';
 import hashtag from './hashtag';
 import link from './link';
 import newline from './newline';
-import { defaultOptions, isWhitespace, Codes, normalize, last, getLength } from './utils';
+import { defaultOptions, isWhitespace, Codes, normalize, last, getLength, isNumber, isAlpha, isNewLine, isQuote, isAlphaNumeric } from './utils';
 import { insertText, setLink } from '../formatted-string';
 import { trim } from '../formatted-string/split';
 
@@ -35,6 +35,7 @@ const commentClose = toCharCodes('-->');
 const piStart = toCharCodes('<?');
 const piEnd = toCharCodes('?>');
 const voidTerminator = toCharCodes('/>');
+let entityConverter: HTMLElement | null | undefined;
 
 const specialTags = ['script', 'style'];
 const voidTags = ['img', 'meta', 'link', 'br', 'base', 'hr', 'area', 'wbr', 'col', 'embed', 'input', 'param', 'source', 'track'];
@@ -54,8 +55,6 @@ const cssReset = ['normal', 'unset', 'initial', 'revert', 'none'];
 const monospaceFonts = ['jetbrains mono', 'fira code', 'pt mono', 'menlo', 'courier', 'monospace'];
 
 export default function htmlToString(html: string): Token[] {
-
-
     const state = new ParserState(html, {
         ...defaultOptions,
         useFormat: true
@@ -64,6 +63,7 @@ export default function htmlToString(html: string): Token[] {
     const pendingText: PendingText[] = [];
     let pendingLink: PendingLink | null = null;
     let tag: HTMLTag;
+    let entity: string | undefined;
 
     const closeLink = (pos: number = getLength(state.tokens)) => {
         if (pendingLink && pendingLink[1] !== pos) {
@@ -73,7 +73,15 @@ export default function htmlToString(html: string): Token[] {
     }
 
     while (state.hasNext()) {
-        if ((tag = htmlTag(state))) {
+        if ((entity = consumeEntity(state))) {
+            state.flushText();
+            state.tokens.push({
+                type: TokenType.Text,
+                format: state.format,
+                value: convertEntity(entity),
+                sticky: false,
+            });
+        } else if ((tag = htmlTag(state))) {
             state.flushText();
 
             if (tag.name === 'input' && tag.attributes.value) {
@@ -150,6 +158,18 @@ function skipToTag(state: ParserState, tagName: string) {
             state.pos++;
         }
     }
+}
+
+function consumeEntity(state: ParserState): string | undefined {
+    const start = state.pos;
+    if (state.consume(Codes.Ampersand)) {
+        state.consume(Codes.Hash)
+        if (state.consumeWhile(isAlphaNumeric) && state.consume(Codes.SemiColon)) {
+            return state.substring(start);
+        }
+    }
+
+    state.pos = start;
 }
 
 function htmlTag(state: ParserState): HTMLTag | undefined {
@@ -339,34 +359,10 @@ function nameChar(ch: number) {
 }
 
 /**
- * Check if given character code is alpha code (letter through A to Z)
- */
-function isAlpha(code: number): boolean {
-    code &= ~32; // quick hack to convert any char code to uppercase char code
-    return code >= 65 /* A */ && code <= 90 /* Z */;
-}
-
-/**
- * Check if given code is a number
- */
-function isNumber(code: number): boolean {
-    return code > 47 && code < 58;
-}
-
-/**
  * Check if given character code is a space character
  */
 function isSpace(code: number): boolean {
-    return isWhitespace(code)
-        || code === 10  /* LF */
-        || code === 13; /* CR */
-}
-
-/**
- * Check if given character code is a quote character
- */
-function isQuote(code: number): boolean {
-    return code === 39 /* ' */ || code === 34 /* " */;
+    return isWhitespace(code) || isNewLine(code);
 }
 
 /**
@@ -494,4 +490,19 @@ function pushNewline(chunks: PendingText[], pos: number) {
     }
 
     chunks.push(['\n', pos]);
+}
+
+function convertEntity(entity: string): string {
+    if (entityConverter === undefined) {
+        entityConverter = typeof document !== 'undefined'
+            ? document.createElement('div')
+            : null;
+    }
+
+    if (entityConverter) {
+        entityConverter.innerHTML = entity;
+        return entityConverter.innerText;
+    }
+
+    return entity;
 }
