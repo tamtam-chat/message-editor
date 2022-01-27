@@ -15,6 +15,9 @@ export interface EditorOptions extends BaseEditorOptions {
     /** Значение по умолчанию для редактора */
     value?: string;
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
+
+    /** Размечать ссылки при вставке HTML */
+    htmlLinks?: boolean;
 }
 
 type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
@@ -174,7 +177,7 @@ export default class Editor {
      */
     private onPaste = (evt: ClipboardEvent) => {
         const range = getTextRange(this.element);
-        const parsed = getFormattedString(evt.clipboardData);
+        const parsed = getFormattedString(evt.clipboardData, this.options);
         let fragment: string | Token[];
 
         if (parsed) {
@@ -834,7 +837,7 @@ function getScrollTarget(r: Range): Element | undefined {
     }
 }
 
-function getFormattedString(data: DataTransfer): Token[] | undefined {
+function getFormattedString(data: DataTransfer, options: EditorOptions): Token[] | undefined {
     const internalData = data.getData(fragmentMIME);
 
     if (internalData) {
@@ -845,7 +848,7 @@ function getFormattedString(data: DataTransfer): Token[] | undefined {
 
     const html = data.getData('text/html');
     if (html) {
-        return parseHTML(html);
+        return parseHTML(html, { links: options.htmlLinks });
     }
 }
 

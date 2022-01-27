@@ -51,14 +51,25 @@ const tagToFormat: Record<string, TokenFormat> = {
     u: TokenFormat.Underline,
 };
 
+interface HTMLParserOptions {
+    /** Разрешать парсить ссылки */
+    links: boolean;
+}
+
 const cssReset = ['normal', 'unset', 'initial', 'revert', 'none'];
 const monospaceFonts = ['jetbrains mono', 'fira code', 'pt mono', 'menlo', 'courier', 'monospace'];
 
-export default function htmlToString(html: string): Token[] {
+export default function htmlToString(html: string, options?: Partial<HTMLParserOptions>): Token[] {
     const state = new ParserState(html, {
         ...defaultOptions,
         useFormat: true
     });
+
+    const opt: HTMLParserOptions = {
+        links: false,
+        ...options
+    };
+
     const stack: StackItem[] = [];
     const pendingText: PendingText[] = [];
     let pendingLink: PendingLink | null = null;
@@ -106,7 +117,7 @@ export default function htmlToString(html: string): Token[] {
                     }
 
                     // Ссылка: убедимся, что там написано то, что мы понимаем
-                    if (tag.name === 'a' && isValidHref(tag.attributes!.href)) {
+                    if (tag.name === 'a' && opt.links && isValidHref(tag.attributes!.href)) {
                         const textLen = getLength(state.tokens);
                         closeLink(textLen);
                         pendingLink = [tag.attributes!.href, textLen];
@@ -119,7 +130,7 @@ export default function htmlToString(html: string): Token[] {
                     const entry = last(stack);
                     state.format = entry ? entry[1] : TokenFormat.None;
                 }
-                if (tag.name === 'a') {
+                if (tag.name === 'a' && opt.links) {
                     closeLink();
                 }
             } else if (tag.name === 'br') {

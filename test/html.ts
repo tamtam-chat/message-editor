@@ -3,8 +3,8 @@ import { repr } from './formatted-string';
 import html from '../src/parser/html';
 import toHTML from '../src/render/html';
 
-const parse = (text: string) => repr(html(text));
-const convert = (text: string) => toHTML(html(text));
+const parse = (text: string) => repr(html(text, { links: true }));
+const convert = (text: string) => toHTML(html(text, { links: true }));
 
 describe('HTML Parser', () => {
     it('format from tags', () => {
