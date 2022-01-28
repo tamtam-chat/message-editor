@@ -476,7 +476,9 @@ function formatFromTag(tag: HTMLTag, base: TokenFormat = TokenFormat.None): Toke
         if (fontFamily) {
             if (monospaceFonts.some(font => fontFamily.includes(font))) {
                 format |= TokenFormat.Monospace;
-            } else {
+            } else if (tagToFormat[tag.name] !== TokenFormat.Monospace) {
+                // В случае, если у нас явно тэгом не задано моноширинное оформление,
+                // отменяем его для неизвестных шрифтов
                 format &= ~TokenFormat.Monospace;
             }
         }

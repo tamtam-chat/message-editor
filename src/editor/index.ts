@@ -16,6 +16,9 @@ export interface EditorOptions extends BaseEditorOptions {
     value?: string;
     shortcuts?: Record<string, ShortcutHandler<Editor>>;
 
+    /** Парсить HTML при вставке */
+    html?: boolean;
+
     /** Размечать ссылки при вставке HTML */
     htmlLinks?: boolean;
 }
@@ -846,9 +849,11 @@ function getFormattedString(data: DataTransfer, options: EditorOptions): Token[]
             : internalData
     }
 
-    const html = data.getData('text/html');
-    if (html) {
-        return parseHTML(html, { links: options.htmlLinks });
+    if (options.html) {
+        const html = data.getData('text/html');
+        if (html) {
+            return parseHTML(html, { links: options.htmlLinks });
+        }
     }
 }
 
