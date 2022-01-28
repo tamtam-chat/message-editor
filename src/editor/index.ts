@@ -188,7 +188,7 @@ export default class Editor {
         } else if (evt.clipboardData.types.includes('Files')) {
             // TODO обработать вставку файлов
         } else {
-            fragment = evt.clipboardData.getData('text/plain');
+            fragment = sanitize(evt.clipboardData.getData('text/plain') || '');
         }
 
         if (fragment && range) {
@@ -852,7 +852,7 @@ function getFormattedString(data: DataTransfer, options: EditorOptions): Token[]
     if (options.html) {
         const html = data.getData('text/html');
         if (html) {
-            return parseHTML(html, { links: options.htmlLinks });
+            return parseHTML(sanitize(html), { links: options.htmlLinks });
         }
     }
 }
@@ -875,6 +875,8 @@ function getDiffTypeFromEvent(evt: InputEvent): DiffActionType | string {
 }
 
 function sanitize(text: string, nowrap?: boolean): string {
+    // eslint-disable-next-line no-control-regex
+    text = text.replace(/\x00/g, ' ');
     return nowrap
         ? text.replace(/[\r\n?|\n]/g, ' ')
         : text.replace(/\r\n?/g, '\n');
