@@ -15,7 +15,7 @@ export default function parseNewline(state: ParserState): boolean {
     }
 }
 
-function consumeNewline(state: ParserState): boolean {
+export function consumeNewline(state: ParserState): boolean {
     if (state.consume(Codes.Return)) {
         state.consume(Codes.NewLine);
         return true;

@@ -6,7 +6,7 @@ import toHTML from '../src/render/html';
 const parse = (text: string) => repr(html(text, { links: true }));
 const convert = (text: string) => toHTML(html(text, { links: true }));
 
-describe('HTML Parser', () => {
+describe.skip('HTML Parser', () => {
     it('format from tags', () => {
         equal(parse('hello world!'), 'hello world!');
         equal(parse('hello <strong>world</strong>!'), 'hello <b>world</b>!');

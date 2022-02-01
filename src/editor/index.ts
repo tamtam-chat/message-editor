@@ -8,7 +8,7 @@ import { cutText, getText, insertText, removeText, replaceText, setFormat, toggl
 import { setLink, slice, mdToText, textToMd,TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { createWalker, getRawValue, isElement } from './utils';
-import parseHTML from '../parser/html';
+import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 
 export interface EditorOptions extends BaseEditorOptions {
