@@ -123,10 +123,10 @@ export default class Editor {
             this.startRange = getTextRange(this.element);
         }
 
-        if (evt.inputType === 'insertLineBreak' && evt.data == null) {
+        if ((evt.inputType === 'insertLineBreak' || evt.inputType === 'insertParagraph') && evt.data == null) {
             // В Chrome если сразу после написания текста нажать Shift+Enter,
-            // в событии 'beforeinput' будет тип 'insertLineBreak', а в 'input'
-            // будет 'insertText' и пустое значение. Обработаем эту ситуацию, чтобы
+            // в событии 'beforeinput' будет тип insertLineBreak | insertParagraph,
+            // а в 'input' будет 'insertText' и пустое значение. Обработаем эту ситуацию, чтобы
             // запустился waitExpectedEnter
             evt.preventDefault();
         }
