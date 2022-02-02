@@ -27,7 +27,7 @@ export function getRawValue(node: Node): string {
         }
 
         return node.getAttribute('data-raw')
-            || node.getAttribute('alt')
+            // || node.getAttribute('alt')
             || '';
     }
 
