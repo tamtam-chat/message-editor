@@ -878,6 +878,6 @@ function sanitize(text: string, nowrap?: boolean): string {
     // eslint-disable-next-line no-control-regex
     text = text.replace(/\x00/g, ' ');
     return nowrap
-        ? text.replace(/[\r\n?|\n]/g, ' ')
+        ? text.replace(/(\r\n?|\n)/g, ' ')
         : text.replace(/\r\n?/g, '\n');
 }
