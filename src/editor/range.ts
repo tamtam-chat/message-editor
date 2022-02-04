@@ -128,6 +128,10 @@ export function rangeBoundToLocation(root: HTMLElement, bound: Node, pos: number
         // Punto Switcher начинаем писать текст при пустом значении инпута (важно!).
         // В этом случае мы не доберёмся до рендеринга, а браузер сделает свою
         // разметку, которая не соответствует ожидаемой
+        if (pos > 0 && isElement(bound)) {
+            // На случай если попали в контейнер с чем-то, например, эмоджи
+            result += getRawValue(bound).length;
+        }
         result += sumNodesLength(root, bound, pos);
     }
 
