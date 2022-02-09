@@ -4,7 +4,7 @@ import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { DiffActionType } from './diff';
-import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent } from './update';
+import { cutText, getInputEventText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent } from './update';
 import { setLink, slice, mdToText, textToMd,TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts, { ShortcutHandler } from './shortcuts';
 import { createWalker, getRawValue, isElement } from './utils';
@@ -64,6 +64,7 @@ export default class Editor {
     private composition: Model | null = null;
     /** Диапазон, который сейчас будет обновляться на событие ввода */
     private startRange: TextRange | null = null;
+    private pendingText: string | null = null;
     private _inited = false;
     private caret: TextRange = [0, 0];
     private focused = false;
@@ -123,6 +124,11 @@ export default class Editor {
             this.startRange = getTextRange(this.element);
         }
 
+        // В Chrome при замене спеллчекера в событии `input` будет отсутствовать
+        // текст, на который делается замена. Поэтому мы запомним его тут
+        // и прокинем в событии `input`
+        this.pendingText = evt.inputType === 'insertReplacementText' ? getInputEventText(evt) : null;
+
         if ((evt.inputType === 'insertLineBreak' || evt.inputType === 'insertParagraph') && evt.data == null) {
             // В Chrome если сразу после написания текста нажать Shift+Enter,
             // в событии 'beforeinput' будет тип insertLineBreak | insertParagraph,
@@ -134,7 +140,7 @@ export default class Editor {
 
     private onInput = (evt: InputEvent) => {
         this.expectEnter = false;
-        const nextModel = updateFromInputEvent(this.composition || this.model, this.startRange, evt, this.options);
+        const nextModel = updateFromInputEvent(this.composition || this.model, this.startRange, evt, this.options, this.pendingText);
         if (this.composition) {
             // Находимся в режиме композиции: накапливаем изменения
             this.composition = nextModel;
@@ -148,6 +154,7 @@ export default class Editor {
             );
             this.setSelection(range[0], range[1]);
         }
+        this.pendingText = null;
     }
 
     private onSelectionChange = () => {
@@ -273,6 +280,7 @@ export default class Editor {
         // * Автоподстановка слов (iOS, Android)
         // * Punto Switcher
         // * Изменение форматирования из тачбара на Маке
+        // * Замена правописания
         element.addEventListener('keydown', this.onKeyDown);
         element.addEventListener('compositionstart', this.onCompositionStart);
         element.addEventListener('compositionend', this.onCompositionEnd);

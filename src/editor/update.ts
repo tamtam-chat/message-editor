@@ -123,7 +123,7 @@ export function applyFormatFromFragment(model: Model, fragment: Model, offset = 
     return model;
 }
 
-export function updateFromInputEvent(model: Model, range: TextRange, evt: InputEvent, options: BaseEditorOptions): Model {
+export function updateFromInputEvent(model: Model, range: TextRange, evt: InputEvent, options: BaseEditorOptions, inputText?: string): Model {
     if (skipInputTypes.has(evt.inputType)) {
         evt.preventDefault();
         return model;
@@ -161,7 +161,10 @@ export function updateFromInputEvent(model: Model, range: TextRange, evt: InputE
     }
 
     if (evt.inputType.startsWith('insert')) {
-        const text = getInputEventText(evt);
+        // В Chrome в событии `input` на действие insertReplacementText при
+        // замене спеллчекера будет отсутствовать информация о заменяемом текст.
+        // Поэтому текст пробрасывается снаружи
+        const text = getInputEventText(evt) || inputText;
         return text
             ? replaceText(model, text, from, to, options)
             : model;
@@ -186,7 +189,7 @@ function isMarkdown(options: BaseEditorOptions): boolean {
     return !!(options.parse?.markdown);
 }
 
-function getInputEventText(evt: InputEvent): string {
+export function getInputEventText(evt: InputEvent): string {
     if (evt.inputType === 'insertParagraph' || evt.inputType === 'insertLineBreak') {
         return '\n';
     }
