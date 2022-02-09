@@ -50,11 +50,19 @@ function walkDOM(node: Node, state: HTMLParseState) {
         if (isTextNode(node)) {
             state.pushText(node.nodeValue);
         } else if (isElementNode(node)) {
-            const tagName = node.nodeName.toLowerCase();
+            const tagName = getTagName(node);
 
             if (!skipTags.has(tagName)) {
                 const { format: prevFormat, link: prevLink } = state;
                 state.format = formatFromTag(node, state.format);
+
+                if (tagName === 'tr') {
+                    state.pushNewline(1);
+                } else if (tagName === 'td') {
+                    state.pushText(' ');
+                } else if (blockTags.has(tagName) || (node.previousSibling && blockTags.has(getTagName(node.previousSibling)))) {
+                    state.pushNewline();
+                }
 
                 if (tagName === 'input') {
                     // Пограничный случай: если есть <input>, то надо достать из него
@@ -70,10 +78,6 @@ function walkDOM(node: Node, state: HTMLParseState) {
                         state.tokens.push(textToken(alt, state.format));
                     }
                 } else {
-                    if (blockTags.has(tagName)) {
-                        state.pushNewline();
-                    }
-
                     if (tagName === 'a' && state.options.links) {
                         const href = node.getAttribute('href');
                         if (isValidHref(href)) {
@@ -127,8 +131,8 @@ class HTMLParseState {
         }
     }
 
-    pushNewline() {
-        if (allowNewline(this.tokens)) {
+    pushNewline(limit?: number) {
+        if (allowNewline(this.tokens, limit)) {
             this.tokens.push(nlToken());
         }
     }
@@ -142,7 +146,7 @@ class HTMLParseState {
             } else if (allowSpace(this.tokens)) {
                 value = ' ';
             }
-        } else if (allowSpace(this.tokens) && allowNewline(this.tokens)) {
+        } else if (allowSpace(this.tokens) && allowNewline(this.tokens, 1)) {
             value = ' ';
         }
 
@@ -333,4 +337,8 @@ function nlToken(format = TokenFormat.None): TokenNewline {
 
 function isSpaceOnlyText(text: string): boolean {
     return /^[\s\r\n]+$/.test(text);
+}
+
+function getTagName(node: Node): string {
+    return node.nodeName.toLowerCase();
 }
