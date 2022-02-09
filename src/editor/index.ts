@@ -858,6 +858,15 @@ function getFormattedString(data: DataTransfer, options: EditorOptions): Token[]
     }
 
     if (options.html) {
+        // Обработка пограничного случая: MS Edge при копировании из адресной строки
+        // добавляет ещё и HTML. В итоге просто так вставить ссылку не получится.
+        // Поэтому мы сначала проверим plain text: если это ссылка, то оставим её
+        // как есть, без парсинга HTML.
+        const plain = parse(sanitize(data.getData('text/plain') || ''), options.parse);
+        if (plain.length === 1 && plain[0].type === TokenType.Link) {
+            return plain;
+        }
+
         const html = data.getData('text/html');
         if (html) {
             return parseHTML(sanitize(html), { links: options.htmlLinks });
