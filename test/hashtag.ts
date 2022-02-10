@@ -1,5 +1,6 @@
 import { deepStrictEqual as deepEqual } from 'assert';
-import _parse, { Token, TokenType } from '../src/parser';
+import _parse, { TokenType } from '../src/parser';
+import type { Token } from '../src/parser';
 
 function parse(text: string) {
     return _parse(text, { hashtag: true });

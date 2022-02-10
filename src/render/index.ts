@@ -1,5 +1,6 @@
 import { isAutoLink, isCustomLink } from '../formatted-string/utils';
-import { Token, TokenFormat, TokenHashTag, TokenLink, TokenMention, TokenType, Emoji, TokenCommand, TokenText } from '../parser';
+import type { Emoji, Token, TokenHashTag, TokenLink, TokenMention, TokenCommand, TokenText } from '../parser';
+import { TokenFormat, TokenType } from '../parser';
 
 declare global {
     interface Element {

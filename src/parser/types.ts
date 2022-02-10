@@ -34,7 +34,7 @@ export interface ParserOptions {
     useFormat?: boolean;
 }
 
-export const enum TokenType {
+export enum TokenType {
     /** Обычный текстовый фрагмент */
     Text = 'text',
 

@@ -1,5 +1,5 @@
 import { TokenFormat, TokenType } from './types';
-import ParserState from './state';
+import type ParserState from './state';
 import { Codes, consumeIdentifier, isDelimiter, isNumber, isUnicodeAlpha } from './utils';
 
 export default function parseMention(state: ParserState): boolean {

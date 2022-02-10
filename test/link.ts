@@ -1,5 +1,6 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import _parse, { Token, TokenLink, TokenType } from '../src/parser';
+import _parse, { TokenType } from '../src/parser';
+import type { Token, TokenLink } from '../src/parser';
 
 function parse(text: string) {
     return _parse(text, { link: true });

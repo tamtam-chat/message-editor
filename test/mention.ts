@@ -1,5 +1,6 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import _parse, { Token, TokenMention, TokenType } from '../src/parser';
+import _parse, { TokenType } from '../src/parser';
+import type { Token, TokenMention } from '../src/parser';
 
 function parse(text: string, mention: boolean | 'strict' = 'strict') {
     return _parse(text, { mention });

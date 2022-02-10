@@ -1,5 +1,6 @@
 import ParserState from './state';
-import { ParserOptions, Token, TokenType, TokenFormat } from './types';
+import { TokenType, TokenFormat } from './types';
+import type { ParserOptions, Token } from './types';
 import emoji from './emoji';
 import textEmoji from './text-emoji';
 import userSticker from './user-sticker';
@@ -44,7 +45,9 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
 
 export { normalize, getText, getLength, codePointAt } from './utils';
 
-export {
-    ParserOptions, Token, TokenType, TokenFormat, Emoji,
-    TokenCommand, TokenHashTag, TokenLink, TokenMarkdown, TokenMention, TokenText, TokenUserSticker
+export type {
+    ParserOptions, Emoji,
+    Token, TokenCommand, TokenHashTag, TokenLink, TokenMarkdown, TokenMention, TokenText, TokenUserSticker
 } from './types';
+
+export { TokenType, TokenFormat } from './types';

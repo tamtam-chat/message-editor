@@ -1,5 +1,5 @@
-import { Token } from '../parser';
-import { TextRange } from './types';
+import type { Token } from '../parser';
+import type { TextRange } from './types';
 
 export interface HistoryOptions {
     /** Список действий, которые можно схлопнуть в одно */

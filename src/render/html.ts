@@ -1,4 +1,5 @@
-import { Token, TokenLink, TokenFormat, TokenType } from '../parser/types';
+import { TokenFormat, TokenType } from '../parser/types';
+import type { Token, TokenLink } from '../parser/types';
 import { isPlainText, isRenderLink, nextInGroup } from './index';
 
 type ClassFormat = [format: TokenFormat, prop: string];

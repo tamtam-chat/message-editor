@@ -8,11 +8,13 @@
  * https://tools.ietf.org/html/rfc1738
  */
 
-import ParserState, { Bracket, Quote } from './state';
+import ParserState, { getQuoteType } from './state';
+import type { Bracket } from './state';
 import { consumeTree, createTree } from './tree';
 import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine, isQuote } from './utils';
 import { keycap } from './emoji';
-import { TokenFormat, TokenLink, TokenType } from './types';
+import { TokenFormat, TokenType } from './types';
+import type { TokenLink } from './types';
 import { peekClosingMarkdown } from './markdown';
 import tld from '../data/tld';
 
@@ -521,10 +523,6 @@ function shouldSkipQuote(state: ParserState, ch: number): boolean {
     // }
 
     // return false;
-}
-
-function getQuoteType(ch: number): Quote {
-    return ch === Codes.SingleQuote ? Quote.Single : Quote.Double;
 }
 
 /**

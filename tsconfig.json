@@ -3,6 +3,8 @@
     "target": "ES2015",
     "module": "ESNext",
     "lib": ["ES2016", "DOM", "DOM.Iterable"],
+    "importsNotUsedAsValues": "error",
+    "isolatedModules": true,
     "moduleResolution": "node",
     "allowJs": true,
     "outDir": "./out",

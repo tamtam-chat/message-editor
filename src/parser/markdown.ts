@@ -1,5 +1,6 @@
-import { Token, TokenMarkdown, TokenType, TokenFormat } from './types';
-import ParserState from './state';
+import { TokenType, TokenFormat } from './types';
+import type { Token, TokenMarkdown } from './types';
+import type ParserState from './state';
 import { Codes, isDelimiter, isBound, last, isPunctuation } from './utils';
 
 export const charToFormat = new Map<number, TokenFormat>([

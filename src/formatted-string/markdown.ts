@@ -1,5 +1,6 @@
-import { TextRange } from './types';
-import { Token, TokenFormat, TokenType } from '../parser';
+import type { TextRange } from './types';
+import { TokenFormat, TokenType } from '../parser';
+import type { Token } from '../parser';
 import { charToFormat, isStartBoundChar, isEndBoundChar } from '../parser/markdown';
 import { isCustomLink } from './utils';
 

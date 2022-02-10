@@ -1,8 +1,8 @@
 import { TokenFormat, TokenType } from './types';
 import type { ParserOptions, Emoji, Token, TokenLink } from './types';
-import ParserState from './state';
+import type ParserState from './state';
 
-export const enum Codes {
+export enum Codes {
     // Formatting
     /** * */
     Asterisk = 42,

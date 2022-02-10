@@ -1,4 +1,4 @@
-import ParserState from './state';
+import type ParserState from './state';
 import { Codes, isNumber } from './utils';
 
 const enum EmojiCodes {
@@ -8,7 +8,6 @@ const enum EmojiCodes {
     SkinModifierFrom = 0x1f3fb,
     /** EMOJI MODIFIER FITZPATRICK TYPE-6 */
     SkinModifierTo = 0x1f3ff,
-    /** VARIATION SELECTOR-16 */
     Presentation = 0xfe0f,
 
     // Модифицирующие последовательности

@@ -1,6 +1,7 @@
 import { deepStrictEqual as deepEqual } from 'assert';
 import { setFormat } from '../src/formatted-string';
-import parse, { Token, TokenFormat } from '../src/parser';
+import parse, { TokenFormat } from '../src/parser';
+import type { Token } from '../src/parser';
 import split from '../src/formatted-string/split';
 import { repr } from './formatted-string';
 

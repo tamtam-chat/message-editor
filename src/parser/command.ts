@@ -1,5 +1,5 @@
 import { TokenFormat, TokenType } from './types';
-import ParserState from './state';
+import type ParserState from './state';
 import { Codes, isCommandName, isDelimiter, isWhitespace } from './utils';
 
 export default function parseCommand(state: ParserState): boolean {

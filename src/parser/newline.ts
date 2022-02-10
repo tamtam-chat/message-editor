@@ -1,4 +1,4 @@
-import ParserState from './state';
+import type ParserState from './state';
 import { TokenFormat, TokenType } from './types';
 import { Codes } from './utils';
 

@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import parse, { Token, TokenType } from '../src/parser';
+import parse, { TokenType } from '../src/parser';
+import type { Token } from '../src/parser';
 
 function read(file: string): string {
     return fs.readFileSync(path.resolve(__dirname, file), 'utf8');

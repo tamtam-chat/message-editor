@@ -4,9 +4,9 @@ import {
     insertText as plainInsertText, removeText as plainRemoveText, replaceText as plainReplaceText,
     mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
     cutText as plainCutText, setFormat as plainSetFormat, setLink, slice,
-    TokenFormatUpdate, CutText
 } from '../formatted-string';
-import { isCustomLink, tokenForPos, LocationType } from '../formatted-string/utils';
+import type { TokenFormatUpdate, CutText } from '../formatted-string';
+import { isCustomLink, tokenForPos } from '../formatted-string/utils';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 
 const skipInputTypes = new Set<string>([
@@ -85,7 +85,7 @@ export function toggleFormat(model: Model, format: TokenFormat, from: number, to
         const fragment = slice(model, from, to);
         source = fragment[0];
     } else {
-        const pos = tokenForPos(model, from, LocationType.Start);
+        const pos = tokenForPos(model, from, 'start');
         if (pos.index !== -1) {
             source = model[pos.index];
         }

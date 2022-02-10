@@ -1,4 +1,4 @@
-import ParserState from './state';
+import type ParserState from './state';
 import { consumeTree, createTree } from './tree';
 import { isDelimiter } from './utils';
 import aliases from '../data/emoji-aliases';
