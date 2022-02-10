@@ -56,7 +56,7 @@ const maxLabelSize = 63;
 const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
 const safeChars = new Set(toCode('$-_.+'));
 const extraChars = new Set(toCode('!*"\'()[],|'));
-const punctChars = new Set(toCode('!,.;?'));
+const punctChars = new Set(toCode('!,.:;?'));
 const mailtoChars = toCode('mailto:', true);
 const magnetChars = toCode('magnet:', true);
 
@@ -444,7 +444,7 @@ function segment(state: ParserState): boolean {
         ch = state.peek();
 
         // Отдельно обрабатываем кавычки: если они есть в предыдущем тексте,
-        // то, не делаем их частью ссылки
+        // то не делаем их частью ссылки
         if (isQuote(ch)) {
             if (shouldSkipQuote(state, ch)) {
                 break;

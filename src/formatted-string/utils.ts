@@ -1,7 +1,7 @@
 import { Token, Emoji, TokenLink, TokenType, TokenText, TokenFormat } from '../parser';
 
 export interface TokenForPos {
-    /** Индекс найденного токена (будет -1, если такой токен не найден) и  */
+    /** Индекс найденного токена (будет -1, если такой токен не найден) */
     index: number;
 
     /** Текстовое смещение позиции относительно начала токена */
