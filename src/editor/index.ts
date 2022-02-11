@@ -186,22 +186,18 @@ export default class Editor {
      * Обработка события вставки текста
      */
     private onPaste = (evt: ClipboardEvent) => {
-        const range = getTextRange(this.element);
-        const parsed = getFormattedString(evt.clipboardData, this.options);
-        let fragment: string | Token[];
+        evt.preventDefault();
 
-        if (parsed) {
-            fragment = parsed;
-        } else if (evt.clipboardData.types.includes('Files')) {
-            // TODO обработать вставку файлов
-        } else {
-            fragment = sanitize(evt.clipboardData.getData('text/plain') || '');
+        if (isFilePaste(evt.clipboardData)) {
+            return;
         }
 
-        if (fragment && range) {
-            evt.stopPropagation();
-            evt.preventDefault();
+        const range = getTextRange(this.element);
+        const parsed = getFormattedString(evt.clipboardData, this.options);
+        const fragment: string | Token[] = parsed
+            || sanitize(evt.clipboardData.getData('text/plain') || '');
 
+        if (fragment && range) {
             const len = typeof fragment === 'string'
                 ? fragment.length : getLength(fragment);
             this.paste(fragment, range[0], range[1]);
@@ -897,4 +893,30 @@ function sanitize(text: string, nowrap?: boolean): string {
     return nowrap
         ? text.replace(/(\r\n?|\n)/g, ' ')
         : text.replace(/\r\n?/g, '\n');
+}
+
+function isFilePaste(data: DataTransfer) {
+    if (data.types.includes('Files')) {
+        // Есть файл в клипборде: это может быть как непосредственно файл,
+        // так и скриншот текста из ворда, например. При этом, даже если это
+        // именно файл, рядом может лежать текст, в котором может быть написано
+        // имя файла или путь к нему. То есть мы не можем однозначно ответить,
+        // вставляется файл или текст.
+        // Поэтому сделаем небольшой трюк: посчитаем количество текстовых и файловых
+        // элементов в буффере, если больше текстовых, значит, хотим вставить текст
+        let files = 0;
+        let texts = 0;
+        for (let i = 0; i < data.items.length; i++) {
+            const item = data.items[i];
+            if (item.kind === 'string') {
+                texts++;
+            } else if (item.kind === 'file') {
+                files++;
+            }
+        }
+
+        return files >= texts;
+    }
+
+    return false;
 }
