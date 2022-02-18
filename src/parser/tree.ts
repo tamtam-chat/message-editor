@@ -4,7 +4,7 @@
  * для поглощения элемента дерева
  */
 
-import ParserState from './state';
+import type ParserState from './state';
 import { asciiToUpper } from './utils';
 
 export type Tree = Map<number, true | Tree>;

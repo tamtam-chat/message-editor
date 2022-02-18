@@ -295,3 +295,7 @@ export default class ParserState {
         return code;
     }
 }
+
+export function getQuoteType(ch: number): Quote {
+    return ch === Codes.SingleQuote ? Quote.Single : Quote.Double;
+}

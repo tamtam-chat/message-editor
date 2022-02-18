@@ -1,92 +1,92 @@
 import { TokenFormat, TokenType } from './types';
 import type { ParserOptions, Emoji, Token, TokenLink } from './types';
-import ParserState from './state';
+import type ParserState from './state';
 
-export const enum Codes {
+export const Codes = {
     // Formatting
     /** * */
-    Asterisk = 42,
+    Asterisk: 42,
     /** _ */
-    Underscore = 95,
+    Underscore: 95,
     /** ` */
-    BackTick = 96,
+    BackTick: 96,
     /** ~ */
-    Tilde = 126,
+    Tilde: 126,
 
     // Punctuation
     /** ! */
-    Exclamation = 33,
+    Exclamation: 33,
     /** "" */
-    DoubleQuote = 34,
+    DoubleQuote: 34,
     /** ' */
-    SingleQuote = 39,
+    SingleQuote: 39,
     /** , */
-    Comma = 44,
+    Comma: 44,
     /** . */
-    Dot = 46,
+    Dot: 46,
     /** : */
-    Colon = 58,
+    Colon: 58,
     /** ; */
-    SemiColon = 59,
+    SemiColon: 59,
     /** ? */
-    Question = 63,
+    Question: 63,
     /** ( */
-    RoundBracketOpen = 40,
+    RoundBracketOpen: 40,
     /** ) */
-    RoundBracketClose = 41,
+    RoundBracketClose: 41,
     /** [ */
-    SquareBracketOpen = 91,
+    SquareBracketOpen: 91,
     /** ] */
-    SquareBracketClose = 93,
+    SquareBracketClose: 93,
     /** { */
-    CurlyBracketOpen = 123,
+    CurlyBracketOpen: 123,
     /** } */
-    CurlyBracketClose = 125,
+    CurlyBracketClose: 125,
     /** `<` */
-    LeftAngle = 60,
+    LeftAngle: 60,
     /** `>` */
-    RightAngle = 62,
+    RightAngle: 62,
     /** - */
-    Hyphen = 45,
+    Hyphen: 45,
     /** &ndash; */
-    EnDash = 0x02013,
+    EnDash: 0x02013,
     /** &mdash; */
-    EmDash = 0x02014,
+    EmDash: 0x02014,
 
     // Whitespace
-    Tab = 9, // \t
-    Space = 32, //
-    NBSP = 160, // &nbsp;
+    Tab: 9, // \t
+    Space: 32, //
+    NBSP: 160, // &nbsp;
 
     // New line
     /** `\n` */
-    NewLine = 10, // \n
+    NewLine: 10, // \n
     /** `\r` */
-    Return = 13,
+    Return: 13,
     /** `\f` */
-    LineFeed = 12,
+    LineFeed: 12,
 
     // Special
     /** = */
-    Equal = 61,
+    Equal: 61,
     /** / */
-    Slash = 47,
+    Slash: 47,
     /** \ */
-    BackSlash = 92,
+    BackSlash: 92,
     /** | */
-    Pipe = 124,
+    Pipe: 124,
     /** ^ */
-    Caret = 94,
+    Caret: 94,
     /** % */
-    Percent = 37,
+    Percent: 37,
     /** & */
-    Ampersand = 38,
+    Ampersand: 38,
     /** + */
-    Plus = 43,
+    Plus: 43,
     /** @ */
-    At = 64,
+    At: 64,
     /** # */
-    Hash = 35,
+    Hash: 35,
 }
 
 const boundPunctuation = new Set<number>([

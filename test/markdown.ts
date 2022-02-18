@@ -1,6 +1,8 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import _parse, { ParserOptions, Token, TokenFormat, TokenType } from '../src/parser';
-import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd, TextRange } from '../src/formatted-string';
+import _parse, { TokenFormat, TokenType } from '../src/parser';
+import type { Token, ParserOptions } from '../src/parser';
+import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd } from '../src/formatted-string';
+import type { TextRange } from '../src/formatted-string';
 
 const opt: ParserOptions = {
     command: true,

@@ -1,4 +1,4 @@
-import { Token, TokenFormat } from '../parser';
+import type { Token, TokenFormat } from '../parser';
 
 /**
  * Объект для обновления формата формата

@@ -1,5 +1,5 @@
 import { TokenFormat, TokenType } from './types';
-import ParserState from './state';
+import type ParserState from './state';
 import { consumeArray, isAlphaNumeric } from './utils';
 
 const begin = [35, 117]; // #u

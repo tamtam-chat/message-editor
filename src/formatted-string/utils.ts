@@ -1,4 +1,5 @@
-import { Token, Emoji, TokenLink, TokenType, TokenText, TokenFormat } from '../parser';
+import { TokenType, TokenFormat } from '../parser';
+import type { Token, Emoji, TokenLink, TokenText } from '../parser';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) */
@@ -8,10 +9,7 @@ export interface TokenForPos {
     offset: number;
 }
 
-export const enum LocationType {
-    Start = 'start',
-    End = 'end'
-}
+export type LocationType = 'start' | 'end';
 
 /**
  * Возвращает индекс токена из списка `tokens`, который соответствует указанной
@@ -22,7 +20,7 @@ export const enum LocationType {
  * не делить токен и не заниматься репарсингом. Значение может быть `false` (начало)
  * или `true` (конец)
  */
-export function tokenForPos(tokens: Token[], offset: number, locType: LocationType = LocationType.End, solid?: boolean): TokenForPos {
+export function tokenForPos(tokens: Token[], offset: number, locType: LocationType = 'end', solid?: boolean): TokenForPos {
     if (offset < 0) {
         return { index: -1, offset: -1 };
     }
@@ -44,7 +42,7 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
             }
 
             const nextToken = tokens[i + 1]!;
-            if (!isSticky(nextToken) && locType === LocationType.End) {
+            if (!isSticky(nextToken) && locType === 'end') {
                 return true;
             }
         }
@@ -57,14 +55,14 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
     if (index !== -1) {
         const token = tokens[index];
         if (solid && isSolidToken(token)) {
-            pos.offset = locType === LocationType.End ? token.value.length : 0;
+            pos.offset = locType === 'end' ? token.value.length : 0;
         } else if (token.emoji) {
             // Обновляем позицию `offset` внутри токена таким образом,
             // чтобы она не попадала на вложенный эмоджи
             const { emoji } = token;
             for (let i = 0; i < emoji.length && emoji[i].from < pos.offset; i++) {
                 if (emoji[i].to > pos.offset) {
-                    pos.offset = locType === LocationType.Start ? emoji[i].from : emoji[i].to;
+                    pos.offset = locType === 'start' ? emoji[i].from : emoji[i].to;
                     break;
                 }
             }
@@ -78,8 +76,8 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
  * Возвращает позиции в токенах для указанного диапазона
  */
 export function tokenRange(tokens: Token[], from: number, to: number, solid = false): [TokenForPos, TokenForPos] {
-    const start = tokenForPos(tokens, from, LocationType.Start, solid);
-    const end = tokenForPos(tokens, to, LocationType.End, solid);
+    const start = tokenForPos(tokens, from, 'start', solid);
+    const end = tokenForPos(tokens, to, 'end', solid);
     // Из-за особенностей определения позиций может случиться, что концевой токен
     // будет левее начального. В этом случае отдаём предпочтение концевому
     if (end.index < start.index && from === to) {

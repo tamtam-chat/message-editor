@@ -1,5 +1,5 @@
 import { TokenFormat, TokenType } from './types';
-import ParserState from './state';
+import type ParserState from './state';
 import { Codes, isBound, isCommandName, last } from './utils';
 
 export default function parseHashtag(state: ParserState): boolean {

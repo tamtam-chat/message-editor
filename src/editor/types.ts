@@ -2,7 +2,6 @@ import type { ParserOptions, Token } from '../parser';
 import type { EmojiRender } from '../render';
 
 export type TextRange = [from: number, to: number];
-
 export type Model = Token[];
 
 export interface BaseEditorOptions {

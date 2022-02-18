@@ -1,7 +1,8 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
 import { insertText, removeText, setFormat, slice, cutText, setLink, replaceText } from '../src/formatted-string';
 import { createToken as token } from '../src/formatted-string/utils';
-import parse, { ParserOptions, Token, TokenFormat, TokenHashTag, TokenLink, TokenText, TokenType } from '../src/parser';
+import type { ParserOptions, Token, TokenHashTag, TokenLink, TokenText } from '../src/parser';
+import parse, { TokenFormat, TokenType } from '../src/parser';
 
 type StringFormat = [TokenFormat, string];
 

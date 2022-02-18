@@ -7,7 +7,8 @@ import {
     sliceToken, toLink, toText, tokenRange, createToken
 } from './utils';
 
-export { mdToText, textToMd, tokenForPos, CutText, TokenFormatUpdate, TextRange }
+export { mdToText, textToMd, tokenForPos }
+export type { CutText, TokenFormatUpdate, TextRange }
 
 
 /**

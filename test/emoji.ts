@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import parse, { Token, TokenType } from '../src/parser';
+import parse, { TokenType } from '../src/parser';
+import type { Token } from '../src/parser';
 
 function read(file: string): string {
     return fs.readFileSync(path.resolve(__dirname, file), 'utf8');
@@ -169,6 +170,11 @@ describe('Emoji', () => {
         const textRanges: string[] = []
 
         createRanges(read('emoji-test-13.txt')).forEach(r => {
+            // Исключаем символы ™ и © из набора
+            if (r[0] === 0x2122 || r[0] === 0xa9) {
+                return;
+            }
+
             if (r[0] === r[1]) {
                 singles.push(toHex(r[0]));
             } else {

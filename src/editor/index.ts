@@ -1,15 +1,24 @@
-import parse, { getLength, Token, TokenFormat, TokenType } from '../parser';
+import parse, { getLength, TokenFormat, TokenType } from '../parser';
+import type { Token } from '../parser';
 import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { DiffActionType } from './diff';
 import { cutText, getInputEventText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent } from './update';
-import { setLink, slice, mdToText, textToMd,TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
-import Shortcuts, { ShortcutHandler } from './shortcuts';
+import { setLink, slice, mdToText, textToMd } from '../formatted-string';
+import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
+import Shortcuts from './shortcuts';
+import type { ShortcutHandler } from './shortcuts';
 import { createWalker, getRawValue, isElement } from './utils';
 import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
+
+const enum DiffActionType {
+    Insert = 'insert',
+    Remove = 'remove',
+    Replace = 'replace',
+    Compose = 'compose'
+}
 
 export interface EditorOptions extends BaseEditorOptions {
     /** Значение по умолчанию для редактора */
