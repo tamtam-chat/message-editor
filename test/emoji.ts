@@ -170,6 +170,11 @@ describe('Emoji', () => {
         const textRanges: string[] = []
 
         createRanges(read('emoji-test-13.txt')).forEach(r => {
+            // Исключаем символы ™ и © из набора
+            if (r[0] === 0x2122 || r[0] === 0xa9) {
+                return;
+            }
+
             if (r[0] === r[1]) {
                 singles.push(toHex(r[0]));
             } else {
