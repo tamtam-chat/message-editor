@@ -29,14 +29,11 @@ function getBuildConfig() {
 
 /** @type {import('vite').UserConfig} */
 const config = {
+    base: './',
     build: {
         outDir: './dist',
         ...getBuildConfig()
     }
 };
-
-if (process.env.BUILD) {
-    config.base = './';
-}
 
 export default config;
