@@ -35,4 +35,8 @@ const config = {
     }
 };
 
+if (process.env.BUILD) {
+    config.base = './';
+}
+
 export default config;
