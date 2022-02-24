@@ -19,10 +19,7 @@ jobs:
         run: |
           npm i
           npm t
-          npm run build
-          mkdir public
-          cp ./index.html ./public
-          cp -R ./dist ./public
+          npm run build-demo
 
       - name: GitHub Pages action
         uses: peaceiris/actions-gh-pages@v3.7.3

@@ -12,8 +12,10 @@
   "scripts": {
     "test": "mocha",
     "dev": "vite --port=3100",
-    "build": "tsc --emitDeclarationOnly && vite build",
+    "build": "tsc --emitDeclarationOnly && npm run build-lib",
     "build-parser": "BUILD=parser vite build",
+    "build-lib": "BUILD=lib vite build",
+    "build-demo": "BUILD=demo vite build",
     "clean": "rm -rf ./dist",
     "prepare": "npm test && npm run clean && npm run build && npm run build-parser"
   },
