@@ -47,7 +47,7 @@ export function setDOMRange(range: Range): Range | undefined {
                 return;
             }
         }
-    } catch {
+    } catch (err) {
         // Может быть ошибка, если элемент ещё не в DOM-дереве: игнорируем её
     }
     sel.empty();
