@@ -154,6 +154,12 @@ class HTMLParseState {
     }
 
     private handleText(text: string): Token[] {
+        if (!(this.format & TokenFormat.Monospace)) {
+            // Избавляемся от лишних пробелов и переводов строк, так как в HTML
+            // они приравниваются к одному пробелу
+            text = text.replace(/[\s\r\n]+/g, ' ');
+        }
+
         const state = new ParserState(text, {
             ...defaultOptions,
             useFormat: true
