@@ -266,6 +266,10 @@ function formatFromTag(tag: Element, base: TokenFormat = TokenFormat.None): Toke
             format &= ~(TokenFormat.Underline | TokenFormat.Strike);
         }
 
+        if (isMarked(css['color'])) {
+            format |= TokenFormat.Marked;
+        }
+
         if (fontFamily) {
             if (monospaceFonts.some(font => fontFamily.includes(font))) {
                 format |= TokenFormat.Monospace;
@@ -347,4 +351,11 @@ function isSpaceOnlyText(text: string): boolean {
 
 function getTagName(node: Node): string {
     return node.nodeName.toLowerCase();
+}
+
+function isMarked(color?: string): boolean {
+    if (!color) {
+        return false;
+    }
+    return /#f00|#ff0000|rgb\(\s*255\s*,\s*0\s*,\s*0\s*\)/.test(color);
 }
