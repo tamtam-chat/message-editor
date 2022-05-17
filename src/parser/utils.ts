@@ -105,6 +105,31 @@ const delimiterPunctuation = new Set<number>([
     Codes.Exclamation, Codes.Comma, Codes.Dot, Codes.SemiColon, Codes.Question
 ]);
 
+// https://jkorpela.fi/chars/spaces.html
+const whiteSpace = new Set<number>([
+    Codes.Tab,
+    0x0020, // SPACE
+    0x00A0, // NO-BREAK SPACE
+    0x1680, // OGHAM SPACE MARK
+    0x180E, // MONGOLIAN VOWEL SEPARATOR
+    0x2000, // EN QUAD
+    0x2001, // EM QUAD
+    0x2002, // EN SPACE (nut)
+    0x2003, // EM SPACE (mutton)
+    0x2004, // THREE-PER-EM SPACE (thick space)
+    0x2005, // FOUR-PER-EM SPACE (mid space)
+    0x2006, // SIX-PER-EM SPACE
+    0x2007, // FIGURE SPACE
+    0x2008, // PUNCTUATION SPACE
+    0x2009, // THIN SPACE
+    0x200A, // HAIR SPACE
+    0x200B, // ZERO WIDTH SPACE
+    0x202F, // NARROW NO-BREAK SPACE
+    0x205F, // MEDIUM MATHEMATICAL SPACE
+    0x3000, // IDEOGRAPHIC SPACE
+    0xFEFF, // ZERO WIDTH NO-BREAK SPACE
+]);
+
 export const defaultOptions: ParserOptions = {
     markdown: false,
     textEmoji: false,
@@ -129,9 +154,7 @@ export function isDelimiterPunct(ch: number): boolean {
 }
 
 export function isWhitespace(ch: number): boolean {
-    return ch === Codes.Space
-        || ch === Codes.NBSP
-        || ch === Codes.Tab;
+    return whiteSpace.has(ch);
 }
 
 export function isNewLine(ch: number): boolean {
