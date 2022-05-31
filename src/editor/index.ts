@@ -4,12 +4,12 @@ import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { cutText, getInputEventText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent } from './update';
+import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEventFallback } from './update';
 import { setLink, slice, mdToText, textToMd } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
 import type { ShortcutHandler } from './shortcuts';
-import { createWalker, getRawValue, isElement } from './utils';
+import { getInputText, isElement } from './utils';
 import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 
@@ -71,9 +71,10 @@ export default class Editor {
      * Если есть это свойство, значит, мы сейчас находимся в режиме композиции
      * */
     private composition: Model | null = null;
+    /** Диапазон, который был на начало композиции */
+    private compositionStartRange: TextRange | null = null;
     /** Диапазон, который сейчас будет обновляться на событие ввода */
     private startRange: TextRange | null = null;
-    private pendingText: string | null = null;
     private _inited = false;
     private caret: TextRange = [0, 0];
     private focused = false;
@@ -105,18 +106,22 @@ export default class Editor {
     private onCompositionStart = () => {
         this.expectEnter = false;
         this.composition = this.model;
+        this.compositionStartRange = getTextRange(this.element);
     }
 
-    private onCompositionEnd = () => {
-        if (this.composition) {
+    private onCompositionEnd = (evt: CompositionEvent) => {
+        if (this.composition && this.compositionStartRange) {
             const range = getTextRange(this.element);
+            const [from, to] = this.compositionStartRange;
+            const nextModel = replaceText(this.composition, evt.data, from, to, this.options);
+
             this.updateModel(
-                this.composition,
+                nextModel,
                 DiffActionType.Compose,
                 range
             );
             this.setSelection(range[0], range[1]);
-            this.composition = null;
+            this.composition = this.compositionStartRange = null;
         }
     }
 
@@ -132,38 +137,28 @@ export default class Editor {
         if (!this.startRange) {
             this.startRange = getTextRange(this.element);
         }
-
-        // В Chrome при замене спеллчекера в событии `input` будет отсутствовать
-        // текст, на который делается замена. Поэтому мы запомним его тут
-        // и прокинем в событии `input`
-        this.pendingText = evt.inputType === 'insertReplacementText' ? getInputEventText(evt) : null;
-
-        if ((evt.inputType === 'insertLineBreak' || evt.inputType === 'insertParagraph') && evt.data == null) {
-            // В Chrome если сразу после написания текста нажать Shift+Enter,
-            // в событии 'beforeinput' будет тип insertLineBreak | insertParagraph,
-            // а в 'input' будет 'insertText' и пустое значение. Обработаем эту ситуацию, чтобы
-            // запустился waitExpectedEnter
-            evt.preventDefault();
-        }
     }
 
     private onInput = (evt: InputEvent) => {
         this.expectEnter = false;
-        const nextModel = updateFromInputEvent(this.composition || this.model, this.startRange, evt, this.options, this.pendingText);
-        if (this.composition) {
-            // Находимся в режиме композиции: накапливаем изменения
-            this.composition = nextModel;
-        } else {
-            // Обычное изменение, сразу применяем результат к UI
-            const range = getTextRange(this.element);
-            this.updateModel(
-                nextModel,
-                getDiffTypeFromEvent(evt),
-                range
-            );
-            this.setSelection(range[0], range[1]);
+        // Не используем свойство evt.composition, так как в некоторых раскладках
+        // в Хроме он будет всегда.
+        // Можно было бы проверять только на наличие this.composition, однако
+        // в разных браузерах по-разному работает выход из режима композиции:
+        // Firefox 85: compositionend → input
+        // Chrome 100: input → compositionend
+        if (this.composition || evt.inputType.includes('Composition')) {
+            return;
         }
-        this.pendingText = null;
+
+        const range = getTextRange(this.element);
+        const prevRange = this.startRange || this.caret;
+        const nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+
+        // Обычное изменение, сразу применяем результат к UI
+        this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
+        this.setSelection(range[0], range[1]);
+        this.startRange = null;
     }
 
     private onSelectionChange = () => {
@@ -239,6 +234,7 @@ export default class Editor {
     private onFocus = () => {
         this.focused = true;
         document.addEventListener('selectionchange', this.onSelectionChange);
+        this.onSelectionChange();
     }
 
     private onBlur = () => {
@@ -286,6 +282,10 @@ export default class Editor {
         // * Punto Switcher
         // * Изменение форматирования из тачбара на Маке
         // * Замена правописания
+        // * Вставка преревода строки: Enter/Shift-Enter/Alt-Enter
+        // * Баг в Хроме: ставим курсор в конец строки, Cmd+← переходим в начало,
+        //   пишем букву, стираем следующую по Fn+Backspace. Хром посылает команду
+        //   insertText: null, а не beforeinput: deleteContentForward
         element.addEventListener('keydown', this.onKeyDown);
         element.addEventListener('compositionstart', this.onCompositionStart);
         element.addEventListener('compositionend', this.onCompositionEnd);
@@ -649,26 +649,7 @@ export default class Editor {
      * Возвращает строковое содержимое поля ввода
      */
     getInputText(): string {
-        let result = '';
-        let node: Node;
-
-        for (let i = 0; i < this.element.childNodes.length; i++) {
-            const line = this.element.childNodes[i] as HTMLElement;
-
-            // Учитываем случай с Firefox, который при обновлении DOM
-            // может перенести содержимое первой строки во вторую, в которой есть
-            // data-raw
-            if (i > 0) {
-                result += getRawValue(line) || '\n';
-            }
-
-            const walker = createWalker(line);
-            while (node = walker.nextNode()) {
-                result += getRawValue(node);
-            }
-        }
-
-        return result;
+        return getInputText(this.element);
     }
 
     /**

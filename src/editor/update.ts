@@ -1,4 +1,4 @@
-import type { Token } from '../parser';
+import { getLength, Token } from '../parser';
 import parse, { TokenFormat } from '../parser';
 import {
     insertText as plainInsertText, removeText as plainRemoveText, replaceText as plainReplaceText,
@@ -8,6 +8,7 @@ import {
 import type { TokenFormatUpdate, CutText } from '../formatted-string';
 import { isCustomLink, tokenForPos } from '../formatted-string/utils';
 import type { BaseEditorOptions, TextRange, Model } from './types';
+import { getInputText } from './utils';
 
 const skipInputTypes = new Set<string>([
     'insertOrderedList',
@@ -119,6 +120,66 @@ export function applyFormatFromFragment(model: Model, fragment: Model, offset = 
 
         offset += len;
     });
+
+    return model;
+}
+
+const inputToFormat: Record<string, TokenFormat> = {
+    formatBold: TokenFormat.Bold,
+    formatItalic: TokenFormat.Italic,
+    formatUnderline: TokenFormat.Underline,
+    formatStrikeThrough: TokenFormat.Strike
+}
+
+export function updateFromInputEventFallback(evt: InputEvent, model: Model, range: TextRange, prevRange: TextRange, options: BaseEditorOptions): Model {
+    if (skipInputTypes.has(evt.inputType)) {
+        evt.preventDefault();
+        return model;
+    }
+
+    const { inputType } = evt;
+    const [from, to] = range;
+    const [prevFrom, prevTo] = prevRange;
+
+    if (inputType.startsWith('format')) {
+        // Применяем форматирование: скорее всего это Safari с тачбаром
+        if (inputType === 'formatFontColor') {
+            const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
+                ? { remove: TokenFormat.Marked }
+                : { add: TokenFormat.Marked };
+
+            return plainSetFormat(model, update, from, to - from);
+        }
+
+        if (inputType === 'formatRemove') {
+            return plainSetFormat(model, TokenFormat.None, from, to - from);
+        }
+
+        if (inputType in inputToFormat) {
+            return toggleFormat(model, inputToFormat[inputType], from, to, options);
+        }
+
+        return model;
+    }
+
+    if (inputType.startsWith('insert')) {
+        const text = getInputEventText(evt);
+        return replaceText(model, text, prevFrom, prevTo, options);
+    }
+
+    if (inputType.startsWith('delete')) {
+        const boundFrom = Math.min(from, prevFrom);
+        let boundTo = Math.max(to, prevTo);
+        if (boundFrom === boundTo && inputType.includes('Forward')) {
+            const curLen = getInputText(evt.currentTarget as Element).length;
+            const prevLen = getLength(model);
+            if (prevLen > curLen) {
+                boundTo += prevLen - curLen;
+            }
+        }
+
+        return removeText(model, boundFrom, boundTo, options);
+    }
 
     return model;
 }

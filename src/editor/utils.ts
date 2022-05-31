@@ -33,3 +33,29 @@ export function getRawValue(node: Node): string {
 
     return '';
 }
+
+/**
+ * Возвращает текстовое содержимое указанного элемента с contentEditable
+ */
+export function getInputText(element: Element): string {
+    let result = '';
+    let node: Node;
+
+    for (let i = 0; i < element.childNodes.length; i++) {
+        const line = element.childNodes[i] as HTMLElement;
+
+        // Учитываем случай с Firefox, который при обновлении DOM
+        // может перенести содержимое первой строки во вторую, в которой есть
+        // data-raw
+        if (i > 0) {
+            result += getRawValue(line) || '\n';
+        }
+
+        const walker = createWalker(line);
+        while (node = walker.nextNode()) {
+            result += getRawValue(node);
+        }
+    }
+
+    return result;
+}
