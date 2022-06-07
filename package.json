@@ -11,7 +11,7 @@
   },
   "scripts": {
     "test": "mocha",
-    "dev": "vite --port=3100",
+    "dev": "vite --port=3100 --host",
     "build": "tsc --emitDeclarationOnly && npm run build-lib",
     "build-parser": "BUILD=parser vite build",
     "build-lib": "BUILD=lib vite build",

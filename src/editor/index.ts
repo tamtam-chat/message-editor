@@ -73,6 +73,10 @@ export default class Editor {
     private composition: Model | null = null;
     /** Диапазон, который был на начало композиции */
     private compositionStartRange: TextRange | null = null;
+
+    /** Данные из последнего события ввода в процессе композиции */
+    private compositionData: string | null = null;
+
     /** Диапазон, который сейчас будет обновляться на событие ввода */
     private startRange: TextRange | null = null;
     private _inited = false;
@@ -103,17 +107,31 @@ export default class Editor {
         this.waitExpectedEnter(evt);
     }
 
-    private onCompositionStart = () => {
+    private onCompositionStart = (evt: CompositionEvent) => {
+        console.log('composition start', JSON.stringify(evt.data), getTextRange(this.element));
+
         this.expectEnter = false;
         this.composition = this.model;
         this.compositionStartRange = getTextRange(this.element);
+        this.compositionData = null;
     }
 
     private onCompositionEnd = (evt: CompositionEvent) => {
+        console.log('composition end', JSON.stringify(evt.data), getTextRange(this.element));
         if (this.composition && this.compositionStartRange) {
             const range = getTextRange(this.element);
             const [from, to] = this.compositionStartRange;
-            const nextModel = replaceText(this.composition, evt.data, from, to, this.options);
+            console.log('do update from [%s] to [%s] with "%s"', this.compositionStartRange.join(','), range.join(','), evt.data);
+
+            this.applyComposition(evt.data);
+            let nextModel = this.composition;
+
+            // Редактирование текста в Android:
+            // Когда начинаем удалять символы слова, Android переводит это слово
+            // в режим композиции и когда слово удаляется — выходит из него
+            if (!evt.data && from > range[0]) {
+                nextModel = removeText(nextModel, range[0], Math.max(range[1], to), this.options);
+            }
 
             this.updateModel(
                 nextModel,
@@ -126,11 +144,16 @@ export default class Editor {
     }
 
     private onBeforeInput = (evt: InputEvent) => {
+        console.log('before input', evt.inputType, evt);
+
         this.startRange = null;
         if (evt.getTargetRanges) {
             const ranges = evt.getTargetRanges();
             if (ranges.length) {
                 this.startRange = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
+                console.log('before: start range', this.startRange);
+            } else {
+                console.log('before: no target ranges');
             }
         }
 
@@ -140,14 +163,26 @@ export default class Editor {
     }
 
     private onInput = (evt: InputEvent) => {
+        console.log('input', evt.inputType, evt);
         this.expectEnter = false;
+
+        if (evt.getTargetRanges) {
+            const ranges = evt.getTargetRanges();
+            if (ranges.length) {
+                console.log('input: start range', rangeToLocation(this.element, ranges[0] as Range));
+            } else {
+                console.log('input: no target ranges');
+            }
+        }
+
         // Не используем свойство evt.composition, так как в некоторых раскладках
         // в Хроме он будет всегда.
         // Можно было бы проверять только на наличие this.composition, однако
         // в разных браузерах по-разному работает выход из режима композиции:
         // Firefox 85: compositionend → input
         // Chrome 100: input → compositionend
-        if (this.composition || evt.inputType.includes('Composition')) {
+        if (this.applyComposition(evt.data) || evt.inputType.includes('Composition')) {
+            console.log('skip composition event');
             return;
         }
 
@@ -777,6 +812,25 @@ export default class Editor {
         return typeof text === 'string'
             ? sanitize(text, nowrap) as T
             : text.map(t => ({ ...t, value: sanitize(t.value, nowrap) })) as T;
+    }
+
+    /**
+     * Применяет данные к модели композиции, если она есть
+     * @returns Вернёт `true`  если находимся в режиме композиции и данные применились
+     */
+    private applyComposition(data: string | null): boolean {
+        if (this.composition && this.compositionStartRange) {
+            const [from] = this.compositionStartRange;
+            const to = this.compositionData
+                ? from + this.compositionData.length
+                : this.compositionStartRange[1];
+
+            this.composition = replaceText(this.composition, data || '', from, to, this.options);
+            this.compositionData = data;
+            return true;
+        }
+
+        return false;
     }
 }
 
