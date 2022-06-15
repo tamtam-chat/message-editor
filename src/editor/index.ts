@@ -70,7 +70,7 @@ export default class Editor {
      * Модель, которая накапливает изменения в режиме композиции.
      * Если есть это свойство, значит, мы сейчас находимся в режиме композиции
      * */
-    private composition: Model | null = null;
+    private composition = false
     /** Диапазон, который был на начало композиции */
     private compositionStartRange: TextRange | null = null;
 
@@ -144,6 +144,7 @@ export default class Editor {
 
     private onCompositionEnd = (evt: CompositionEvent) => {
         console.log('composition end', JSON.stringify(evt.data), getTextRange(this.element));
+        this.compositionStartRange = null;
         // if (this.compositionStartRange) {
         //     const range = getTextRange(this.element);
         //     const [from, to] = this.getCompositionRange();
@@ -181,6 +182,18 @@ export default class Editor {
     }
 
     private onBeforeInput = (evt: InputEvent) => {
+        if (evt.inputType === 'historyUndo') {
+            this.undo();
+            evt.preventDefault();
+            return;
+        }
+
+        if (evt.inputType === 'historyRedo') {
+            this.redo();
+            evt.preventDefault();
+            return;
+        }
+
         let range: TextRange;
         if (evt.getTargetRanges) {
             const ranges = evt.getTargetRanges();
@@ -196,7 +209,8 @@ export default class Editor {
         console.log('before input', {
             inputType: evt.inputType,
             range,
-            data: getInputEventText(evt)
+            data: getInputEventText(evt),
+            timeStamp: evt.timeStamp
         });
         this.pendingModel = updateFromInputEvent2(evt, this.model, range, this.options);
     }
@@ -217,21 +231,27 @@ export default class Editor {
 
         let nextModel: Model;
         const range = getTextRange(this.element);
-        console.log('input', evt.inputType, range);
+        console.log('input', {
+            inputType: evt.inputType,
+            range,
+            data: getInputEventText(evt),
+            timeStamp: evt.timeStamp
+        });
 
         if (this.pendingModel) {
             nextModel = this.pendingModel;
-            this.pendingModel = null;
-        // if (evt.inputType.includes('Composition')) {
-            // Firefox: `input` вызывается после `compositionend`
-            // Chrome, Safari: `input` вызывается до `compositionend`
-            // В случае отмены композиционного ввода
-            // — Chrome: `input` содержит текст, `compositionend` пустую строку
-            // — Firefox: `input` и `compositionend` содержат пустую строку
-            // — Safari: `input` посылает команду удаления, `compositionend` содержит пустую строку
+            // В мобильном Хроме, если находимся в режиме композиции, Enter два раза
+            // вызовет событие `input`, причём, второе будет без `beforeinput`.
+            // Поэтому не удаляем модель находясь в режиме композиции, пусть это
+            // сделает обработчик `compositionend`
+            if (!this.compositionStartRange) {
+                this.pendingModel = null;
+            }
         } else {
             const prevRange = this.compositionRange || this.caret;
+            console.log('update from event', { range, prevRange });
             nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+
             this.compositionRange = null;
         }
 
@@ -840,6 +860,7 @@ export default class Editor {
             this.expectEnter = true;
             requestAnimationFrame(() => {
                 if (this.expectEnter) {
+                    console.log('handle expected enter');
                     this.expectEnter = false;
                     this.insertOrReplaceText(getTextRange(this.element), '\n');
                     retainNewlineInViewport(this.element);
