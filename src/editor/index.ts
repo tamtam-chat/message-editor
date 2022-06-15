@@ -230,8 +230,9 @@ export default class Editor {
             // — Firefox: `input` и `compositionend` содержат пустую строку
             // — Safari: `input` посылает команду удаления, `compositionend` содержит пустую строку
         } else {
-            const prevRange = this.startRange || this.caret;
+            const prevRange = this.compositionRange || this.caret;
             nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+            this.compositionRange = null;
         }
 
         // Обычное изменение, сразу применяем результат к UI
