@@ -155,28 +155,34 @@ function showToolbar(editor: Editor) {
 
 const rawEditor = document.getElementById('raw-editor');
 rawEditor.addEventListener('beforeinput', evt => {
-    console.log('raw before', evt.inputType, evt.composed, evt);
+    const { rangeOffset, rangeParent } = evt as any;
+
+    console.log('raw before', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
 
     if (evt.getTargetRanges) {
         const ranges = evt.getTargetRanges();
         if (ranges.length) {
-            console.log('before: target range', rangeToLocation(rawEditor, ranges[0] as Range));
+            const range = rangeToLocation(rawEditor, evt.getTargetRanges()[0] as Range);
+            console.log('before: start range', range);
         } else {
-            console.log('before: no ranges', ranges);
+            console.log('before: no target ranges');
         }
     }
 });
 
 rawEditor.addEventListener('input', (evt: InputEvent) => {
-    console.log('raw input', evt.inputType, evt.composed, evt);
-    if (evt.getTargetRanges) {
-        const ranges = evt.getTargetRanges();
-        if (ranges.length) {
-            console.log('input: target range', rangeToLocation(rawEditor, ranges[0] as Range));
-        } else {
-            console.log('input: no ranges', ranges);
-        }
-    }
+    const { rangeOffset, rangeParent } = evt as any;
+    console.log('raw input', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
+
+    // if (evt.getTargetRanges) {
+    //     const ranges = evt.getTargetRanges();
+    //     if (ranges.length) {
+    //         const range = rangeToLocation(rawEditor, evt.getTargetRanges()[0] as Range);
+    //         console.log('input: start range', range);
+    //     } else {
+    //         console.log('input: no target ranges');
+    //     }
+    // }
 });
 
 rawEditor.addEventListener('compositionstart', logComposition);

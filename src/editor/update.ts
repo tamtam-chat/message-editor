@@ -239,6 +239,48 @@ export function updateFromInputEvent(model: Model, range: TextRange, evt: InputE
     return model;
 }
 
+export function updateFromInputEvent2(evt: InputEvent, model: Model, range: TextRange, options: BaseEditorOptions): Model {
+    if (skipInputTypes.has(evt.inputType)) {
+        evt.preventDefault();
+        return model;
+    }
+
+    const { inputType } = evt;
+    const [from, to] = range;
+
+    if (inputType.startsWith('format')) {
+        // Применяем форматирование: скорее всего это Safari с тачбаром
+        if (inputType === 'formatFontColor') {
+            const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
+                ? { remove: TokenFormat.Marked }
+                : { add: TokenFormat.Marked };
+
+            return plainSetFormat(model, update, from, to - from);
+        }
+
+        if (inputType === 'formatRemove') {
+            return plainSetFormat(model, TokenFormat.None, from, to - from);
+        }
+
+        if (inputType in inputToFormat) {
+            return toggleFormat(model, inputToFormat[inputType], from, to, options);
+        }
+
+        return model;
+    }
+
+    if (inputType.startsWith('insert')) {
+        const text = getInputEventText(evt);
+        return replaceText(model, text, from, to, options);
+    }
+
+    if (inputType.startsWith('delete')) {
+        return removeText(model, from, to, options);
+    }
+
+    return model;
+}
+
 /**
  * Возвращает текстовое содержимое указанных токенов
  */
