@@ -1,3 +1,4 @@
+import { getTextRange, rangeToLocation } from './editor/range';
 import { Editor, TokenFormat } from './index';
 
 const shortcuts: Record<string, (editor: Editor) => void> = {
@@ -150,6 +151,38 @@ function showToolbar(editor: Editor) {
     if (toolbar.parentElement !== editor.element.parentElement) {
         editor.element.parentElement.appendChild(toolbar);
     }
+}
+
+const rawEditor = document.getElementById('raw-editor');
+if (rawEditor) {
+    rawEditor.addEventListener('beforeinput', evt => {
+        const { rangeOffset, rangeParent } = evt as any;
+
+        console.log('raw before', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
+
+        if (evt.getTargetRanges) {
+            const ranges = evt.getTargetRanges();
+            if (ranges.length) {
+                const range = rangeToLocation(rawEditor, evt.getTargetRanges()[0] as Range);
+                console.log('before: start range', range);
+            } else {
+                console.log('before: no target ranges');
+            }
+        }
+    });
+
+    rawEditor.addEventListener('input', (evt: InputEvent) => {
+        const { rangeOffset, rangeParent } = evt as any;
+        console.log('raw input', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
+    });
+
+    rawEditor.addEventListener('compositionstart', logComposition);
+    rawEditor.addEventListener('compositionend', logComposition);
+    rawEditor.addEventListener('compositionupdate', logComposition);
+}
+
+function logComposition(evt: CompositionEvent) {
+    console.log(evt.type, JSON.stringify(evt.data), getTextRange(rawEditor), evt);
 }
 
 window['editor'] = editor;

@@ -131,17 +131,17 @@ const inputToFormat: Record<string, TokenFormat> = {
     formatStrikeThrough: TokenFormat.Strike
 }
 
-export function updateFromInputEventFallback(evt: InputEvent, model: Model, range: TextRange, prevRange: TextRange, options: BaseEditorOptions): Model {
+function handleSkipEvent(evt: InputEvent, model: Model): Model | undefined {
     if (skipInputTypes.has(evt.inputType)) {
         evt.preventDefault();
         return model;
     }
+}
 
+function handleFormatEvent(evt: InputEvent, model: Model, range: TextRange, options: BaseEditorOptions): Model | undefined {
     const { inputType } = evt;
-    const [from, to] = range;
-    const [prevFrom, prevTo] = prevRange;
-
     if (inputType.startsWith('format')) {
+        const [from, to] = range;
         // Применяем форматирование: скорее всего это Safari с тачбаром
         if (inputType === 'formatFontColor') {
             const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
@@ -161,16 +161,31 @@ export function updateFromInputEventFallback(evt: InputEvent, model: Model, rang
 
         return model;
     }
+}
 
-    if (inputType.startsWith('insert')) {
+function handleInsertEvent(evt: InputEvent, model: Model, range: TextRange, options: BaseEditorOptions): Model | undefined {
+    if (evt.inputType.startsWith('insert')) {
         const text = getInputEventText(evt);
-        return replaceText(model, text, prevFrom, prevTo, options);
+        return replaceText(model, text, range[0], range[1], options);
+    }
+}
+
+export function updateFromInputEventFallback(evt: InputEvent, model: Model, range: TextRange, prevRange: TextRange, options: BaseEditorOptions): Model {
+    const updated = handleSkipEvent(evt, model)
+        || handleFormatEvent(evt, model, range, options)
+        || handleInsertEvent(evt, model, prevRange, options);
+
+    if (updated) {
+        return updated;
     }
 
-    if (inputType.startsWith('delete')) {
+    if (evt.inputType.startsWith('delete')) {
+        const [from, to] = range;
+        const [prevFrom, prevTo] = prevRange;
         const boundFrom = Math.min(from, prevFrom);
         let boundTo = Math.max(to, prevTo);
-        if (boundFrom === boundTo && inputType.includes('Forward')) {
+
+        if (boundFrom === boundTo && evt.inputType.includes('Forward')) {
             const curLen = getInputText(evt.currentTarget as Element).length;
             const prevLen = getLength(model);
             if (prevLen > curLen) {
@@ -184,58 +199,19 @@ export function updateFromInputEventFallback(evt: InputEvent, model: Model, rang
     return model;
 }
 
-export function updateFromInputEvent(model: Model, range: TextRange, evt: InputEvent, options: BaseEditorOptions, inputText?: string): Model {
-    if (skipInputTypes.has(evt.inputType)) {
-        evt.preventDefault();
-        return model;
-    }
+export function updateFromInputEvent(evt: InputEvent, model: Model, range: TextRange, options: BaseEditorOptions): Model {
+    const updated = handleSkipEvent(evt, model)
+        || handleFormatEvent(evt, model, range, options)
+        || handleInsertEvent(evt, model, range, options);
 
-    const [from, to] = range;
-
-    if (evt.inputType.startsWith('format')) {
-        // Применяем форматирование: скорее всего это Safari с тачбаром
-        switch (evt.inputType) {
-            case 'formatBold':
-                model = toggleFormat(model, TokenFormat.Bold, from, to, options);
-                break;
-            case 'formatItalic':
-                model = toggleFormat(model, TokenFormat.Italic, from, to, options);
-                break;
-            case 'formatUnderline':
-                model = toggleFormat(model, TokenFormat.Underline, from, to, options);
-                break;
-            case 'formatStrikeThrough':
-                model = toggleFormat(model, TokenFormat.Strike, from, to, options);
-                break;
-            case 'formatFontColor':
-                // eslint-disable-next-line no-case-declarations
-                const update: TokenFormatUpdate = /^rgb\(0,\s*0,\s*0\)/.test(evt.data) || evt.data === 'transparent'
-                    ? { remove: TokenFormat.Marked }
-                    : { add: TokenFormat.Marked };
-
-                model = plainSetFormat(model, update, from, to - from);
-                break;
-        }
-
-        // evt.preventDefault();
-        return model;
-    }
-
-    if (evt.inputType.startsWith('insert')) {
-        // В Chrome в событии `input` на действие insertReplacementText при
-        // замене спеллчекера будет отсутствовать информация о заменяемом текст.
-        // Поэтому текст пробрасывается снаружи
-        const text = getInputEventText(evt) || inputText;
-        return text
-            ? replaceText(model, text, from, to, options)
-            : model;
+    if (updated) {
+        return updated;
     }
 
     if (evt.inputType.startsWith('delete')) {
-        return removeText(model, from, to, options);
+        return removeText(model, range[0], range[1], options);
     }
 
-    console.warn('unknown action type', evt.inputType);
     return model;
 }
 

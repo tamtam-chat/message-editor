@@ -4,7 +4,7 @@ import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEventFallback } from './update';
+import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback } from './update';
 import { setLink, slice, mdToText, textToMd } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
@@ -66,15 +66,13 @@ export default class Editor {
     public history: History<Model>;
 
     private _model: Model;
-    /**
-     * Модель, которая накапливает изменения в режиме композиции.
-     * Если есть это свойство, значит, мы сейчас находимся в режиме композиции
-     * */
-    private composition: Model | null = null;
     /** Диапазон, который был на начало композиции */
     private compositionStartRange: TextRange | null = null;
-    /** Диапазон, который сейчас будет обновляться на событие ввода */
-    private startRange: TextRange | null = null;
+
+    /** Диапазон, который был на начало композиции */
+    private compositionRange: TextRange | null = null;
+
+    private pendingModel: Model | null = null;
     private _inited = false;
     private caret: TextRange = [0, 0];
     private focused = false;
@@ -104,61 +102,71 @@ export default class Editor {
     }
 
     private onCompositionStart = () => {
-        this.expectEnter = false;
-        this.composition = this.model;
         this.compositionStartRange = getTextRange(this.element);
+        this.compositionRange = null;
+        this.expectEnter = false;
     }
 
-    private onCompositionEnd = (evt: CompositionEvent) => {
-        if (this.composition && this.compositionStartRange) {
-            const range = getTextRange(this.element);
-            const [from, to] = this.compositionStartRange;
-            const nextModel = replaceText(this.composition, evt.data, from, to, this.options);
+    private onCompositionUpdate = () => {
+        this.compositionRange = this.getCompositionRange();
+    }
 
-            this.updateModel(
-                nextModel,
-                DiffActionType.Compose,
-                range
-            );
-            this.setSelection(range[0], range[1]);
-            this.composition = this.compositionStartRange = null;
-        }
+    private onCompositionEnd = () => {
+        this.compositionStartRange = null;
     }
 
     private onBeforeInput = (evt: InputEvent) => {
-        this.startRange = null;
+        if (evt.inputType === 'historyUndo') {
+            this.undo();
+            evt.preventDefault();
+            return;
+        }
+
+        if (evt.inputType === 'historyRedo') {
+            this.redo();
+            evt.preventDefault();
+            return;
+        }
+
+        let range: TextRange;
         if (evt.getTargetRanges) {
             const ranges = evt.getTargetRanges();
             if (ranges.length) {
-                this.startRange = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
+                range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
             }
         }
 
-        if (!this.startRange) {
-            this.startRange = getTextRange(this.element);
+        if (!range) {
+            range = getTextRange(this.element);
         }
+        this.pendingModel = updateFromInputEvent(evt, this.model, range, this.options);
     }
 
     private onInput = (evt: InputEvent) => {
         this.expectEnter = false;
-        // Не используем свойство evt.composition, так как в некоторых раскладках
-        // в Хроме он будет всегда.
-        // Можно было бы проверять только на наличие this.composition, однако
-        // в разных браузерах по-разному работает выход из режима композиции:
-        // Firefox 85: compositionend → input
-        // Chrome 100: input → compositionend
-        if (this.composition || evt.inputType.includes('Composition')) {
-            return;
+        let nextModel: Model;
+        const range = getTextRange(this.element);
+
+        if (this.pendingModel) {
+            nextModel = this.pendingModel;
+            // В мобильном Хроме, если находимся в режиме композиции, Enter два раза
+            // вызовет событие `input`, причём, второе будет без `beforeinput`.
+            // Поэтому не удаляем модель находясь в режиме композиции, пусть это
+            // сделает обработчик `compositionend`
+            if (!this.compositionStartRange) {
+                this.pendingModel = null;
+            }
+        } else {
+            const prevRange = this.compositionRange || this.caret;
+            nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+            this.compositionRange = null;
         }
 
-        const range = getTextRange(this.element);
-        const prevRange = this.startRange || this.caret;
-        const nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
-
         // Обычное изменение, сразу применяем результат к UI
-        this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
-        this.setSelection(range[0], range[1]);
-        this.startRange = null;
+        if (nextModel) {
+            this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
+            this.setSelection(range[0], range[1]);
+        }
     }
 
     private onSelectionChange = () => {
@@ -288,6 +296,7 @@ export default class Editor {
         //   insertText: null, а не beforeinput: deleteContentForward
         element.addEventListener('keydown', this.onKeyDown);
         element.addEventListener('compositionstart', this.onCompositionStart);
+        element.addEventListener('compositionupdate', this.onCompositionUpdate);
         element.addEventListener('compositionend', this.onCompositionEnd);
         element.addEventListener('beforeinput', this.onBeforeInput);
         element.addEventListener('input', this.onInput);
@@ -309,17 +318,20 @@ export default class Editor {
      * Вызывается для того, чтобы удалить все связи редактора с DOM.
      */
     dispose(): void {
-        this.element.removeEventListener('keydown', this.onKeyDown);
-        this.element.removeEventListener('compositionstart', this.onCompositionStart);
-        this.element.removeEventListener('compositionend', this.onCompositionEnd);
-        this.element.removeEventListener('beforeinput', this.onBeforeInput);
-        this.element.removeEventListener('input', this.onInput);
-        this.element.removeEventListener('cut', this.onCut);
-        this.element.removeEventListener('copy', this.onCopy);
-        this.element.removeEventListener('paste', this.onPaste);
-        this.element.removeEventListener('click', this.onClick);
-        this.element.removeEventListener('focus', this.onFocus);
-        this.element.removeEventListener('blur', this.onBlur);
+        const { element } = this;
+
+        element.removeEventListener('keydown', this.onKeyDown);
+        element.removeEventListener('compositionstart', this.onCompositionStart);
+        element.removeEventListener('compositionupdate', this.onCompositionUpdate);
+        element.removeEventListener('compositionend', this.onCompositionEnd);
+        element.removeEventListener('beforeinput', this.onBeforeInput);
+        element.removeEventListener('input', this.onInput);
+        element.removeEventListener('cut', this.onCut);
+        element.removeEventListener('copy', this.onCopy);
+        element.removeEventListener('paste', this.onPaste);
+        element.removeEventListener('click', this.onClick);
+        element.removeEventListener('focus', this.onFocus);
+        element.removeEventListener('blur', this.onBlur);
         document.removeEventListener('selectionchange', this.onSelectionChange);
     }
 
@@ -750,7 +762,7 @@ export default class Editor {
     }
 
     private waitExpectedEnter(evt: KeyboardEvent): void {
-        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter') {
+        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter' && hasModifier(evt)) {
             this.expectEnter = true;
             requestAnimationFrame(() => {
                 if (this.expectEnter) {
@@ -777,6 +789,15 @@ export default class Editor {
         return typeof text === 'string'
             ? sanitize(text, nowrap) as T
             : text.map(t => ({ ...t, value: sanitize(t.value, nowrap) })) as T;
+    }
+
+    private getCompositionRange(): TextRange {
+        const range = getTextRange(this.element);
+        if (this.compositionStartRange) {
+            range[0] = Math.min(this.compositionStartRange[0], range[0]);
+        }
+
+        return range;
     }
 }
 
@@ -909,4 +930,8 @@ function isFilePaste(data: DataTransfer) {
     }
 
     return false;
+}
+
+function hasModifier(evt: KeyboardEvent) {
+    return evt.altKey || evt.ctrlKey || evt.shiftKey || evt.metaKey;
 }
