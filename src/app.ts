@@ -154,40 +154,32 @@ function showToolbar(editor: Editor) {
 }
 
 const rawEditor = document.getElementById('raw-editor');
-rawEditor.addEventListener('beforeinput', evt => {
-    const { rangeOffset, rangeParent } = evt as any;
+if (rawEditor) {
+    rawEditor.addEventListener('beforeinput', evt => {
+        const { rangeOffset, rangeParent } = evt as any;
 
-    console.log('raw before', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
+        console.log('raw before', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
 
-    if (evt.getTargetRanges) {
-        const ranges = evt.getTargetRanges();
-        if (ranges.length) {
-            const range = rangeToLocation(rawEditor, evt.getTargetRanges()[0] as Range);
-            console.log('before: start range', range);
-        } else {
-            console.log('before: no target ranges');
+        if (evt.getTargetRanges) {
+            const ranges = evt.getTargetRanges();
+            if (ranges.length) {
+                const range = rangeToLocation(rawEditor, evt.getTargetRanges()[0] as Range);
+                console.log('before: start range', range);
+            } else {
+                console.log('before: no target ranges');
+            }
         }
-    }
-});
+    });
 
-rawEditor.addEventListener('input', (evt: InputEvent) => {
-    const { rangeOffset, rangeParent } = evt as any;
-    console.log('raw input', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
+    rawEditor.addEventListener('input', (evt: InputEvent) => {
+        const { rangeOffset, rangeParent } = evt as any;
+        console.log('raw input', evt.inputType, getTextRange(rawEditor), { rangeOffset, rangeParent }, evt);
+    });
 
-    // if (evt.getTargetRanges) {
-    //     const ranges = evt.getTargetRanges();
-    //     if (ranges.length) {
-    //         const range = rangeToLocation(rawEditor, evt.getTargetRanges()[0] as Range);
-    //         console.log('input: start range', range);
-    //     } else {
-    //         console.log('input: no target ranges');
-    //     }
-    // }
-});
-
-rawEditor.addEventListener('compositionstart', logComposition);
-rawEditor.addEventListener('compositionend', logComposition);
-rawEditor.addEventListener('compositionupdate', logComposition);
+    rawEditor.addEventListener('compositionstart', logComposition);
+    rawEditor.addEventListener('compositionend', logComposition);
+    rawEditor.addEventListener('compositionupdate', logComposition);
+}
 
 function logComposition(evt: CompositionEvent) {
     console.log(evt.type, JSON.stringify(evt.data), getTextRange(rawEditor), evt);

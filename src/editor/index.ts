@@ -4,7 +4,7 @@ import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { cutText, getInputEventText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent2, updateFromInputEventFallback } from './update';
+import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback } from './update';
 import { setLink, slice, mdToText, textToMd } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
@@ -66,24 +66,13 @@ export default class Editor {
     public history: History<Model>;
 
     private _model: Model;
-    /**
-     * Модель, которая накапливает изменения в режиме композиции.
-     * Если есть это свойство, значит, мы сейчас находимся в режиме композиции
-     * */
-    private composition = false
     /** Диапазон, который был на начало композиции */
     private compositionStartRange: TextRange | null = null;
 
     /** Диапазон, который был на начало композиции */
     private compositionRange: TextRange | null = null;
 
-    /** Данные из последнего события ввода в процессе композиции */
-    private compositionData: string | null = null;
-
     private pendingModel: Model | null = null;
-
-    /** Диапазон, который сейчас будет обновляться на событие ввода */
-    private startRange: TextRange | null = null;
     private _inited = false;
     private caret: TextRange = [0, 0];
     private focused = false;
@@ -112,73 +101,18 @@ export default class Editor {
         this.waitExpectedEnter(evt);
     }
 
-    private onCompositionStart = (evt: CompositionEvent) => {
-        console.log('composition start', JSON.stringify(evt.data), getTextRange(this.element));
-
+    private onCompositionStart = () => {
         this.compositionStartRange = getTextRange(this.element);
         this.compositionRange = null;
         this.expectEnter = false;
-        // this.composition = this.model;
-        // this.compositionData = null;
     }
 
-    private onCompositionUpdate = (evt: CompositionEvent) => {
-        // const range = getTextRange(this.element);
-        // Старые браузеры, которые не поддерживают `beforeinput` (например, Firefox 85),
-        // не отражают правильный диапазон изменения композиции, он всегда указывает
-        // на финальную позицию каретки. Попробуем это исправить
-        // if (range[0] === range[1] && this.compositionStartRange && evt.data) {
-        //     range[0] = Math.min(range[0], this.compositionStartRange[0]);
-        // }
-        // this.compositionRange = range;
-
+    private onCompositionUpdate = () => {
         this.compositionRange = this.getCompositionRange();
-        console.log('compositionupdate', { range: this.compositionRange, data: evt.data });
-
-        // if (this.composition) {
-        //     if (from !== to) {
-        //         this.composition = replaceText(this.composition, evt.data, from, to, this.options);
-        //     }
-        // }
     }
 
-    private onCompositionEnd = (evt: CompositionEvent) => {
-        console.log('composition end', JSON.stringify(evt.data), getTextRange(this.element));
+    private onCompositionEnd = () => {
         this.compositionStartRange = null;
-        // if (this.compositionStartRange) {
-        //     const range = getTextRange(this.element);
-        //     const [from, to] = this.getCompositionRange();
-        //     const nextModel = replaceText(this.model, evt.data, from, to, this.options);
-
-        //     this.updateModel(nextModel, 'composition', range);
-        //     this.setSelection(range[0], range[1]);
-        //     this.compositionStartRange = this.compositionRange = null;
-        // }
-
-        // this.compositionRange = null;
-        // if (this.composition && this.compositionStartRange) {
-        //     const range = getTextRange(this.element);
-        //     const [from, to] = this.compositionStartRange;
-        //     console.log('do update from [%s] to [%s] with "%s"', this.compositionStartRange.join(','), range.join(','), evt.data);
-
-        //     this.applyComposition(evt.data);
-        //     let nextModel = this.composition;
-
-        //     // Редактирование текста в Android:
-        //     // Когда начинаем удалять символы слова, Android переводит это слово
-        //     // в режим композиции и когда слово удаляется — выходит из него
-        //     if (!evt.data && from > range[0]) {
-        //         nextModel = removeText(nextModel, range[0], Math.max(range[1], to), this.options);
-        //     }
-
-        //     this.updateModel(
-        //         nextModel,
-        //         DiffActionType.Compose,
-        //         range
-        //     );
-        //     this.setSelection(range[0], range[1]);
-        //     this.composition = this.compositionStartRange = null;
-        // }
     }
 
     private onBeforeInput = (evt: InputEvent) => {
@@ -205,38 +139,13 @@ export default class Editor {
         if (!range) {
             range = getTextRange(this.element);
         }
-
-        console.log('before input', {
-            inputType: evt.inputType,
-            range,
-            data: getInputEventText(evt),
-            timeStamp: evt.timeStamp
-        });
-        this.pendingModel = updateFromInputEvent2(evt, this.model, range, this.options);
+        this.pendingModel = updateFromInputEvent(evt, this.model, range, this.options);
     }
 
     private onInput = (evt: InputEvent) => {
         this.expectEnter = false;
-
-        // Не используем свойство evt.composition, так как в некоторых раскладках
-        // в Хроме он будет всегда.
-        // Можно было бы проверять только на наличие this.composition, однако
-        // в разных браузерах по-разному работает выход из режима композиции:
-        // Firefox 85: compositionend → input
-        // Chrome 100: input → compositionend
-        // if (this.applyComposition(evt.data) || evt.inputType.includes('Composition')) {
-        //     console.log('skip composition event');
-        //     return;
-        // }
-
         let nextModel: Model;
         const range = getTextRange(this.element);
-        console.log('input', {
-            inputType: evt.inputType,
-            range,
-            data: getInputEventText(evt),
-            timeStamp: evt.timeStamp
-        });
 
         if (this.pendingModel) {
             nextModel = this.pendingModel;
@@ -249,9 +158,7 @@ export default class Editor {
             }
         } else {
             const prevRange = this.compositionRange || this.caret;
-            console.log('update from event', { range, prevRange });
             nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
-
             this.compositionRange = null;
         }
 
@@ -259,7 +166,6 @@ export default class Editor {
         if (nextModel) {
             this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
             this.setSelection(range[0], range[1]);
-            this.startRange = null;
         }
     }
 
@@ -856,11 +762,10 @@ export default class Editor {
     }
 
     private waitExpectedEnter(evt: KeyboardEvent): void {
-        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter') {
+        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter' && hasModifier(evt)) {
             this.expectEnter = true;
             requestAnimationFrame(() => {
                 if (this.expectEnter) {
-                    console.log('handle expected enter');
                     this.expectEnter = false;
                     this.insertOrReplaceText(getTextRange(this.element), '\n');
                     retainNewlineInViewport(this.element);
@@ -1025,4 +930,8 @@ function isFilePaste(data: DataTransfer) {
     }
 
     return false;
+}
+
+function hasModifier(evt: KeyboardEvent) {
+    return evt.altKey || evt.ctrlKey || evt.shiftKey || evt.metaKey;
 }
