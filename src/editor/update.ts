@@ -110,7 +110,9 @@ export function toggleFormat(model: Model, format: TokenFormat, from: number, to
 export function applyFormatFromFragment(model: Model, fragment: Model, offset = 0, options: BaseEditorOptions): Model {
     fragment.forEach(token => {
         const len = token.value.length;
-        if (token.format) {
+        if ('sticky' in token && token.sticky) {
+            model = setFormat(model, token.format, offset, offset + len, options);
+        } else if (token.format) {
             model = setFormat(model, { add: token.format }, offset, offset + len, options);
         }
 

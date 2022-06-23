@@ -5,13 +5,14 @@ import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback } from './update';
-import { setLink, slice, mdToText, textToMd } from '../formatted-string';
+import { setLink, slice, mdToText, textToMd, getFormat } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
 import type { ShortcutHandler } from './shortcuts';
 import { getInputText, isElement } from './utils';
 import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
+import { last } from '../parser/utils';
 
 const enum DiffActionType {
     Insert = 'insert',
@@ -210,8 +211,23 @@ export default class Editor {
             || sanitize(evt.clipboardData.getData('text/plain') || '');
 
         if (fragment && range) {
-            const len = typeof fragment === 'string'
-                ? fragment.length : getLength(fragment);
+            let len = 0;
+            if (typeof fragment === 'string') {
+                len = fragment.length
+            } else {
+                len = getLength(fragment);
+                if (last(fragment)?.format) {
+                    // У последнего токена есть форматирование: добавим sticky-токен,
+                    // чтобы пользователь продолжал писать в том же формате, что и был
+                    fragment.push({
+                        type: TokenType.Text,
+                        value: '',
+                        format: getFormat(this.model, range[0]),
+                        sticky: true
+                    });
+                }
+            }
+
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
 
