@@ -223,8 +223,6 @@ function renderText(token: Token, state: ReconcileState): void {
         if (tail) {
             state.text(tail);
         }
-
-        state.trim();
     } else {
         state.text(value);
     }
