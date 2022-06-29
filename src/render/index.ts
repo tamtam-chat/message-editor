@@ -9,7 +9,7 @@ declare global {
 }
 
 type ClassFormat = [type: TokenFormat, value: string];
-export type EmojiRender = (emoji: string | null, elem?: Element) => Element | void;
+export type EmojiRender = (emoji: string | null, elem?: Element, rawEmoji?: string) => Element | void;
 
 export interface RenderOptions {
     /**
@@ -328,7 +328,7 @@ class ReconcileState {
         const { emoji } = this.options;
         const node = this.container.childNodes[this.pos];
         const isCurEmoji = node ? isEmoji(node) : false;
-        const next = emoji(actualEmoji, isCurEmoji ? node as Element : null);
+        const next = emoji(actualEmoji, isCurEmoji ? node as Element : null, rawEmoji);
 
         if (next) {
             if (node !== next) {
