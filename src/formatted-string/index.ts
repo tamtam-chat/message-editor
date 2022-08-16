@@ -452,7 +452,7 @@ function expandToken(token: Token): TokenText | TokenLink {
 
         // Авто-ссылка: проверим её содержимое: если текст соответствует ссылке,
         // то оставим её, иначе превратим в текст
-        return parse(token.value, { link: true })[0] as TokenText | TokenLink;
+        return parse(token.value, { link: true, format: token.format })[0] as TokenText | TokenLink;
     }
 
     return toText(token);

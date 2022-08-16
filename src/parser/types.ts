@@ -32,6 +32,9 @@ export interface ParserOptions {
      * избавиться от неё
      */
     useFormat?: boolean;
+
+    /** Текущий формат токена */
+    format?: TokenFormat;
 }
 
 export enum TokenType {
