@@ -50,7 +50,7 @@ export function setDOMRange(range: Range): Range | undefined {
     } catch (err) {
         // Может быть ошибка, если элемент ещё не в DOM-дереве: игнорируем её
     }
-    sel.empty();
+    sel.removeAllRanges();
     sel.addRange(range);
     return range;
 }
