@@ -40,12 +40,6 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
         tokens = normalize(tokens);
     }
 
-    if (opt?.format) {
-        for (let i = 0; i < tokens.length; i++) {
-            tokens[i].format = opt.format
-        }
-    }
-
     return tokens;
 }
 
