@@ -519,15 +519,17 @@ export function isRenderLink(token: Token): boolean {
         return token.type === TokenType.Link && (!token.auto || /^[a-z+]+:\/\//i.test(token.value));
     }
 
-    if (isPrefixedToken(token)) {
+    if (token.type === TokenType.Mention) {
         return token.value.length > 1;
     }
 
     return token.type === TokenType.Link;
 }
 
-function isPrefixedToken(token: Token): token is TokenMention {
-    return token.type === TokenType.Mention;
+function isPrefixedToken(token: Token): token is TokenMention | TokenCommand | TokenHashTag {
+    return token.type === TokenType.Mention
+        || token.type === TokenType.Command
+        || token.type === TokenType.HashTag;
 }
 
 export function isPlainText(token: Token): token is TokenText {
