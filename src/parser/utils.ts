@@ -149,9 +149,9 @@ export function isBoundPunctuation(ch: number): boolean {
     return boundPunctuation.has(ch);
 }
 
-export function isDelimiterPunct(ch: number): boolean {
-    return delimiterPunctuation.has(ch);
-}
+// export function isDelimiterPunct(ch: number): boolean {
+//     return delimiterPunctuation.has(ch);
+// }
 
 export function isWhitespace(ch: number): boolean {
     return whiteSpace.has(ch);
@@ -163,12 +163,12 @@ export function isNewLine(ch: number): boolean {
         || ch === Codes.LineFeed;
 }
 
-export function isMarkdown(ch: number): boolean {
-    return ch === Codes.Asterisk
-        || ch === Codes.Underscore
-        || ch === Codes.Tilde
-        || ch === Codes.BackTick;
-}
+// export function isMarkdown(ch: number): boolean {
+//     return ch === Codes.Asterisk
+//         || ch === Codes.Underscore
+//         || ch === Codes.Tilde
+//         || ch === Codes.BackTick;
+// }
 
 export function isBound(ch?: number): boolean {
     return ch === undefined
@@ -245,9 +245,9 @@ export function toCode(str: string, ignoreCase?: boolean): number[] {
  * Проверяет, находимся ли мы сейчас в контексте блока кода: для некоторых случаев
  * это влияет на возможность парсинга
  */
-export function isCodeBlock(state: ParserState): boolean {
-    return state.hasFormat(TokenFormat.Monospace);
-}
+// export function isCodeBlock(state: ParserState): boolean {
+//     return state.hasFormat(TokenFormat.Monospace);
+// }
 
 /**
  * Вернёт `true` если указанный код соответствует числу

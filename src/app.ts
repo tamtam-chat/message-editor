@@ -1,5 +1,5 @@
 import { getTextRange, rangeToLocation } from './editor/range';
-import { Editor, TokenFormat } from './index';
+import { Editor, MDEditor, TokenFormat } from './index';
 
 const shortcuts: Record<string, (editor: Editor) => void> = {
     'Cmd+Z': editor => editor.undo(),
@@ -34,7 +34,7 @@ editor
     .on('editor-selectionchange', (evt: CustomEvent) => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', (evt: CustomEvent) => updateToolbarState(evt.detail.editor));
 
-const mdEditor = new Editor(document.querySelector('#md-editor'), {
+const mdEditor = new MDEditor(document.querySelector('#md-editor'), {
     value: 'Привет, *markdown* мир! 😇',
     shortcuts,
     parse: {

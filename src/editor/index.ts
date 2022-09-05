@@ -1,7 +1,7 @@
 import parse, { getLength, TokenFormat, TokenType } from '../parser';
 import type { Token } from '../parser';
 import render, { dispatch, isEmoji } from '../render';
-import type { BaseEditorOptions, TextRange, Model } from './types';
+import type { BaseEditorOptions, TextRange, Model, OmittedBaseEditorOptions } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback } from './update';
@@ -33,6 +33,18 @@ export interface EditorOptions extends BaseEditorOptions {
     htmlLinks?: boolean;
 }
 
+export interface OmittedEditorOptions extends OmittedBaseEditorOptions {
+    /** Значение по умолчанию для редактора */
+    value?: string;
+    shortcuts?: Record<string, ShortcutHandler<Editor>>;
+
+    /** Парсить HTML при вставке */
+    html?: boolean;
+
+    /** Размечать ссылки при вставке HTML */
+    htmlLinks?: boolean;
+}
+
 type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
 
 interface EditorEventDetails {
@@ -41,7 +53,7 @@ interface EditorEventDetails {
 
 export interface EditorEvent<T = EditorEventDetails> extends CustomEvent<T> {}
 
-interface PickLinkOptions {
+export interface PickLinkOptions {
     /**
      * Функция, которая на вход принимает текущую ссылку, если она есть, и должна
      * вернуть новую ссылку или Promise, который вернёт ссылку
@@ -58,13 +70,14 @@ interface PickLinkOptions {
 /** MIME-тип для хранения отформатированной строки в буффере */
 const fragmentMIME = 'tamtam/fragment';
 
-const defaultPickLinkOptions: PickLinkOptions = {
+export const defaultPickLinkOptions: PickLinkOptions = {
     url: cur => prompt('Введите ссылку', cur)
 };
 
 export default class Editor {
     public shortcuts: Shortcuts<Editor>;
     public history: History<Model>;
+    public options: EditorOptions;
 
     private _model: Model;
     /** Диапазон, который был на начало композиции */
@@ -82,7 +95,8 @@ export default class Editor {
     /**
      * @param element Контейнер, в котором будет происходить редактирование
      */
-    constructor(public element: HTMLElement, public options: EditorOptions = {}) {
+    constructor(public element: HTMLElement, options: OmittedEditorOptions = {}) {
+        this.options = options
         const value = options.value || '';
         this.model = parse(this.sanitizeText(value), options.parse);
         this.history = new History({
@@ -460,26 +474,15 @@ export default class Editor {
      * диапазоне (если она есть), и должна вернуть новую ссылку. Если надо убрать
      * ссылку, функция должна вернуть пустую строку
      */
-    pickLink(options: PickLinkOptions = defaultPickLinkOptions): void {
+    pickLink(options: PickLinkOptions = defaultPickLinkOptions, token?: Token): void {
         const [from, to] = options.range || this.getSelection();
-        let token = this.tokenForPos(from);
+        if (!token) {
+            token = this.tokenForPos(from);
+        }
         let currentUrl = '';
 
-        if (token) {
-            if (token.format & TokenFormat.LinkLabel) {
-                // Это подпись к ссылке в MD-формате. Найдём саму ссылку
-                let ix = this.model.indexOf(token) + 1;
-                while (ix < this.model.length) {
-                    token = this.model[ix++];
-                    if (token.type === TokenType.Link) {
-                        break;
-                    }
-                }
-            }
-
-            if (token.type === TokenType.Link) {
-                currentUrl = token.link;
-            }
+        if (token && token.type === TokenType.Link) {
+            currentUrl = token.link;
         }
 
         const result = options.url(currentUrl);
@@ -505,13 +508,8 @@ export default class Editor {
 
         let updated: Model;
         const range: Rng = [from, to - from];
-        if (this.isMarkdown) {
-            const text = mdToText(this.model, range);
-            const next = setLink(text, url, range[0], range[1]);
-            updated = parse(textToMd(next, range), this.options.parse);
-        } else {
-            updated = setLink(this.model, url, range[0], range[1]);
-        }
+
+        updated = setLink(this.model, url, range[0], range[1]);
 
         const result = this.updateModel(updated, 'link', [from, to]);
         setRange(this.element, range[0], range[0] + range[1]);
@@ -643,16 +641,10 @@ export default class Editor {
     /**
      * Обновляет опции редактора
      */
-    setOptions(options: Partial<EditorOptions>): void {
-        let markdownUpdated = false;
+    setOptions(options: Partial<EditorOptions>, markdownUpdated?: boolean): void {
         if (options.shortcuts) {
             this.shortcuts.unregisterAll();
             this.shortcuts.registerAll(options.shortcuts);
-        }
-
-        if (options.parse) {
-            const markdown = !!this.options.parse?.markdown;
-            markdownUpdated = options.parse.markdown !== markdown;
         }
 
         this.options = {
@@ -660,15 +652,7 @@ export default class Editor {
             ...options
         };
 
-        if (markdownUpdated) {
-            const sel = this.getSelection();
-            const range: Rng = [sel[0], sel[1] - sel[0]];
-            const tokens = this.options.parse?.markdown
-                ? textToMd(this.model, range)
-                : mdToText(this.model, range);
-
-            this.setValue(tokens, [range[0], range[0] + range[1]]);
-        } else {
+        if (!markdownUpdated) {
             this.render();
         }
     }
@@ -717,7 +701,7 @@ export default class Editor {
      * @param range Диапазон выделения, который нужно сохранить в качестве текущего
      * в записи в истории
      */
-    private updateModel(value: Model, action?: string | false, range?: TextRange): Model {
+    protected updateModel(value: Model, action?: string | false, range?: TextRange): Model {
         if (value !== this.model) {
             if (typeof action === 'string') {
                 this.history.push(value, action, range);
@@ -757,7 +741,7 @@ export default class Editor {
         return false;
     }
 
-    private render(): void {
+    protected render(): void {
         render(this.element, this.model, {
             fixTrailingLine: true,
             replaceTextEmoji: this.options.parse?.textEmoji,
@@ -817,7 +801,7 @@ export default class Editor {
     }
 }
 
-function isCollapsed(range: TextRange): boolean {
+export function isCollapsed(range: TextRange): boolean {
     return range[0] === range[1];
 }
 
