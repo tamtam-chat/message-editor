@@ -519,7 +519,7 @@ export function isRenderLink(token: Token): boolean {
         return token.type === TokenType.Link && (!token.auto || /^[a-z+]+:\/\//i.test(token.value));
     }
 
-    if (isPrefixedToken(token)) {
+    if (token.type === TokenType.Mention) {
         return token.value.length > 1;
     }
 
