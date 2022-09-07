@@ -13,6 +13,7 @@ import { getInputText, isElement } from './utils';
 import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 import { last } from '../parser/utils';
+import { objectMerge } from '../utils/objectMerge';
 
 const enum DiffActionType {
     Insert = 'insert',
@@ -655,10 +656,7 @@ export default class Editor {
             markdownUpdated = options.parse.markdown !== markdown;
         }
 
-        this.options = {
-            ...this.options,
-            ...options
-        };
+        this.options = objectMerge(this.options, options);
 
         if (markdownUpdated) {
             const sel = this.getSelection();
@@ -804,7 +802,7 @@ export default class Editor {
 
         return typeof text === 'string'
             ? sanitize(text, nowrap) as T
-            : text.map(t => ({ ...t, value: sanitize(t.value, nowrap) })) as T;
+            : text.map(t => objectMerge(t, { value: sanitize(t.value, nowrap) })) as T;
     }
 
     private getCompositionRange(): TextRange {

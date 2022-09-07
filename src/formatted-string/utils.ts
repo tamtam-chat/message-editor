@@ -1,5 +1,6 @@
 import { TokenType, TokenFormat } from '../parser';
 import type { Token, Emoji, TokenLink, TokenText } from '../parser';
+import { objectMerge } from '../utils/objectMerge';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) */
@@ -124,11 +125,10 @@ export function splitToken(token: Token, pos: number): [Token, Token] {
  */
 export function sliceToken(token: Token, start: number, end = token.value.length): Token {
     const { value, emoji } = token;
-    const result = {
-        ...token,
+    const result = objectMerge(token, {
         value: value.slice(start, end),
         emoji: sliceEmoji(emoji, start, end)
-    };
+    });
 
     if (result.type === TokenType.Link) {
         // Если достаём фрагмент автоссылки, то убираем это признак
@@ -191,8 +191,7 @@ export function isAutoLink(token: Token): token is TokenLink {
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
-    return emoji.map(e => ({
-        ...e,
+    return emoji.map(e => objectMerge(e, {
         from: e.from + offset,
         to: e.to + offset
     }));

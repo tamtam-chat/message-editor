@@ -1,6 +1,7 @@
 import { TokenFormat, TokenType } from './types';
 import type { ParserOptions, Emoji, Token, TokenLink } from './types';
 import type ParserState from './state';
+import { objectMerge } from '../utils/objectMerge';
 
 export const Codes = {
     // Formatting
@@ -411,7 +412,7 @@ function joinSimilar(tokens: Token[]): Token[] {
     return tokens.reduce((out, token) => {
         let prev = out[out.length - 1];
         if (prev && allowJoin(prev, token)) {
-            prev = { ...prev };
+            prev = objectMerge(prev);
 
             if (token.emoji) {
                 const nextEmoji = shiftEmoji(token.emoji, prev.value.length);
@@ -439,8 +440,7 @@ function allowJoin(token1: Token, token2: Token): boolean {
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
-    return emoji.map(e => ({
-        ...e,
+    return emoji.map(e => objectMerge(e, {
         from: e.from + offset,
         to: e.to + offset
     }));

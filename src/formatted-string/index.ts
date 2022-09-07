@@ -6,6 +6,7 @@ import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
     sliceToken, toLink, toText, tokenRange, createToken
 } from './utils';
+import { objectMerge } from '../utils/objectMerge';
 
 export { mdToText, textToMd, tokenForPos }
 export type { CutText, TokenFormatUpdate, TextRange }
@@ -89,10 +90,9 @@ export function setFormat(tokens: Token[], format: TokenFormatUpdate | TokenForm
         for (let i = start.index + 1, nextFormat: TokenFormat; i < end.index; i++) {
             nextFormat = applyFormat(tokens[i].format, format);
             if (tokens[i].format !== nextFormat) {
-                tokens[i] = {
-                    ...tokens[i],
+                tokens[i] = objectMerge(tokens[i], {
                     format: nextFormat
-                };
+                });
             }
         }
 
@@ -395,7 +395,7 @@ function applyFormatAt(tokens: Token[], tokenIndex: number, update: TokenFormatU
 
     if (pos === 0 && len === token.value.length) {
         // Частный случай: меняем формат у всего токена
-        nextTokens = [{ ...token, format }];
+        nextTokens = [objectMerge(token, { format })];
     } else {
         // Делим токен на части. Если это специальный токен типа хэштэга
         // или команды, превратим его в обычный текст

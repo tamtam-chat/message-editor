@@ -1,6 +1,7 @@
 import { isAutoLink, isCustomLink } from '../formatted-string/utils';
 import type { Emoji, Token, TokenHashTag, TokenLink, TokenMention, TokenCommand, TokenText } from '../parser';
 import { TokenFormat, TokenType } from '../parser';
+import { objectMerge } from '../utils/objectMerge';
 
 declare global {
     interface Element {
@@ -78,7 +79,7 @@ const defaultOptions: RenderOptions = {
 }
 
 export default function render(elem: HTMLElement, tokens: Token[], opt?: Partial<RenderOptions>): void {
-    const options: RenderOptions = opt ? { ...defaultOptions, ...opt } : defaultOptions;
+    const options: RenderOptions = opt ? objectMerge(defaultOptions, opt) : defaultOptions;
 
     if (options.inline) {
         renderInline(elem, tokens, options);
