@@ -8,7 +8,7 @@ import {
 import type { TokenFormatUpdate, CutText } from '../formatted-string';
 import { isCustomLink, tokenForPos } from '../formatted-string/utils';
 import type { BaseEditorOptions, TextRange, Model } from './types';
-import { getInputText } from './utils';
+import { getInputText, isCollapsed, startsWith } from './utils';
 
 const skipInputTypes = new Set<string>([
     'insertOrderedList',
@@ -142,7 +142,7 @@ function handleSkipEvent(evt: InputEvent, model: Model): Model | undefined {
 
 function handleFormatEvent(evt: InputEvent, model: Model, range: TextRange, options: BaseEditorOptions): Model | undefined {
     const { inputType } = evt;
-    if (inputType.startsWith('format')) {
+    if (inputType && startsWith(inputType, 'format')) {
         const [from, to] = range;
         // Применяем форматирование: скорее всего это Safari с тачбаром
         if (inputType === 'formatFontColor') {
@@ -166,10 +166,40 @@ function handleFormatEvent(evt: InputEvent, model: Model, range: TextRange, opti
 }
 
 function handleInsertEvent(evt: InputEvent, model: Model, range: TextRange, options: BaseEditorOptions): Model | undefined {
-    if (evt.inputType.startsWith('insert')) {
+    const { inputType } = evt;
+    if (inputType && startsWith(inputType, 'insert')) {
         const text = getInputEventText(evt);
         return replaceText(model, text, range[0], range[1], options);
     }
+}
+
+/**
+ * Выполняет обновление для старых браузеров, которые ещё не поддерживают
+ * полноценный `InputEvent`
+ */
+export function updateFromOldEvent(text: string, model: Model, range: TextRange, prevRange: TextRange, options: BaseEditorOptions) {
+    let [from, to] = prevRange;
+    let update = '';
+    if (isCollapsed(prevRange)) {
+        const len = getLength(model);
+        if (len > text.length) {
+            // Удалили контент
+            from = Math.min(from, range[0]);
+            to = Math.max(to, range[1]);
+            if (from === to) {
+                // Удаление справа от курсора
+                to += len - text.length;
+            }
+        } else {
+            // Добавили контент
+            update = text.slice(from, Math.max(range[0], range[1]));
+        }
+    } else {
+        // Было выделение: либо заменили контент, либо удалили
+        update = text.slice(Math.min(from, range[0]), range[1]);
+    }
+
+    return replaceText(model, update, from, to, options);
 }
 
 export function updateFromInputEventFallback(evt: InputEvent, model: Model, range: TextRange, prevRange: TextRange, options: BaseEditorOptions): Model {
@@ -181,7 +211,8 @@ export function updateFromInputEventFallback(evt: InputEvent, model: Model, rang
         return updated;
     }
 
-    if (evt.inputType.startsWith('delete')) {
+    const { inputType } = evt;
+    if (inputType && startsWith(inputType, 'delete')) {
         const [from, to] = range;
         const [prevFrom, prevTo] = prevRange;
         const boundFrom = Math.min(from, prevFrom);
@@ -210,7 +241,8 @@ export function updateFromInputEvent(evt: InputEvent, model: Model, range: TextR
         return updated;
     }
 
-    if (evt.inputType.startsWith('delete')) {
+    const { inputType } = evt;
+    if (inputType && inputType.startsWith('delete')) {
         return removeText(model, range[0], range[1], options);
     }
 

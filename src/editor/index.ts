@@ -4,12 +4,12 @@ import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback } from './update';
+import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback, updateFromOldEvent } from './update';
 import { setLink, slice, mdToText, textToMd, getFormat } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
 import type { ShortcutHandler } from './shortcuts';
-import { getInputText, isElement } from './utils';
+import { getInputText, isCollapsed, isElement, startsWith } from './utils';
 import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 import { last } from '../parser/utils';
@@ -160,7 +160,9 @@ export default class Editor {
             }
         } else {
             const prevRange = this.compositionRange || this.caret;
-            nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+            nextModel = evt.inputType
+                ? updateFromInputEventFallback(evt, this.model, range, prevRange, this.options)
+                : updateFromOldEvent(this.getInputText(), this.model, range, prevRange, this.options);
             this.compositionRange = null;
         }
 
@@ -815,10 +817,6 @@ export default class Editor {
     }
 }
 
-function isCollapsed(range: TextRange): boolean {
-    return range[0] === range[1];
-}
-
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }
@@ -897,16 +895,18 @@ function getFormattedString(data: DataTransfer, options: EditorOptions): Token[]
 
 function getDiffTypeFromEvent(evt: InputEvent): DiffActionType | string {
     const { inputType } = evt;
-    if (inputType.startsWith('insert')) {
-        return DiffActionType.Insert;
-    }
+    if (inputType) {
+        if (startsWith(inputType, 'insert')) {
+            return DiffActionType.Insert;
+        }
 
-    if (inputType.startsWith('delete')) {
-        return DiffActionType.Remove;
-    }
+        if (startsWith(inputType, 'delete')) {
+            return DiffActionType.Remove;
+        }
 
-    if (inputType.startsWith('format')) {
-        return 'format';
+        if (startsWith(inputType, 'format')) {
+            return 'format';
+        }
     }
 
     return 'update';

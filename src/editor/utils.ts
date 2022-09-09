@@ -1,3 +1,5 @@
+import type { TextRange } from './types';
+
 export function createWalker(elem: HTMLElement): TreeWalker {
     return elem.ownerDocument.createTreeWalker(elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT)
 }
@@ -58,4 +60,16 @@ export function getInputText(element: Element): string {
     }
 
     return result;
+}
+
+/**
+ * Утилита для старых браузеров
+ */
+export const startsWith = String.prototype.startsWith
+    ? (text: string, prefix: string) => text.startsWith(prefix)
+    : (text: string, prefix: string) => text.slice(0, prefix.length) === prefix;
+
+
+export function isCollapsed(range: TextRange): boolean {
+    return range[0] === range[1];
 }
