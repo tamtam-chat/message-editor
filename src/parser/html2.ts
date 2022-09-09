@@ -12,6 +12,7 @@ import link from './link';
 import { consumeNewline } from './newline';
 import { setLink } from '../formatted-string';
 import { trim } from '../formatted-string/split';
+import { objectMerge } from '../utils/objectMerge';
 
 interface HTMLParserOptions {
     /** Разрешать парсить ссылки */
@@ -111,10 +112,9 @@ class HTMLParseState {
     options: HTMLParserOptions;
 
     constructor(opt?: Partial<HTMLParserOptions>) {
-        this.options = {
-            links: false,
-            ...opt
-        };
+        this.options = objectMerge({
+            links: false
+        }, opt);
     }
 
     pushText(text: string) {
@@ -160,10 +160,9 @@ class HTMLParseState {
             text = text.replace(/[\s\r\n]+/g, ' ');
         }
 
-        const state = new ParserState(text, {
-            ...defaultOptions,
+        const state = new ParserState(text, objectMerge(defaultOptions, {
             useFormat: true
-        });
+        }));
         state.format = this.format;
 
         if (this.link) {

@@ -3,4 +3,5 @@
 yarn-error.log
 /dist
 /public
+/.idea
 

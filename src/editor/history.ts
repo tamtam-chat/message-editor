@@ -1,5 +1,6 @@
 import type { Token } from '../parser';
 import type { TextRange } from './types';
+import { objectMerge } from '../utils/objectMerge';
 
 export interface HistoryOptions {
     /** Список действий, которые можно схлопнуть в одно */
@@ -33,10 +34,7 @@ export default class History<S = Token[]> {
     private _ptr = -1;
 
 	constructor(options?: Partial<HistoryOptions>) {
-		this.options = {
-			...defaultOptions,
-			...options
-		};
+		this.options = objectMerge(defaultOptions, options);
 	}
 
 	/**

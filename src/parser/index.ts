@@ -11,9 +11,10 @@ import link from './link';
 import markdown from './markdown';
 import newline from './newline';
 import { normalize, defaultOptions } from './utils';
+import { objectMerge } from '../utils/objectMerge';
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
-    const options: ParserOptions = { ...defaultOptions, ...opt };
+    const options: ParserOptions = objectMerge(defaultOptions, opt);
     const state = new ParserState(text, options);
 
     while (state.hasNext()) {
