@@ -35,9 +35,7 @@ function atHashtagBound(state: ParserState): boolean {
 
     if (!state.hasPendingText()) {
         const lastToken = last(state.tokens);
-        if (lastToken) {
-            return lastToken.type === TokenType.HashTag;
-        }
+        return lastToken?.type === TokenType.HashTag;
     }
 
     return false;

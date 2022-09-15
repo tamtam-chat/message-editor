@@ -51,6 +51,19 @@ describe('Text Emoji', () => {
         tokens = parse(':)a');
         t = tokens[0] as TokenText;
         deepEqual(types(tokens), [TokenType.Text]);
-        equal(t.emoji, undefined);
+        equal(emojiValue(t, 0), ':)');
+        equal(emojiAlias(t, 0), '🙂');
+    });
+
+    it('multiple text smiles', () => {
+        const tokens = parse(':):):):)');
+        const t = tokens[0] as TokenText;
+        deepEqual(types(tokens), [TokenType.Text]);
+        deepEqual(t.emoji, [
+            { from: 0, to: 2, emoji: '🙂' },
+            { from: 2, to: 4, emoji: '🙂' },
+            { from: 4, to: 6, emoji: '🙂' },
+            { from: 6, to: 8, emoji: '🙂' }
+        ]);
     });
 });
