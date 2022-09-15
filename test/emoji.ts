@@ -12,7 +12,7 @@ function types(tokens: Token[]): TokenType[] {
     return tokens.map(t => t.type);
 }
 
-function emoji(token: Token): string[] {
+function emoji(token: Token): string[] | undefined {
     if (token.type === TokenType.Text && token.emoji) {
         return token.emoji.map(e => token.value.substring(e.from, e.to));
     }
@@ -72,10 +72,10 @@ describe('Emoji', () => {
             return null;
         };
         const repr = (text: string) => {
-            const chars = [];
+            const chars: string[] = [];
             let i = 0;
             while (i < text.length) {
-                const cp = text.codePointAt(i);
+                const cp = text.codePointAt(i)!;
                 chars.push(`U+${cp.toString(16).toUpperCase()}`);
                 i += cp > 0xffff ? 2 : 1;
             }

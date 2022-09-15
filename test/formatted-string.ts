@@ -57,8 +57,8 @@ function text(tokens: Token[]): string {
     return tokens.map(t => t.value).join('');
 }
 
-function emojiText(token: Token): string[] {
-    return token.emoji.map(e => token.value.substring(e.from, e.to));
+function emojiText(token: Token): string[] | undefined {
+    return token.emoji?.map(e => token.value.substring(e.from, e.to));
 }
 
 function types(tokens: Token[]): TokenType[] {

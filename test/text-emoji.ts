@@ -14,14 +14,14 @@ function values(tokens: Token[]): string[] {
     return tokens.map(t => t.value);
 }
 
-function emojiValue(token: Token, pos = 0): string {
+function emojiValue(token: Token, pos = 0): string | undefined {
     if (token.type === TokenType.Text && token.emoji) {
         const e = token.emoji[pos];
         return token.value.substring(e.from, e.to);
     }
 }
 
-function emojiAlias(token: Token, pos = 0): string {
+function emojiAlias(token: Token, pos = 0): string | undefined {
     if (token.type === TokenType.Text && token.emoji) {
         return token.emoji[pos].emoji;
     }
