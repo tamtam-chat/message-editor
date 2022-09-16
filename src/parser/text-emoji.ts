@@ -7,7 +7,7 @@ import { type Emoji, TokenType } from './types';
 const lookup = createTree(Object.keys(aliases));
 
 export default function parseTextEmoji(state: ParserState): boolean {
-    if (state.options.textEmoji && atTextEmojiBound(state)) {
+    if (state.options.textEmoji) {
         const { pos } = state;
 
         // Если нашли совпадение, то убедимся, что оно на границе слов

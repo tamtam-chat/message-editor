@@ -46,7 +46,9 @@ describe('Text Emoji', () => {
         tokens = parse('a:)');
         t = tokens[0] as TokenText;
         deepEqual(types(tokens), [TokenType.Text]);
-        equal(t.emoji, undefined);
+        // equal(t.emoji, undefined);
+        equal(emojiValue(t, 0), ':)');
+        equal(emojiAlias(t, 0), '🙂');
 
         tokens = parse(':)a');
         t = tokens[0] as TokenText;
