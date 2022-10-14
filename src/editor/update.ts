@@ -2,7 +2,6 @@ import { getLength, Token } from '../parser';
 import parse, { TokenFormat } from '../parser';
 import {
     insertText as plainInsertText, removeText as plainRemoveText, replaceText as plainReplaceText,
-    mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
     cutText as plainCutText, setFormat as plainSetFormat, setLink, slice,
 } from '../formatted-string';
 import type { TokenFormatUpdate, CutText } from '../formatted-string';
@@ -10,7 +9,7 @@ import { isCustomLink, tokenForPos } from '../formatted-string/utils';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import { getInputText } from './utils';
 
-const skipInputTypes = new Set<string>([
+export const skipInputTypes = new Set<string>([
     'insertOrderedList',
     'insertUnorderedList',
     'deleteOrderedList',
@@ -21,12 +20,9 @@ const skipInputTypes = new Set<string>([
  * Вставляет указанный текст в модель в указанную позицию
  */
 export function insertText(model: Model, pos: number, text: string, options: BaseEditorOptions): Model {
-    const md = isMarkdown(options);
-    let updated = md
-        ? mdInsertText(model, pos, text, options.parse)
-        : plainInsertText(model, pos, text, options.parse);
+    let updated = plainInsertText(model, pos, text, options.parse);
 
-    if (options.resetFormatOnNewline && !md && /^[\n\r]+$/.test(text)) {
+    if (options.resetFormatOnNewline && /^[\n\r]+$/.test(text)) {
         updated = plainSetFormat(updated, TokenFormat.None, pos, text.length);
     }
 
@@ -34,16 +30,12 @@ export function insertText(model: Model, pos: number, text: string, options: Bas
 }
 
 export function removeText(model: Model, from: number, to: number, options: BaseEditorOptions): Model {
-    return isMarkdown(options)
-        ? mdRemoveText(model, from, to - from, options.parse)
-        : plainRemoveText(model, from, to - from, options.parse);
+    return plainRemoveText(model, from, to - from, options.parse);
 }
 
 export function replaceText(model: Model, text: Model | string, from: number, to: number, options: BaseEditorOptions): Model {
     const value = typeof text === 'string' ? text : getText(text);
-    model = isMarkdown(options)
-        ? mdReplaceText(model, from, to - from, value, options.parse)
-        : plainReplaceText(model, from, to - from, value, options.parse);
+    model = plainReplaceText(model, from, to - from, value, options.parse);
 
     // Применяем форматирование из фрагмента
     if (Array.isArray(text)) {
@@ -57,9 +49,7 @@ export function replaceText(model: Model, text: Model | string, from: number, to
  * Вырезает фрагмент по указанному диапазону из модели и возвращает его
  */
 export function cutText(model: Model, from: number, to: number, options: BaseEditorOptions): CutText {
-    return isMarkdown(options)
-        ? mdCutText(model, from, to, options.parse)
-        : plainCutText(model, from, to, options.parse);
+    return plainCutText(model, from, to, options.parse);
 }
 
 /**
@@ -67,16 +57,6 @@ export function cutText(model: Model, from: number, to: number, options: BaseEdi
  */
 export function setFormat(tokens: Model, format: TokenFormat | TokenFormatUpdate, from: number, to: number, options: BaseEditorOptions): Model {
     const len = to - from;
-    if (isMarkdown(options)) {
-        // С изменением MD-форматирования немного схитрим: оставим «чистый» набор
-        // токенов, без MD-символов, и поменяем ему формат через стандартный `setFormat`.
-        // Полученный результат обрамим MD-символами для получения нужного результата
-        // и заново распарсим
-        const text = mdToText(tokens, [from, len]);
-        const updated = plainSetFormat(text, format, from, len);
-        return parse(textToMd(updated, [from, len]), options.parse);
-    }
-
     return plainSetFormat(tokens, format, from, len);
 }
 
@@ -126,14 +106,14 @@ export function applyFormatFromFragment(model: Model, fragment: Model, offset = 
     return model;
 }
 
-const inputToFormat: Record<string, TokenFormat> = {
+export const inputToFormat: Record<string, TokenFormat> = {
     formatBold: TokenFormat.Bold,
     formatItalic: TokenFormat.Italic,
     formatUnderline: TokenFormat.Underline,
     formatStrikeThrough: TokenFormat.Strike
 }
 
-function handleSkipEvent(evt: InputEvent, model: Model): Model | undefined {
+export function handleSkipEvent(evt: InputEvent, model: Model): Model | undefined {
     if (skipInputTypes.has(evt.inputType)) {
         evt.preventDefault();
         return model;
@@ -222,10 +202,6 @@ export function updateFromInputEvent(evt: InputEvent, model: Model, range: TextR
  */
 export function getText(tokens: Token[]): string {
     return tokens.map(t => t.value).join('');
-}
-
-function isMarkdown(options: BaseEditorOptions): boolean {
-    return !!(options.parse?.markdown);
 }
 
 export function getInputEventText(evt: InputEvent): string {

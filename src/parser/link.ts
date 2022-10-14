@@ -15,7 +15,7 @@ import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, to
 import { keycap } from './emoji';
 import { TokenFormat, TokenType } from './types';
 import type { TokenLink } from './types';
-import { peekClosingMarkdown } from './markdown';
+import { peekClosingMarkdown } from '../md-parser/markdown';
 import tld from '../data/tld';
 
 const enum FragmentMatch {

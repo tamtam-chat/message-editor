@@ -1,8 +1,8 @@
-import type { TextRange } from './types';
+import type { TextRange } from '../formatted-string/types';
 import { TokenFormat, TokenType } from '../parser';
 import type { Token } from '../parser';
-import { charToFormat, isStartBoundChar, isEndBoundChar } from '../parser/markdown';
-import { isCustomLink } from './utils';
+import { charToFormat, isStartBoundChar, isEndBoundChar } from '../md-parser/markdown';
+import { isCustomLink } from '../formatted-string/utils';
 
 interface TextConvertState {
     format: TokenFormat;

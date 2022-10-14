@@ -1,11 +1,11 @@
-import parse, { getLength, TokenFormat, TokenType } from '../parser';
+import parse, { getLength, ParserOptions, TokenFormat, TokenType } from '../parser';
 import type { Token } from '../parser';
 import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback } from './update';
-import { setLink, slice, mdToText, textToMd, getFormat } from '../formatted-string';
+import { setLink, slice, getFormat } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
 import type { ShortcutHandler } from './shortcuts';
@@ -14,7 +14,7 @@ import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 import { last } from '../parser/utils';
 
-const enum DiffActionType {
+export const enum DiffActionType {
     Insert = 'insert',
     Remove = 'remove',
     Replace = 'replace',
@@ -84,7 +84,7 @@ export default class Editor {
      */
     constructor(public element: HTMLElement, public options: EditorOptions = {}) {
         const value = options.value || '';
-        this.model = parse(this.sanitizeText(value), options.parse);
+        this.model = this.parse(this.sanitizeText(value), options.parse);
         this.history = new History({
             compactActions: [DiffActionType.Insert, DiffActionType.Remove]
         });
@@ -140,7 +140,7 @@ export default class Editor {
         if (!range) {
             range = getTextRange(this.element);
         }
-        this.pendingModel = updateFromInputEvent(evt, this.model, range, this.options);
+        this.pendingModel = this.updateFromInputEvent(evt, range);
     }
 
     private onInput = (evt: InputEvent) => {
@@ -159,7 +159,7 @@ export default class Editor {
             }
         } else {
             const prevRange = this.compositionRange || this.caret;
-            nextModel = updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+            nextModel = this.updateFromInputEventFallback(evt, range, prevRange);
             this.compositionRange = null;
         }
 
@@ -206,7 +206,7 @@ export default class Editor {
         }
 
         const range = getTextRange(this.element);
-        const parsed = getFormattedString(evt.clipboardData, this.options);
+        const parsed = this.getFormattedString(evt.clipboardData, this.options);
         const fragment: string | Token[] = parsed
             || sanitize(evt.clipboardData.getData('text/plain') || '');
 
@@ -276,13 +276,6 @@ export default class Editor {
             this.emit('editor-update');
             this.render();
         }
-    }
-
-    /**
-     * Вернёт `true` если редактор работает в режиме Markdown
-     */
-    get isMarkdown(): boolean {
-        return !!(this.options.parse?.markdown);
     }
 
     /**
@@ -359,7 +352,7 @@ export default class Editor {
     insertText(pos: number, text: string): Model {
         text = this.sanitizeText(text);
         const result = this.updateModel(
-            insertText(this.model, pos, text, this.options),
+            this.updateInsertText(pos, text),
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
@@ -394,7 +387,7 @@ export default class Editor {
      * @returns Вырезанный фрагмент модели
      */
     cut(from: number, to: number): Model {
-        const result = cutText(this.model, from, to, this.options);
+        const result = this.cutText(from, to);
         this.updateModel(result.tokens, 'cut', [from, to]);
         return result.cut;
     }
@@ -505,13 +498,7 @@ export default class Editor {
 
         let updated: Model;
         const range: Rng = [from, to - from];
-        if (this.isMarkdown) {
-            const text = mdToText(this.model, range);
-            const next = setLink(text, url, range[0], range[1]);
-            updated = parse(textToMd(next, range), this.options.parse);
-        } else {
-            updated = setLink(this.model, url, range[0], range[1]);
-        }
+        updated = setLink(this.model, url, range[0], range[1]);
 
         const result = this.updateModel(updated, 'link', [from, to]);
         setRange(this.element, range[0], range[0] + range[1]);
@@ -604,7 +591,7 @@ export default class Editor {
      */
     setValue(value: string | Model, selection?: TextRange): void {
         if (typeof value === 'string') {
-            value = parse(this.sanitizeText(value), this.options.parse);
+            value = this.parse(this.sanitizeText(value), this.options.parse);
         }
 
         if (!selection) {
@@ -644,15 +631,9 @@ export default class Editor {
      * Обновляет опции редактора
      */
     setOptions(options: Partial<EditorOptions>): void {
-        let markdownUpdated = false;
         if (options.shortcuts) {
             this.shortcuts.unregisterAll();
             this.shortcuts.registerAll(options.shortcuts);
-        }
-
-        if (options.parse) {
-            const markdown = !!this.options.parse?.markdown;
-            markdownUpdated = options.parse.markdown !== markdown;
         }
 
         this.options = {
@@ -660,17 +641,7 @@ export default class Editor {
             ...options
         };
 
-        if (markdownUpdated) {
-            const sel = this.getSelection();
-            const range: Rng = [sel[0], sel[1] - sel[0]];
-            const tokens = this.options.parse?.markdown
-                ? textToMd(this.model, range)
-                : mdToText(this.model, range);
-
-            this.setValue(tokens, [range[0], range[0] + range[1]]);
-        } else {
-            this.render();
-        }
+        this.render();
     }
 
     /**
@@ -717,7 +688,7 @@ export default class Editor {
      * @param range Диапазон выделения, который нужно сохранить в качестве текущего
      * в записи в истории
      */
-    private updateModel(value: Model, action?: string | false, range?: TextRange): Model {
+    protected updateModel(value: Model, action?: string | false, range?: TextRange): Model {
         if (value !== this.model) {
             if (typeof action === 'string') {
                 this.history.push(value, action, range);
@@ -726,35 +697,6 @@ export default class Editor {
         }
 
         return this.model;
-    }
-
-    /**
-     * Правильно помещает фрагмент текста в буффер. Вместе с обычным текстом
-     * туда помещается сериализованный фрагмент модели, чтобы сохранить форматирование
-     */
-    private copyFragment(clipboard: DataTransfer, cut?: boolean): boolean {
-        const range = getTextRange(this.element);
-
-        if (range && !isCollapsed(range)) {
-            const fragment = cut
-                ? this.cut(range[0], range[1])
-                : this.slice(range[0], range[1]);
-
-            clipboard.setData('text/plain', getText(fragment));
-            clipboard.setData('text/html', toHTML(fragment));
-
-            if (!this.isMarkdown) {
-                clipboard.setData(fragmentMIME, JSON.stringify(fragment));
-            }
-
-            if (cut) {
-                this.setSelection(range[0]);
-            }
-
-            return true;
-        }
-
-        return false;
     }
 
     private render(): void {
@@ -766,7 +708,7 @@ export default class Editor {
         });
     }
 
-    private emit(eventName: EventName): void {
+    protected emit(eventName: EventName): void {
         if (this._inited) {
             dispatch<EditorEventDetails>(this.element, eventName, { editor: this });
         }
@@ -791,7 +733,7 @@ export default class Editor {
     }
 
     private insertOrReplaceText(range: TextRange, text: string): Model {
-        return isCollapsed(range)
+        return this.isCollapsed(range)
             ? this.insertText(range[0], text)
             : this.replaceText(range[0], range[1], text);
     }
@@ -815,10 +757,82 @@ export default class Editor {
 
         return range;
     }
-}
 
-function isCollapsed(range: TextRange): boolean {
-    return range[0] === range[1];
+    parse(value: string, parseOptions?: Partial<ParserOptions>) {
+        return parse(value, parseOptions);
+    }
+
+    updateFromInputEvent(evt: InputEvent, range: TextRange) {
+        return updateFromInputEvent(evt, this.model, range, this.options)
+    }
+
+    updateFromInputEventFallback(evt: InputEvent, range: TextRange | undefined, prevRange: TextRange) {
+        return updateFromInputEventFallback(evt, this.model, range, prevRange, this.options);
+    }
+
+    getFormattedString(data: DataTransfer, options: EditorOptions): Token[] | undefined {
+        const internalData = data.getData(fragmentMIME);
+
+        if (internalData) {
+            return typeof internalData === 'string'
+                ? JSON.parse(internalData) as Token[]
+                : internalData
+        }
+
+        if (options.html) {
+            // Обработка пограничного случая: MS Edge при копировании из адресной строки
+            // добавляет ещё и HTML. В итоге просто так вставить ссылку не получится.
+            // Поэтому мы сначала проверим plain text: если это ссылка, то оставим её
+            // как есть, без парсинга HTML.
+            const plain = this.parse(sanitize(data.getData('text/plain') || ''), options.parse);
+            if (plain.length === 1 && plain[0].type === TokenType.Link) {
+                return plain;
+            }
+
+            const html = data.getData('text/html');
+            if (html) {
+                return parseHTML(sanitize(html), { links: options.htmlLinks });
+            }
+        }
+    }
+
+    /**
+     * Правильно помещает фрагмент текста в буффер. Вместе с обычным текстом
+     * туда помещается сериализованный фрагмент модели, чтобы сохранить форматирование
+     */
+    copyFragment(clipboard: DataTransfer, cut?: boolean): boolean {
+        const range = getTextRange(this.element);
+
+        if (range && !this.isCollapsed(range)) {
+            const fragment = cut
+                ? this.cut(range[0], range[1])
+                : this.slice(range[0], range[1]);
+
+            clipboard.setData('text/plain', getText(fragment));
+            clipboard.setData('text/html', toHTML(fragment));
+            clipboard.setData(fragmentMIME, JSON.stringify(fragment));
+
+            if (cut) {
+                this.setSelection(range[0]);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    isCollapsed(range: TextRange): boolean {
+        return range[0] === range[1];
+    }
+
+    updateInsertText(pos: number, text: string) {
+        return insertText(this.model, pos, text, this.options);
+    }
+
+    cutText(from: number, to: number) {
+        return cutText(this.model, from, to, this.options);
+    }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -868,32 +882,6 @@ function getScrollTarget(r: Range): Element | undefined {
     target = r.startContainer.childNodes[r.startOffset - 1];
     if (target?.nodeName === 'BR') {
         return target as Element;
-    }
-}
-
-function getFormattedString(data: DataTransfer, options: EditorOptions): Token[] | undefined {
-    const internalData = data.getData(fragmentMIME);
-
-    if (internalData) {
-        return typeof internalData === 'string'
-            ? JSON.parse(internalData) as Token[]
-            : internalData
-    }
-
-    if (options.html) {
-        // Обработка пограничного случая: MS Edge при копировании из адресной строки
-        // добавляет ещё и HTML. В итоге просто так вставить ссылку не получится.
-        // Поэтому мы сначала проверим plain text: если это ссылка, то оставим её
-        // как есть, без парсинга HTML.
-        const plain = parse(sanitize(data.getData('text/plain') || ''), options.parse);
-        if (plain.length === 1 && plain[0].type === TokenType.Link) {
-            return plain;
-        }
-
-        const html = data.getData('text/html');
-        if (html) {
-            return parseHTML(sanitize(html), { links: options.htmlLinks });
-        }
     }
 }
 

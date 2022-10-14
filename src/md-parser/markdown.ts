@@ -1,7 +1,7 @@
-import { TokenType, TokenFormat } from './types';
-import type { Token, TokenMarkdown } from './types';
-import type ParserState from './state';
-import { Codes, isDelimiter, isBound, last, isPunctuation } from './utils';
+import { TokenType, TokenFormat } from '../parser/types';
+import type { Token, TokenMarkdown } from '../parser/types';
+import type ParserState from '../parser/state';
+import { Codes, isDelimiter, isBound, last, isPunctuation } from '../parser/utils';
 
 export const charToFormat = new Map<number, TokenFormat>([
     [Codes.Asterisk, TokenFormat.Bold],
@@ -11,20 +11,16 @@ export const charToFormat = new Map<number, TokenFormat>([
 ]);
 
 export default function parseMarkdown(state: ParserState): boolean {
-    if (state.options.markdown) {
-        const { pos } = state;
-        if (!customLink(state)) {
-            if (isStartBound(state)) {
-                consumeOpen(state);
-            } else {
-                consumeClose(state);
-            }
+    const { pos } = state;
+    if (!customLink(state)) {
+        if (isStartBound(state)) {
+            consumeOpen(state);
+        } else {
+            consumeClose(state);
         }
-
-        return state.pos !== pos;
     }
 
-    return false;
+    return state.pos !== pos;
 }
 
 /**
@@ -46,10 +42,6 @@ export function isEndBoundChar(ch: number): boolean {
 }
 
 export function peekClosingMarkdown(state: ParserState): boolean {
-    if (!state.options.markdown) {
-        return false;
-    }
-
     const { pos } = state;
     let format: TokenFormat;
     while ((format = formatForChar(state.peek())) && state.hasFormat(format)) {

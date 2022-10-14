@@ -8,16 +8,15 @@ import mention from './mention';
 import command from './command';
 import hashtag from './hashtag';
 import link from './link';
-import markdown from './markdown';
 import newline from './newline';
-import { normalize, defaultOptions } from './utils';
+import { defaultOptions } from './utils';
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
     const options: ParserOptions = { ...defaultOptions, ...opt };
     const state = new ParserState(text, options);
 
     while (state.hasNext()) {
-        markdown(state) || newline(state)
+         newline(state)
             || emoji(state) || textEmoji(state) || userSticker(state)
             || mention(state) || command(state) || hashtag(state)
             || link(state)
@@ -27,18 +26,6 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     state.flushText();
 
     let { tokens } = state;
-
-    if (options.markdown && state.formatStack.length) {
-        // Если есть незакрытые токены форматирования, сбрасываем их формат,
-        // так как они не валидны
-        for (let i = 0, token: Token; i < state.formatStack.length; i++) {
-            token = state.formatStack[i] as Token;
-            token.format = TokenFormat.None;
-            token.type = TokenType.Text;
-        }
-
-        tokens = normalize(tokens);
-    }
 
     return tokens;
 }

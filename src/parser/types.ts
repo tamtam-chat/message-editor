@@ -1,7 +1,4 @@
 export interface ParserOptions {
-    /** Использовать MD-форматирование  */
-    markdown: boolean;
-
     /** Находить текстовые эмоджи типа `:)` */
     textEmoji: boolean;
 

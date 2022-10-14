@@ -131,7 +131,6 @@ const whiteSpace = new Set<number>([
 ]);
 
 export const defaultOptions: ParserOptions = {
-    markdown: false,
     textEmoji: false,
     hashtag: false,
     mention: false,
