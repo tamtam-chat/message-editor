@@ -7,8 +7,8 @@ import userSticker from '../parser/user-sticker';
 import mention from '../parser/mention';
 import command from '../parser/command';
 import hashtag from '../parser/hashtag';
-// import link from '../parser/link'; SHOULD BE MD
-import markdown from './markdown'; // PUT TO local
+import link from './link';
+import markdown from './markdown';
 import newline from '../parser/newline';
 import { normalize, defaultOptions } from '../parser/utils';
 
@@ -20,7 +20,7 @@ export default function parseMD(text: string, opt?: Partial<ParserOptions>): Tok
         markdown(state) || newline(state)
             || emoji(state) || textEmoji(state) || userSticker(state)
             || mention(state) || command(state) || hashtag(state)
-            // || link(state)
+            || link(state)
             || state.consumeText();
     }
 

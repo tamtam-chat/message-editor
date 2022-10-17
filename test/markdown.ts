@@ -1,7 +1,8 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import _parse, { TokenFormat, TokenType } from '../src/parser';
+import { TokenFormat, TokenType } from '../src/parser';
+import _parse from '../src/md-parser';
 import type { Token, ParserOptions } from '../src/parser';
-import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd } from '../src/formatted-string';
+import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd } from '../src/md-formatted-string';
 import type { TextRange } from '../src/formatted-string';
 
 const opt: ParserOptions = {
@@ -11,7 +12,6 @@ const opt: ParserOptions = {
     mention: true,
     textEmoji: false,
     userSticker: true,
-    markdown: true,
 };
 
 function parse(text: string) {

@@ -13,13 +13,13 @@ import { consumeNewline } from './newline';
 import { setLink } from '../formatted-string';
 import { trim } from '../formatted-string/split';
 
-interface HTMLParserOptions {
+export interface HTMLParserOptions {
     /** Разрешать парсить ссылки */
     links: boolean;
 }
 
-const blockTags = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'section', 'br', 'hr']);
-const skipTags = new Set(['base', 'head', 'link', 'meta', 'style', 'script', 'title', 'area', 'audio', 'map', 'track', 'video', 'embed', 'iframe', 'object', 'param', 'picture', 'portal', 'source', 'svg', 'math', 'noscript', 'datalist', 'select', 'template']);
+export const blockTags = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'section', 'br', 'hr']);
+export const skipTags = new Set(['base', 'head', 'link', 'meta', 'style', 'script', 'title', 'area', 'audio', 'map', 'track', 'video', 'embed', 'iframe', 'object', 'param', 'picture', 'portal', 'source', 'svg', 'math', 'noscript', 'datalist', 'select', 'template']);
 const cssReset = new Set(['normal', 'unset', 'initial', 'revert', 'none']);
 const monospaceFonts = ['jetbrains mono', 'fira code', 'pt mono', 'menlo', 'courier', 'monospace'];
 
@@ -96,11 +96,11 @@ function walkDOM(node: Node, state: HTMLParseState) {
     }
 }
 
-function isElementNode(node: Node): node is Element {
+export function isElementNode(node: Node): node is Element {
     return node.nodeType === 1;
 }
 
-function isTextNode(node: Node): node is Text {
+export function isTextNode(node: Node): node is Text {
     return node.nodeType === 3;
 }
 
@@ -191,7 +191,7 @@ class HTMLParseState {
 /**
  * Вернёт `true` если можно добавлять перевод строки в указанную позицию
  */
-function allowNewline(tokens: Token[], limit = 2): boolean {
+export function allowNewline(tokens: Token[], limit = 2): boolean {
     // Для красоты не будем давать добавлять более двух переводов строк подряд,
     // у нас же не блог-платформа, а написание текста
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -209,7 +209,7 @@ function allowNewline(tokens: Token[], limit = 2): boolean {
     return true;
 }
 
-function allowSpace(tokens: Token[]): boolean {
+export function allowSpace(tokens: Token[]): boolean {
     const token = last(tokens);
     if (token) {
         const { value } = token;
@@ -219,7 +219,7 @@ function allowSpace(tokens: Token[]): boolean {
     return true;
 }
 
-function formatFromTag(tag: Element, base: TokenFormat = TokenFormat.None): TokenFormat {
+export function formatFromTag(tag: Element, base: TokenFormat = TokenFormat.None): TokenFormat {
     const tagName = tag.nodeName.toLowerCase();
     const style = tag.getAttribute('style');
     let format = base;
@@ -302,7 +302,7 @@ function parseStyle(value: string): Record<string, string> {
     return result;
 }
 
-function isValidHref(url: string | undefined): boolean {
+export function isValidHref(url: string | undefined): boolean {
     if (url) {
         return /^mailto:/i.test(url) || /^https?:/i.test(url);
     }
@@ -310,7 +310,7 @@ function isValidHref(url: string | undefined): boolean {
     return false;
 }
 
-function newline(state: ParserState): boolean {
+export function newline(state: ParserState): boolean {
     if (consumeNewline(state)) {
         // Внутри HTML перевод строки по умолчанию означает пробел.
         // Кроме случаев, если у элемента указано `white-space: nowrap | pre`.
@@ -328,7 +328,7 @@ function newline(state: ParserState): boolean {
     return false;
 }
 
-function textToken(value: string, format: TokenFormat): TokenText {
+export function textToken(value: string, format: TokenFormat): TokenText {
     return {
         type: TokenType.Text,
         value,
@@ -337,7 +337,7 @@ function textToken(value: string, format: TokenFormat): TokenText {
     }
 }
 
-function nlToken(format = TokenFormat.None): TokenNewline {
+export function nlToken(format = TokenFormat.None): TokenNewline {
     return {
         type: TokenType.Newline,
         format,
@@ -345,11 +345,11 @@ function nlToken(format = TokenFormat.None): TokenNewline {
     };
 }
 
-function isSpaceOnlyText(text: string): boolean {
+export function isSpaceOnlyText(text: string): boolean {
     return /^[\s\r\n]+$/.test(text);
 }
 
-function getTagName(node: Node): string {
+export function getTagName(node: Node): string {
     return node.nodeName.toLowerCase();
 }
 

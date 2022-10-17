@@ -10,7 +10,7 @@ import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
 import type { ShortcutHandler } from './shortcuts';
 import { getInputText, isElement } from './utils';
-import parseHTML from '../parser/html2';
+import parseHTML, { HTMLParserOptions } from '../parser/html2';
 import toHTML from '../render/html';
 import { last } from '../parser/utils';
 
@@ -762,6 +762,10 @@ export default class Editor {
         return parse(value, parseOptions);
     }
 
+    parseHTML(html: string, options?: Partial<HTMLParserOptions>) {
+        return parseHTML(html, options);
+    }
+
     updateFromInputEvent(evt: InputEvent, range: TextRange) {
         return updateFromInputEvent(evt, this.model, range, this.options)
     }
@@ -791,7 +795,7 @@ export default class Editor {
 
             const html = data.getData('text/html');
             if (html) {
-                return parseHTML(sanitize(html), { links: options.htmlLinks });
+                return this.parseHTML(sanitize(html), { links: options.htmlLinks });
             }
         }
     }

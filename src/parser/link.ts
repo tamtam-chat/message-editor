@@ -15,10 +15,9 @@ import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, to
 import { keycap } from './emoji';
 import { TokenFormat, TokenType } from './types';
 import type { TokenLink } from './types';
-import { peekClosingMarkdown } from '../md-parser/markdown';
 import tld from '../data/tld';
 
-const enum FragmentMatch {
+export const enum FragmentMatch {
     /** Фрагмент не найден */
     No = 0,
 
@@ -47,19 +46,19 @@ const enum FragmentMatch {
     MiddlePrintable = 1 << 7,
 }
 
-const enum ConsumeResult {
+export const enum ConsumeResult {
     No = 0,
     Yes = 1,
     Skip = 2
 }
 
-const maxLabelSize = 63;
+export const maxLabelSize = 63;
 /** Маска для парсинга доменного имени */
-const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
+export const domainMask = FragmentMatch.ASCII | FragmentMatch.Dot | FragmentMatch.Unicode | FragmentMatch.ValidTLD;
 const safeChars = new Set(toCode('$-_.+'));
 const extraChars = new Set(toCode('!*"\'()[],|'));
 const punctChars = new Set(toCode('!,.:;?'));
-const mailtoChars = toCode('mailto:', true);
+export const mailtoChars = toCode('mailto:', true);
 const magnetChars = toCode('magnet:', true);
 
 /**
@@ -78,7 +77,7 @@ const loginChars = new Set(toCode(';?&=:'));
  */
 const printableChars = new Set(toCode('!$%&*+=^`{|}~'));
 
-const supportedProtocols = createTree([
+export const supportedProtocols = createTree([
     'skype://',
     'http://',
     'https://',
@@ -202,7 +201,7 @@ function emailOrAddress(state: ParserState): ConsumeResult {
     return prefix ? ConsumeResult.Skip : ConsumeResult.No;
 }
 
-function magnet(state: ParserState): ConsumeResult {
+export function magnet(state: ParserState): ConsumeResult {
     const { pos } = state;
     if (consumeArray(state, magnetChars, true)) {
         consumeQueryString(state);
@@ -239,7 +238,7 @@ function email(state: ParserState, prefix: FragmentMatch, start: number): boolea
  * Для полученного фрагмент пытается поглотить интернет-адрес. Вернёт `true`, если это
  * удалось сделать
  */
-function address(state: ParserState, prefix: FragmentMatch, start: number): boolean {
+export function address(state: ParserState, prefix: FragmentMatch, start: number): boolean {
     if (isDomain(prefix)) {
         consumePort(state);
         consumePath(state);
@@ -275,7 +274,7 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
     while (state.hasNext()) {
         pos = state.pos;
 
-        if (keycap(state) || peekClosingMarkdown(state)) {
+        if (keycap(state)) {
             // Нарвались на keycap-эмоджи или на закрывающий MD-синтаксис,
             // прекращаем парсинг
             state.pos = pos;
@@ -335,7 +334,7 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
 /**
  * Поглощает порт с текущей позиции
  */
-function consumePort(state: ParserState): boolean {
+export function consumePort(state: ParserState): boolean {
     const { pos } = state;
     if (state.consume(Codes.Colon)) {
         let start = 0;
@@ -363,7 +362,7 @@ function consumePort(state: ParserState): boolean {
 /**
  * Поглощает путь в URL: `/path/to/image.png`
  */
-function consumePath(state: ParserState): boolean {
+export function consumePath(state: ParserState): boolean {
     const { pos } = state;
 
     state.resetBrackets();
@@ -377,7 +376,7 @@ function consumePath(state: ParserState): boolean {
 /**
  * Поглощает query string с текущей позиции: `?foo=bar&a=b`
  */
-function consumeQueryString(state: ParserState): boolean {
+export function consumeQueryString(state: ParserState): boolean {
     // Разбираем пограничный случай: символ ? может означать
     // как разделитель строки запроса, так и знак вопроса типа
     // `ты заходил на сайт https://tt.me?`
@@ -397,7 +396,7 @@ function consumeQueryString(state: ParserState): boolean {
 /**
  * Поглощает хэш из текущей позиции
  */
-function consumeHash(state: ParserState): boolean {
+export function consumeHash(state: ParserState): boolean {
     if (state.consume(Codes.Hash)) {
         state.resetBrackets();
         segment(state);
@@ -412,7 +411,7 @@ function consumeHash(state: ParserState): boolean {
  * при этом содержать «проблемные» символы, из-за которых результат может быть
  * двойственным, мы либо поглотим login-часть целиком, либо откатимся назад
  */
-function login(state: ParserState): boolean {
+export function login(state: ParserState): boolean {
     // Пример проблемной ситуации:
     // – ты заходил на http://foo?
     // – ты заходил на http://foo?bar@domain.com
@@ -528,14 +527,14 @@ function shouldSkipQuote(state: ParserState, ch: number): boolean {
 /**
  * Проверяет, содержи ли `result` все биты из `test`
  */
-function includes(result: FragmentMatch, test: FragmentMatch): boolean {
+export function includes(result: FragmentMatch, test: FragmentMatch): boolean {
     return (result & test) === test;
 }
 
 /**
  * Проверяет, что результат `result` не содержит биты из `test`
  */
-function excludes(result: FragmentMatch, test: FragmentMatch): boolean {
+export function excludes(result: FragmentMatch, test: FragmentMatch): boolean {
     return (result & test) === 0;
 }
 
@@ -544,12 +543,12 @@ function atWordEdge(state: ParserState): boolean {
     return isBound(ch) || isPunct(ch);
 }
 
-function isEmailLocalPart(result: FragmentMatch): boolean {
+export function isEmailLocalPart(result: FragmentMatch): boolean {
     return excludes(result, FragmentMatch.Unicode | FragmentMatch.OctetOverflow)
         && (includes(result, FragmentMatch.ASCII) || includes(result, FragmentMatch.Printable));
 }
 
-function isDomain(result: FragmentMatch): boolean {
+export function isDomain(result: FragmentMatch): boolean {
     return excludes(result, FragmentMatch.Printable | FragmentMatch.OctetOverflow)
         && includes(result, FragmentMatch.Dot | FragmentMatch.ValidTLD)
         && ((result & (FragmentMatch.ASCII | FragmentMatch.Unicode)) !== 0);
@@ -558,7 +557,7 @@ function isDomain(result: FragmentMatch): boolean {
 /**
  * Проверяет, что указанный символ является _допустимым_ ASCII-символом для домена
  */
-function isASCII(ch: number): boolean {
+export function isASCII(ch: number): boolean {
     return ch === Codes.Hyphen
         // Согласно RFC подчёркивание не является допустимым ASCII, но по факту
         // этот символ может использоваться в доменах третьего уровня
@@ -567,7 +566,7 @@ function isASCII(ch: number): boolean {
         || isNumber(ch);
 }
 
-function isPrintable(ch: number): boolean {
+export function isPrintable(ch: number): boolean {
     return printableChars.has(ch);
 }
 
@@ -643,7 +642,7 @@ function isLogin(ch: number) {
     return loginChars.has(ch);
 }
 
-function linkToken(value: string, link: string): TokenLink {
+export function linkToken(value: string, link: string): TokenLink {
     return {
         type: TokenType.Link,
         format: TokenFormat.None,

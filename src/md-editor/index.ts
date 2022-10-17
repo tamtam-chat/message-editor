@@ -7,10 +7,16 @@ import type { Model } from '../editor/types';
 import { cutTextMD, insertTextMD, removeTextMD, setFormatMD, updateFromInputEventFallbackMD, updateFromInputEventMD } from "./update";
 import toHTML from '../render/html';
 import { mdToText, textToMd } from "../md-formatted-string";
+import type { HTMLParserOptions } from "../parser/html2";
+import parseHTMLMD from "../md-parser/html2";
 
 export default class MDEditor extends Editor {
     parse(value: string, parseOptions?: Partial<ParserOptions>) {
         return parseMD(value, parseOptions);
+    }
+
+    parseHTML(html: string, options?: Partial<HTMLParserOptions>) {
+        return parseHTMLMD(html, options);
     }
 
     updateFromInputEvent(evt: InputEvent, range: TextRange) {
