@@ -760,7 +760,7 @@ export default class Editor {
     private render(): void {
         render(this.element, this.model, {
             fixTrailingLine: true,
-            replaceTextEmoji: this.options.parse?.textEmoji,
+            replaceTextEmoji: !!this.options.parse?.textEmoji,
             emoji: this.options.emoji,
             nowrap: this.options.nowrap
         });
