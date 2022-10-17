@@ -2,8 +2,8 @@ import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
 import _parse, { TokenType }  from '../src/parser';
 import type { Token, TokenText } from '../src/parser';
 
-function parse(text: string) {
-    return _parse(text, { textEmoji: true });
+function parse(text: string, force?: boolean) {
+    return _parse(text, { textEmoji: force ? 'force' : true });
 }
 
 function types(tokens: Token[]): TokenType[] {
@@ -46,7 +46,11 @@ describe('Text Emoji', () => {
         tokens = parse('a:)');
         t = tokens[0] as TokenText;
         deepEqual(types(tokens), [TokenType.Text]);
-        // equal(t.emoji, undefined);
+        equal(t.emoji, undefined);
+
+        tokens = parse('a:)', true);
+        t = tokens[0] as TokenText;
+        deepEqual(types(tokens), [TokenType.Text]);
         equal(emojiValue(t, 0), ':)');
         equal(emojiAlias(t, 0), '🙂');
 

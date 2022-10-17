@@ -7,7 +7,7 @@ import { type Emoji, TokenType } from './types';
 const lookup = createTree(Object.keys(aliases));
 
 export default function parseTextEmoji(state: ParserState): boolean {
-    if (state.options.textEmoji) {
+    if (state.options.textEmoji && atTextEmojiBound(state)) {
         const { pos } = state;
 
         // Если нашли совпадение, то убедимся, что оно на границе слов
@@ -24,6 +24,12 @@ export default function parseTextEmoji(state: ParserState): boolean {
 }
 
 function atTextEmojiBound(state: ParserState) {
+    if (state.options.textEmoji === 'force') {
+        // Указали, что текстовые эмоджи ищем везде, даже внутри текста, а не только
+        // на границе
+        return true;
+    }
+
     let lastTextEmoji: Emoji | undefined;
     if (state.hasPendingText()) {
         const emoji = last(state.emoji);

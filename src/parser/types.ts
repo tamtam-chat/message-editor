@@ -3,7 +3,7 @@ export interface ParserOptions {
     markdown: boolean;
 
     /** Находить текстовые эмоджи типа `:)` */
-    textEmoji: boolean;
+    textEmoji: boolean | 'force';
 
     /** Находить упоминания: `@user_name` */
     mention: boolean | 'strict';
