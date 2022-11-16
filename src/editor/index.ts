@@ -32,6 +32,8 @@ export interface EditorOptions extends BaseEditorOptions {
 
     /** Размечать ссылки при вставке HTML */
     htmlLinks?: boolean;
+
+    scroller?: HTMLElement;
 }
 
 type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
@@ -234,7 +236,7 @@ export default class Editor {
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
 
-            requestAnimationFrame(() => retainNewlineInViewport(this.element));
+            requestAnimationFrame(() => retainNewlineInViewport(this.getScroller()));
         }
     }
 
@@ -276,8 +278,8 @@ export default class Editor {
     set model(value: Model) {
         if (this._model !== value) {
             this._model = value;
-            this.emit('editor-update');
             this.render();
+            this.emit('editor-update');
         }
     }
 
@@ -784,7 +786,7 @@ export default class Editor {
                 if (this.expectEnter) {
                     this.expectEnter = false;
                     this.insertOrReplaceText(getTextRange(this.element), '\n');
-                    retainNewlineInViewport(this.element);
+                    retainNewlineInViewport(this.getScroller());
                 }
             });
         }
@@ -814,6 +816,10 @@ export default class Editor {
         }
 
         return range;
+    }
+
+    private getScroller(): HTMLElement {
+        return this.options.scroller || this.element;
     }
 }
 

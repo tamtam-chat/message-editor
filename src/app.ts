@@ -28,11 +28,14 @@ const editor = new Editor(document.querySelector('#text-editor'), {
     },
     emoji: renderEmoji,
     resetFormatOnNewline: true,
-    html: true
+    html: true,
+    scroller: document.querySelector('#text-editor-scroller')
 });
 editor
     .on('editor-selectionchange', (evt: CustomEvent) => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', (evt: CustomEvent) => updateToolbarState(evt.detail.editor));
+
+createRectObserver(editor)
 
 const mdEditor = new Editor(document.querySelector('#md-editor'), {
     value: 'Привет, *markdown* мир! 😇',
@@ -183,6 +186,43 @@ if (rawEditor) {
 
 function logComposition(evt: CompositionEvent) {
     console.log(evt.type, JSON.stringify(evt.data), getTextRange(rawEditor), evt);
+}
+
+function createRectObserver(editor: Editor) {
+    let refs = new Map<HTMLImageElement, HTMLElement>();
+    const overlay = editor.element.parentElement.querySelector('.editor-overlay')!;
+
+    const update = () => {
+        const nextRefs = new Map<HTMLImageElement, HTMLElement>();
+        const parentRect = editor.element.getBoundingClientRect();
+
+        for (const emoji of editor.element.querySelectorAll('img')) {
+            let rect = refs.get(emoji);
+            if (rect) {
+                refs.delete(emoji);
+            } else {
+                rect = document.createElement('div');
+                rect.className = 'rect';
+                overlay.appendChild(rect);
+            }
+            nextRefs.set(emoji, rect);
+            const emojiRect = emoji.getBoundingClientRect();
+            rect.style.left = `${emojiRect.left - parentRect.left}px`;
+            rect.style.top = `${emojiRect.top - parentRect.top}px`;
+        }
+
+        for (const rect of refs.values()) {
+            rect.remove();
+        }
+        refs = nextRefs;
+    };
+
+    const resize = new ResizeObserver(() => update());
+    resize.observe(editor.element);
+
+    editor.on('editor-update', update);
+    editor.on('editor-formatchange', update);
+    update();
 }
 
 window['editor'] = editor;
