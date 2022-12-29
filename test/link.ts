@@ -1,9 +1,9 @@
 import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
-import _parse, { TokenType } from '../src/parser';
+import _parse, { type ParserOptions, TokenType } from '../src/parser';
 import type { Token, TokenLink } from '../src/parser';
 
-function parse(text: string) {
-    return _parse(text, { link: true });
+function parse(text: string, opt?: Partial<ParserOptions>) {
+    return _parse(text, { link: true, ...opt });
 }
 
 function types(tokens: Token[]): TokenType[] {
@@ -246,5 +246,14 @@ describe('Link', () => {
         tokens = parse('/ok.ru');
         deepEqual(types(tokens), [TokenType.Text]);
         deepEqual(values(tokens), ['/ok.ru']);
+    });
+
+    it('custom protocols', () => {
+        const tokens = parse('ok.ru http://ok.ru ftp://ok.ru', {
+            linkProtocols: ['http://']
+        });
+
+        deepEqual(types(tokens), [TokenType.Link, TokenType.Text, TokenType.Link, TokenType.Text]);
+        deepEqual(values(tokens), ['ok.ru', ' ', 'http://ok.ru', ' ftp://ok.ru']);
     });
 });

@@ -12,16 +12,25 @@ import markdown from './markdown';
 import newline from './newline';
 import { normalize, defaultOptions } from './utils';
 import { objectMerge } from '../utils/objectMerge';
+import { createTree, type Tree } from './tree';
 
 export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
     const options: ParserOptions = objectMerge(defaultOptions, opt);
     const state = new ParserState(text, options);
+    const { linkProtocols } = options;
+
+    let protocols: Tree | undefined;
+    if (linkProtocols) {
+        protocols = Array.isArray(linkProtocols)
+            ? createTree(linkProtocols, true)
+            : linkProtocols;
+    }
 
     while (state.hasNext()) {
         markdown(state) || newline(state)
             || emoji(state) || textEmoji(state) || userSticker(state)
             || mention(state) || command(state) || hashtag(state)
-            || link(state)
+            || link(state, protocols)
             || state.consumeText();
     }
 

@@ -1,3 +1,5 @@
+import type { Tree } from './tree';
+
 export interface ParserOptions {
     /** Использовать MD-форматирование  */
     markdown: boolean;
@@ -25,6 +27,8 @@ export interface ParserOptions {
 
     /** Нужно ли отключить парсинг эмоджи в тексте */
     skipEmoji?: boolean;
+
+    linkProtocols?: string[] | Tree;
 
     /**
      * Использовать текущий формат парсера при добавлении текстового токена

@@ -10,7 +10,7 @@
 
 import ParserState, { getQuoteType } from './state';
 import type { Bracket } from './state';
-import { consumeTree, createTree } from './tree';
+import { consumeTree, createTree, type Tree } from './tree';
 import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine, isQuote } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenType } from './types';
@@ -93,10 +93,10 @@ const supportedProtocols = createTree([
 /**
  * Парсинг ссылок с текущей позиции парсера
  */
-export default function parseLink(state: ParserState): boolean {
+export default function parseLink(state: ParserState, protocols = supportedProtocols): boolean {
     if (state.options.link && state.atWordBound()) {
         const { pos } = state;
-        const handled = magnet(state) || strictEmail(state) || strictAddress(state) || emailOrAddress(state);
+        const handled = magnet(state) || strictEmail(state) || strictAddress(state, protocols) || emailOrAddress(state);
 
         if (handled === ConsumeResult.No) {
             // Не смогли ничего внятного поглотить, сбросим позицию
@@ -134,11 +134,11 @@ function strictEmail(state: ParserState): ConsumeResult {
     return ConsumeResult.No;
 }
 
-function strictAddress(state: ParserState): ConsumeResult {
+function strictAddress(state: ParserState, protocols: Tree): ConsumeResult {
     let { pos } = state;
     const start = pos;
 
-    if (consumeTree(state, supportedProtocols, true)) {
+    if (consumeTree(state, protocols, true)) {
         // Нашли протокол, далее поглощаем доменную часть.
         // При наличии протокола правила для доменной части будут упрощённые:
         // нам не нужно валидировать результат через `isDomain()`, достаточно
