@@ -361,36 +361,40 @@ export default class Editor {
     /**
      * Вставляет текст в указанную позицию
      */
-    insertText(pos: number, text: string): Model {
+    insertText(pos: number, text: string, noFocus?: boolean): Model {
         text = this.sanitizeText(text);
         const result = this.updateModel(
             insertText(this.model, pos, text, this.options),
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
-        this.setSelection(pos + text.length);
+        pos += text.length;
+        this.setSelection(pos, pos, noFocus);
         return result;
     }
 
     /**
      * Удаляет указанный диапазон текста
+     * @param noFocus Не ставить фокус в поле ввода (полезно для мобилок)
      */
-    removeText(from: number, to: number): Model {
+    removeText(from: number, to: number, noFocus?: boolean): Model {
         const result = this.updateModel(
             removeText(this.model, from, to, this.options),
             DiffActionType.Remove,
             [from, to]);
 
-        this.setSelection(from);
+        this.setSelection(from, from, noFocus);
         return result;
     }
 
     /**
      * Заменяет текст в указанном диапазоне `from:to` на новый
+     * @param noFocus Не ставить фокус в поле ввода (полезно для мобилок)
      */
-    replaceText(from: number, to: number, text: string): Model {
+    replaceText(from: number, to: number, text: string, noFocus?: boolean): Model {
         const result = this.paste(text, from, to);
-        this.setSelection(from + text.length);
+        const pos = from + text.length;
+        this.setSelection(pos, pos, noFocus);
         return result;
     }
 
@@ -596,11 +600,14 @@ export default class Editor {
 
     /**
      * Указывает текущее выделение текста или позицию каретки
+     * @param noFocus Не ставить фокус в поле ввода (полезно для мобилок)
      */
-    setSelection(from: number, to = from): void {
+    setSelection(from: number, to = from, noFocus?: boolean): void {
         [from, to] = this.normalizeRange([from, to]);
         this.saveSelection([from, to]);
-        setRange(this.element, from, to);
+        if (!noFocus) {
+            setRange(this.element, from, to);
+        }
     }
 
     /**
