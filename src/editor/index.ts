@@ -22,6 +22,10 @@ const enum DiffActionType {
     Compose = 'compose'
 }
 
+const enum DirtyState {
+    None, Dirty, DirtyRetainNewline
+}
+
 export interface EditorOptions extends BaseEditorOptions {
     /** Значение по умолчанию для редактора */
     value?: string;
@@ -78,9 +82,17 @@ export default class Editor {
 
     private pendingModel: Model | null = null;
     private _inited = false;
+
+    /** Редактор в «грязном» состоянии: требуется синхронизация модели и UI (> 0) */
+    private dirty: DirtyState = DirtyState.None;
+
+    /**
+     * Текущая позиция каретки/выделения в редакторе. Должна быть источником
+     * правды при работе с выделением
+     */
     private caret: TextRange = [0, 0];
     private focused = false;
-    private expectEnter = false;
+    private rafId = 0;
 
     /**
      * @param element Контейнер, в котором будет происходить редактирование
@@ -102,13 +114,13 @@ export default class Editor {
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
         }
-        this.waitExpectedEnter(evt);
+
+        this.handleEnter(evt);
     }
 
     private onCompositionStart = () => {
         this.compositionStartRange = getTextRange(this.element);
         this.compositionRange = null;
-        this.expectEnter = false;
     }
 
     private onCompositionUpdate = () => {
@@ -136,7 +148,7 @@ export default class Editor {
         if (evt.getTargetRanges) {
             const ranges = evt.getTargetRanges();
             if (ranges.length) {
-                range = rangeToLocation(this.element, evt.getTargetRanges()[0] as Range);
+                range = rangeToLocation(this.element, ranges[0] as Range);
             }
         }
 
@@ -147,7 +159,6 @@ export default class Editor {
     }
 
     private onInput = (evt: InputEvent) => {
-        this.expectEnter = false;
         let nextModel: Model;
         const range = getTextRange(this.element);
 
@@ -171,7 +182,6 @@ export default class Editor {
         // Обычное изменение, сразу применяем результат к UI
         if (nextModel) {
             this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
-            this.setSelection(range[0], range[1]);
         }
     }
 
@@ -278,8 +288,14 @@ export default class Editor {
     set model(value: Model) {
         if (this._model !== value) {
             this._model = value;
-            this.render();
-            this.emit('editor-update');
+            if (this.dirty === DirtyState.None) {
+                this.dirty = DirtyState.Dirty;
+            }
+            // Изменения применяем не сразу, а на конец таска, так как
+            // в некоторых случаях (нативная панель эмоджи в Windows) в одном
+            // таске может быть несколько input-событий, которые зависят от текущего
+            // (промежуточного) состояния поля ввода
+            this.scheduleSyncUI();
         }
     }
 
@@ -315,6 +331,8 @@ export default class Editor {
         // * Баг в Хроме: ставим курсор в конец строки, Cmd+← переходим в начало,
         //   пишем букву, стираем следующую по Fn+Backspace. Хром посылает команду
         //   insertText: null, а не beforeinput: deleteContentForward
+        // * В Windows при использорвании нативной панели с эмоджи, само эмоджи
+        //   вставляется через два события input: insertCompositionText и insertText
         element.addEventListener('keydown', this.onKeyDown);
         element.addEventListener('compositionstart', this.onCompositionStart);
         element.addEventListener('compositionupdate', this.onCompositionUpdate);
@@ -734,6 +752,10 @@ export default class Editor {
             this.model = value;
         }
 
+        if (range) {
+            this.saveSelection(range);
+        }
+
         return this.model;
     }
 
@@ -766,6 +788,36 @@ export default class Editor {
         return false;
     }
 
+    /**
+     * Синхронизация модели данных редактора с UI.
+     * Метод нужно вызывать только в том случае, если есть какие-то изменения
+     */
+    private syncUI() {
+        this.render();
+        if (this.focused) {
+            const [from, to] = this.caret;
+            setRange(this.element, from, to);
+        }
+
+        if (this.dirty === DirtyState.DirtyRetainNewline) {
+            retainNewlineInViewport(this.getScroller());
+        }
+
+        this.dirty = DirtyState.None;
+        this.emit('editor-update');
+    }
+
+    private scheduleSyncUI() {
+        if (!this.rafId) {
+            this.rafId = requestAnimationFrame(() => {
+                this.rafId = 0;
+                if (this.dirty !== DirtyState.None) {
+                    this.syncUI();
+                }
+            });
+        }
+    }
+
     private render(): void {
         render(this.element, this.model, {
             fixTrailingLine: true,
@@ -786,23 +838,19 @@ export default class Editor {
         return [clamp(from, 0, maxIx), clamp(to, 0, maxIx)];
     }
 
-    private waitExpectedEnter(evt: KeyboardEvent): void {
-        if (!this.expectEnter && !evt.defaultPrevented && evt.key === 'Enter' && hasModifier(evt)) {
-            this.expectEnter = true;
-            requestAnimationFrame(() => {
-                if (this.expectEnter) {
-                    this.expectEnter = false;
-                    this.insertOrReplaceText(getTextRange(this.element), '\n');
-                    retainNewlineInViewport(this.getScroller());
-                }
-            });
-        }
-    }
+    private handleEnter(evt: KeyboardEvent): void {
+        if (!evt.defaultPrevented && evt.key === 'Enter' && hasModifier(evt)) {
+            evt.preventDefault();
+            const range = getTextRange(this.element);
+            const text = '\n';
+            if (isCollapsed(range)) {
+                this.insertText(range[0], text)
+            } else {
+                this.replaceText(range[0], range[1], text);
+            }
 
-    private insertOrReplaceText(range: TextRange, text: string): Model {
-        return isCollapsed(range)
-            ? this.insertText(range[0], text)
-            : this.replaceText(range[0], range[1], text);
+            this.dirty = DirtyState.DirtyRetainNewline;
+        }
     }
 
     /**

@@ -88,7 +88,7 @@ function renderEmoji(emoji: string, elem: HTMLElement) {
         }
     }
 
-    const url = `//st.mycdn.me/static/emoji/3-1-1/20/${codePoints.join('-')}@2x.png`;
+    const url = `//st.mycdn.me/static/emoji/14-0-0/20/${codePoints.join('-')}@2x.png`;
     if (!elem) {
         elem = document.createElement('img');
     }
@@ -151,8 +151,9 @@ function hideToolbar() {
 
 function showToolbar(editor: Editor) {
     toolbar.classList.remove('hidden');
-    if (toolbar.parentElement !== editor.element.parentElement) {
-        editor.element.parentElement.appendChild(toolbar);
+    const target = editor.options.scroller || editor.element;
+    if (toolbar.parentElement !== target.parentElement) {
+        target.parentElement.appendChild(toolbar);
     }
 }
 
