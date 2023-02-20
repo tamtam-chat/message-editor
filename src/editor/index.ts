@@ -379,40 +379,33 @@ export default class Editor {
     /**
      * Вставляет текст в указанную позицию
      */
-    insertText(pos: number, text: string, noFocus?: boolean): Model {
+    insertText(pos: number, text: string): Model {
         text = this.sanitizeText(text);
         const result = this.updateModel(
             insertText(this.model, pos, text, this.options),
             DiffActionType.Insert,
             [pos, pos + text.length]
         );
-        pos += text.length;
-        this.setSelection(pos, pos, noFocus);
         return result;
     }
 
     /**
      * Удаляет указанный диапазон текста
-     * @param noFocus Не ставить фокус в поле ввода (полезно для мобилок)
      */
-    removeText(from: number, to: number, noFocus?: boolean): Model {
+    removeText(from: number, to: number): Model {
         const result = this.updateModel(
             removeText(this.model, from, to, this.options),
             DiffActionType.Remove,
             [from, to]);
 
-        this.setSelection(from, from, noFocus);
         return result;
     }
 
     /**
      * Заменяет текст в указанном диапазоне `from:to` на новый
-     * @param noFocus Не ставить фокус в поле ввода (полезно для мобилок)
      */
-    replaceText(from: number, to: number, text: string, noFocus?: boolean): Model {
+    replaceText(from: number, to: number, text: string): Model {
         const result = this.paste(text, from, to);
-        const pos = from + text.length;
-        this.setSelection(pos, pos, noFocus);
         return result;
     }
 
@@ -432,7 +425,9 @@ export default class Editor {
     paste(text: string | Model, from: number, to: number): Model {
         text = this.sanitizeText(text);
         const nextModel = replaceText(this.model, text, from, to, this.options);
-        return this.updateModel(nextModel, 'paste', [from, to]);
+        const len = typeof text === 'string' ? text.length : getLength(text);
+        const pos = from + len;
+        return this.updateModel(nextModel, 'paste', [pos, pos]);
     }
 
     /**
@@ -620,10 +615,10 @@ export default class Editor {
      * Указывает текущее выделение текста или позицию каретки
      * @param noFocus Не ставить фокус в поле ввода (полезно для мобилок)
      */
-    setSelection(from: number, to = from, noFocus?: boolean): void {
+    setSelection(from: number, to = from): void {
         [from, to] = this.normalizeRange([from, to]);
         this.saveSelection([from, to]);
-        if (!noFocus) {
+        if (!this.dirty) {
             setRange(this.element, from, to);
         }
     }
@@ -642,13 +637,8 @@ export default class Editor {
             selection = [len, len];
         }
 
+        this.saveSelection(selection);
         this.model = value;
-
-        if (this.focused) {
-            this.setSelection(selection[0], selection[1]);
-        } else {
-            this.saveSelection(this.normalizeRange(selection));
-        }
 
         this.history.clear();
         this.history.push(this.model, 'init', this.caret);
