@@ -3,12 +3,6 @@ import type { Emoji, Token, TokenHashTag, TokenLink, TokenMention, TokenCommand,
 import { TokenFormat, TokenType } from '../parser';
 import { objectMerge } from '../utils/objectMerge';
 
-declare global {
-    interface Element {
-        $$emoji?: boolean;
-    }
-}
-
 type ClassFormat = [type: TokenFormat, value: string];
 export type EmojiRender = (emoji: string | null, elem?: Element, rawEmoji?: string) => Element | void;
 
@@ -338,7 +332,7 @@ class ReconcileState {
                     remove(node, emoji);
                 }
             }
-            next.$$emoji = true;
+            markAsEmoji(next);
             next.setAttribute('data-raw', rawEmoji);
             this.pos++;
             return next;
@@ -453,7 +447,11 @@ function isEmojiSymbol(emoji: Emoji): boolean {
 }
 
 export function isEmoji(elem: Node): elem is Element {
-    return elem.nodeType === 1 ? (elem as Element).$$emoji : false;
+    return elem.nodeType === 1 ? (elem as Element).hasAttribute('data-emoji') : false;
+}
+
+function markAsEmoji(elem: Element) {
+    elem.setAttribute('data-emoji', '');
 }
 
 /**

@@ -273,7 +273,6 @@ export default class Editor {
     private onFocus = () => {
         this.focused = true;
         document.addEventListener('selectionchange', this.onSelectionChange);
-        this.onSelectionChange();
     }
 
     private onBlur = () => {
@@ -434,8 +433,9 @@ export default class Editor {
      * Ставит фокус в редактор
      */
     focus(): void {
+        const [from, to] = this.caret;
         this.element.focus();
-        this.setSelection(this.caret[0], this.caret[1]);
+        setRange(this.element, from, to);
     }
 
     /**
@@ -834,11 +834,12 @@ export default class Editor {
             const range = getTextRange(this.element);
             const text = '\n';
             if (isCollapsed(range)) {
-                this.insertText(range[0], text)
+                this.insertText(range[0], text);
             } else {
                 this.replaceText(range[0], range[1], text);
             }
 
+            this.setSelection(range[0]+ text.length);
             this.dirty = DirtyState.DirtyRetainNewline;
         }
     }
@@ -907,15 +908,8 @@ function retainNewlineInViewport(element: Element): void {
  * Вернёт элемент, к которому нужно подскроллится.
  */
 function getScrollTarget(r: Range): Element | undefined {
-    let target = r.startContainer.childNodes[r.startOffset];
-    if (target?.nodeName === 'BR') {
-        return target as Element;
-    }
-
-    target = r.startContainer.childNodes[r.startOffset - 1];
-    if (target?.nodeName === 'BR') {
-        return target as Element;
-    }
+    const target = r.startContainer.childNodes[r.startOffset];
+    return target && isElement(target) ? target : r.startContainer as Element;
 }
 
 function getFormattedString(data: DataTransfer, options: EditorOptions): Token[] | undefined {
