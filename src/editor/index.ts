@@ -521,9 +521,8 @@ export default class Editor {
      * @param url Ссылка. Если `url` пустой или равен `null`, удаляет ссылку с указанного диапазона.
      * @param from Начало диапазона.
      * @param to Конец диапазона.
-     * @param updateSelection Необходимость выделения указанного диапазона. По умолчанию равен `true`
      */
-    setLink(url: string | null, from: number, to = from, updateSelection = true): Model {
+    setLink(url: string | null, from: number, to = from): Model {
         if (url) {
             url = url.trim();
         }
@@ -538,14 +537,7 @@ export default class Editor {
             updated = setLink(this.model, url, range[0], range[1]);
         }
 
-        let result;
-        if (updateSelection) {
-            result = this.updateModel(updated, 'link', [from, to]);
-            setRange(this.element, range[0], range[0] + range[1]);
-        } else {
-            result = this.updateModel(updated, 'link');
-        }
-        return result;
+        return this.updateModel(updated, 'link');
     }
 
     /**
