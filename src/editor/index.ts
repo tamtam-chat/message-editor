@@ -186,6 +186,10 @@ export default class Editor {
     }
 
     private onSelectionChange = () => {
+        if (this.dirty !== DirtyState.None) {
+            return;
+        }
+
         const range = getTextRange(this.element);
         if (range) {
             this.saveSelection(range);
