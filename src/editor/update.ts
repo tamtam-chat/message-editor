@@ -6,9 +6,10 @@ import {
     cutText as plainCutText, setFormat as plainSetFormat, setLink, slice,
 } from '../formatted-string';
 import type { TokenFormatUpdate, CutText } from '../formatted-string';
-import { isCustomLink, tokenForPos } from '../formatted-string/utils';
+import { isCustomLink, tokenForPos, tokenRange } from '../formatted-string/utils';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import { getInputText, isCollapsed, startsWith } from './utils';
+import type { EmojiParams } from '../parser/types';
 
 const skipInputTypes = new Set<string>([
     'insertOrderedList',
@@ -118,6 +119,10 @@ export function applyFormatFromFragment(model: Model, fragment: Model, offset = 
 
         if (isCustomLink(token)) {
             model = setLink(model, token.link, offset, len);
+        }
+
+        if (token.emoji?.length) {
+            model = setEmojiParamsFromFragment(model, token, offset, len);
         }
 
         offset += len;
@@ -276,4 +281,80 @@ export function getInputEventText(evt: InputEvent): string {
     }
 
     return '';
+}
+
+/**
+ * Устанавливает параметры эмоджи из фрагмента
+ */
+export function setEmojiParamsFromFragment(tokens: Token[], fragment: Token, pos: number, posLen = 0): Token[] {
+
+    const [start, end] = tokenRange(tokens, pos, pos + posLen);
+
+    if (start.index === -1 || end.index === -1 || end.index < start.index) {
+        return tokens;
+    }
+
+    const startTokens = tokens.slice(0, start.index);
+    let midTokens = tokens.slice(start.index, end.index + 1);
+    const endTokens = tokens.slice(end.index + 1);
+
+    const offset = pos - getText(startTokens).length;
+
+    let len = 0;
+    midTokens = midTokens.map((token) => {
+        token = {
+            ...token,
+            emoji: token.emoji?.map((emoji) => {
+                const fragmentEmoji = fragment.emoji?.find((item) => item.from + offset === len + emoji.from);
+
+                if (fragmentEmoji) {
+                    return {
+                        ...emoji,
+                        params: fragmentEmoji.params,
+                    }
+                }
+                return emoji;
+            }),
+        };
+
+        len += token.value.length;
+        return token;
+    });
+
+    return [...startTokens, ...midTokens, ...endTokens];
+}
+
+/**
+ * Применяет параметры анимоджи ко всем эмоджи в указаном диапазоне
+ */
+export function applyAnimojiParams(model: Model, from: number, to: number, params: EmojiParams): Model {
+    const [start, end] = tokenRange(model, from, to);
+
+    if (start.index !== -1 && end.index !== -1) {
+        for (let tokenIndex = start.index; tokenIndex <= end.index; tokenIndex++) {
+            // если это токен между start-токеном и end-токеном, то проходимся по всему диапазону
+            let offsetFrom = 0;
+            if (tokenIndex === start.index && start.offset !== -1) {
+                offsetFrom = start.offset;
+            }
+
+            let offsetTo = model[tokenIndex].value.length;
+            if (tokenIndex === end.index && end.offset !== -1) {
+                offsetTo = end.offset;
+            }
+
+            model[tokenIndex].emoji = model[tokenIndex].emoji?.map((item) => {
+                if (item.from >= offsetFrom && item.to <= offsetTo) {
+                    return {
+                        ...item,
+                        params,
+                    }
+                }
+
+                return item;
+            });
+        }
+    }
+
+    return model;
 }

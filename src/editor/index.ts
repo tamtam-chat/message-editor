@@ -4,7 +4,19 @@ import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback, updateFromOldEvent } from './update';
+import {
+    applyAnimojiParams,
+    cutText,
+    getText,
+    insertText,
+    removeText,
+    replaceText,
+    setFormat,
+    toggleFormat,
+    updateFromInputEvent,
+    updateFromInputEventFallback,
+    updateFromOldEvent
+} from './update';
 import { setLink, slice, mdToText, textToMd, getFormat } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
@@ -14,6 +26,7 @@ import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 import { last } from '../parser/utils';
 import { objectMerge } from '../utils/objectMerge';
+import type { EmojiParams } from '../parser/types';
 
 const enum DiffActionType {
     Insert = 'insert',
@@ -410,6 +423,21 @@ export default class Editor {
     replaceText(from: number, to: number, text: string): Model {
         const result = this.paste(text, from, to);
         return result;
+    }
+
+    /**
+     * Заменяет текст в указанном диапазоне `from:to` на один эмоджи, и записывает ему указанные параметры
+     * Если передать более одного эмоджи, указанные параметры будут записаны всем переданным эмоджи
+     */
+    replaceOnEmoji(from: number, to: number, emoji: string, params?: EmojiParams): Model {
+        emoji = this.sanitizeText(emoji);
+        let nextModel = replaceText(this.model, emoji, from, to, this.options);
+
+        // устанавливаем параметры анимоджи в диапазоне куда мы добавили эмоджи
+        nextModel = applyAnimojiParams(nextModel, from, from + emoji.length, params);
+
+        const pos = from + emoji.length;
+        return this.updateModel(nextModel, DiffActionType.Insert, [pos, pos]);
     }
 
     /**

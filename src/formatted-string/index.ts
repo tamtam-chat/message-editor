@@ -299,7 +299,35 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
 
     if (nextTokens.length) {
         // Вставляем/заменяем фрагмент
-        nextTokens.forEach(t => t.format = startToken.format);
+        let len = 0;
+        nextTokens.forEach((token) => {
+            token.format = startToken.format;
+
+            // переносим параметры эмоджи из startToken (до start.offset) и endToken (после end.offset),
+            // так как после parse() эти параметры теряются
+            token.emoji = token.emoji?.map((emoji) => {
+                if (!len && emoji.from < start.offset) {
+                    const startTokenEmoji = startToken.emoji?.find((item) => item.from === emoji.from);
+
+                    if (startTokenEmoji) {
+                        return {
+                            ...emoji,
+                            params: startTokenEmoji?.params,
+                        }
+                    }
+                }
+
+                if (len + emoji.from >= textBound) {
+                    const endTokenEmoji = endToken.emoji?.find((item) => textBound + item.from - end.offset === len + emoji.from);
+                    return {
+                        ...emoji,
+                        params: endTokenEmoji?.params,
+                    }
+                }
+                return emoji;
+            });
+            len += token.value.length;
+        });
 
         // Применяем форматирование из концевых токенов, но только если можем
         // сделать это безопасно: применяем только для текста
