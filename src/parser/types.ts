@@ -179,7 +179,7 @@ export interface TokenNewline extends TokenBase {
     type: TokenType.Newline;
 }
 
-export interface EmojiParams {
+export interface EmojiData {
     [key: string]: number | string;
 }
 
@@ -193,6 +193,6 @@ export interface Emoji {
      * Используется для текстовых эмоджи (алиасов)
      * */
     emoji?: string;
-    /** Дополнительные параметры эмоджи */
-    params?: EmojiParams;
+    /** Дополнительные данные эмоджи */
+    emojiData?: EmojiData;
 }

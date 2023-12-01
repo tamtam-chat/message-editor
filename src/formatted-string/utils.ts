@@ -1,6 +1,7 @@
 import { TokenType, TokenFormat } from '../parser';
 import type { Token, Emoji, TokenLink, TokenText } from '../parser';
 import { objectMerge } from '../utils/objectMerge';
+import type { EmojiUpdatePayload } from './types';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) */
@@ -245,4 +246,20 @@ export function createToken(text: string, format: TokenFormat = 0, sticky = fals
 
 export function isSticky(token: Token): boolean {
     return 'sticky' in token && token.sticky;
+}
+
+/**
+ * Создает EmojiUpdatePayload из массива emoji.
+ * @param text текст токена в котором находятся эмоджи
+ */
+export function createEmojiUpdatePayload(emojis: Emoji[], offset = 0, text?: string): EmojiUpdatePayload[] {
+    const sortedEmojis = emojis.slice().sort((a, b) => a.from - b.from);
+
+    return sortedEmojis.map((emoji) => {
+        const pos = offset + emoji.from;
+        const data = emoji.emojiData || null;
+        const hint = text && text.slice(emoji.from, emoji.to);
+
+        return { pos, data, hint };
+    });
 }

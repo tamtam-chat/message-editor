@@ -5,7 +5,6 @@ import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import {
-    applyAnimojiParams,
     cutText,
     getText,
     insertText,
@@ -26,7 +25,6 @@ import parseHTML from '../parser/html2';
 import toHTML from '../render/html';
 import { last } from '../parser/utils';
 import { objectMerge } from '../utils/objectMerge';
-import type { EmojiParams } from '../parser/types';
 
 const enum DiffActionType {
     Insert = 'insert',
@@ -259,7 +257,6 @@ export default class Editor {
                     });
                 }
             }
-
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
 
@@ -418,26 +415,11 @@ export default class Editor {
     }
 
     /**
-     * Заменяет текст в указанном диапазоне `from:to` на новый
+     * Заменяет текст в указанном диапазоне `from:to` на новый текст или токены
      */
-    replaceText(from: number, to: number, text: string): Model {
+    replaceText(from: number, to: number, text: string | Model): Model {
         const result = this.paste(text, from, to);
         return result;
-    }
-
-    /**
-     * Заменяет текст в указанном диапазоне `from:to` на один эмоджи, и записывает ему указанные параметры
-     * Если передать более одного эмоджи, указанные параметры будут записаны всем переданным эмоджи
-     */
-    replaceOnEmoji(from: number, to: number, emoji: string, params?: EmojiParams): Model {
-        emoji = this.sanitizeText(emoji);
-        let nextModel = replaceText(this.model, emoji, from, to, this.options);
-
-        // устанавливаем параметры анимоджи в диапазоне куда мы добавили эмоджи
-        nextModel = applyAnimojiParams(nextModel, from, from + emoji.length, params);
-
-        const pos = from + emoji.length;
-        return this.updateModel(nextModel, DiffActionType.Insert, [pos, pos]);
     }
 
     /**
