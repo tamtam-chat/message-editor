@@ -1,10 +1,11 @@
 import { isAutoLink, isCustomLink } from '../formatted-string/utils';
 import type { Emoji, Token, TokenHashTag, TokenLink, TokenMention, TokenCommand, TokenText } from '../parser';
 import { TokenFormat, TokenType } from '../parser';
+import type { EmojiData } from '../parser/types';
 import { objectMerge } from '../utils/objectMerge';
 
 type ClassFormat = [type: TokenFormat, value: string];
-export type EmojiRender = (emoji: string | null, elem?: Element, rawEmoji?: string) => Element | void;
+export type EmojiRender = (emoji: string | null, elem?: Element, rawEmoji?: string, emojiData?: EmojiData) => Element | void;
 
 export interface RenderOptions {
     /**
@@ -210,7 +211,7 @@ function renderText(token: Token, state: ReconcileState): void {
                 state.text(text);
             }
 
-            state.emoji(emoji, rawEmoji);
+            state.emoji(emoji, rawEmoji, emojiToken.emojiData);
             offset = emojiToken.to;
         });
 
@@ -319,11 +320,11 @@ class ReconcileState {
     /**
      * Ожидает элемент с указанным эмоджи, при необходимости создаёт или обновляет его
      */
-    emoji(actualEmoji: string, rawEmoji: string): Element | void {
+    emoji(actualEmoji: string, rawEmoji: string, emojiData?: EmojiData): Element | void {
         const { emoji } = this.options;
         const node = this.container.childNodes[this.pos];
         const isCurEmoji = node ? isEmoji(node) : false;
-        const next = emoji(actualEmoji, isCurEmoji ? node as Element : null, rawEmoji);
+        const next = emoji(actualEmoji, isCurEmoji ? node as Element : null, rawEmoji, emojiData);
 
         if (next) {
             if (node !== next) {

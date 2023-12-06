@@ -4,7 +4,18 @@ import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
-import { cutText, getText, insertText, removeText, replaceText, setFormat, toggleFormat, updateFromInputEvent, updateFromInputEventFallback, updateFromOldEvent } from './update';
+import {
+    cutText,
+    getText,
+    insertText,
+    removeText,
+    replaceText,
+    setFormat,
+    toggleFormat,
+    updateFromInputEvent,
+    updateFromInputEventFallback,
+    updateFromOldEvent
+} from './update';
 import { setLink, slice, mdToText, textToMd, getFormat } from '../formatted-string';
 import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
 import Shortcuts from './shortcuts';
@@ -246,7 +257,6 @@ export default class Editor {
                     });
                 }
             }
-
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
 
@@ -405,9 +415,9 @@ export default class Editor {
     }
 
     /**
-     * Заменяет текст в указанном диапазоне `from:to` на новый
+     * Заменяет текст в указанном диапазоне `from:to` на новый текст или токены
      */
-    replaceText(from: number, to: number, text: string): Model {
+    replaceText(from: number, to: number, text: string | Model): Model {
         const result = this.paste(text, from, to);
         return result;
     }

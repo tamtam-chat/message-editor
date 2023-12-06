@@ -1,15 +1,16 @@
 import parse, { getText, getLength, normalize, TokenType } from '../parser';
 import type { ParserOptions, Token, TokenFormat, TokenLink, TokenText } from '../parser';
 import { mdToText, textToMd } from './markdown';
-import type { TokenFormatUpdate, TextRange, CutText } from './types';
+import type { TokenFormatUpdate, TextRange, CutText, EmojiUpdatePayload } from './types';
 import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
-    sliceToken, toLink, toText, tokenRange, createToken
+    sliceToken, toLink, toText, tokenRange, createToken, createEmojiUpdatePayload
 } from './utils';
 import { objectMerge } from '../utils/objectMerge';
+import type { Emoji } from '../parser/types';
 
-export { mdToText, textToMd, tokenForPos }
-export type { CutText, TokenFormatUpdate, TextRange }
+export { mdToText, textToMd, tokenForPos, createEmojiUpdatePayload }
+export type { CutText, TokenFormatUpdate, TextRange, EmojiUpdatePayload }
 
 
 /**
@@ -258,6 +259,96 @@ export function mdSetFormat(tokens: Token[], format: TokenFormatUpdate | TokenFo
 }
 
 /**
+ * Обновляет данные эмоджи в нужном токене.
+ * @param tokens массив токенов
+ * @param payload массив данных эмоджи, которые нужно обновить.
+ * NB позиция эмоджи указывается относительно всего текста
+ */
+export function updateEmojiData(tokens: Token[], payload: EmojiUpdatePayload[]): Token[] {
+    const updatedTokens = tokens.slice();
+
+    // Убедимся, что payloads отсортирован
+    payload = payload.sort((a, b) => a.pos - b.pos);
+
+    // Для каждого элемента из payload находим токен и эмоджи в нём
+    payload.forEach((emojiPayload) => {
+        const start = tokenForPos(updatedTokens, emojiPayload.pos, 'start');
+
+        // убедимся, что нашли нужный токен и позицию в нем
+        if (start.index === -1 || start.offset === -1) {
+            return;
+        }
+
+        const token = updatedTokens[start.index];
+        const emoji = token.emoji?.find((item) => item.from === start.offset);
+
+        if (emoji) {
+            // Если есть hint, убедимся, что эмоджи совпадают
+            if (emojiPayload.hint) {
+                const emojiRaw = token.value.slice(emoji.from, emoji.to);
+
+                // Если не совпадают, то не меняем данные эмоджи
+                if (emojiPayload.hint !== emojiRaw) {
+                    return;
+                }
+            }
+
+            // нашли эмоджи, проверили hint, следовательно меняем/удаляем данные
+            if (emojiPayload.data) {
+                emoji.emojiData = emojiPayload.data;
+            } else if (emoji.emojiData) {
+                delete emoji.emojiData;
+            }
+        }
+    });
+
+    return updatedTokens;
+}
+
+/**
+ * Переносит данные эмоджи из `startToken` (до start.offset) и `endToken` (после end.offset) в `tokens`
+ * @param tokens токены в которые нужно перенести данные
+ * @param startToken токен в котором было начало вставки
+ * @param startOffset в какую позицию была вставка относительно текста `startToken`
+ * @param endToken токен в котором был конец вставки (может быть равен `startToken`)
+ * @param endOffset в какую позицию была вставка относительно текста `endToken`
+ * @param textBound длина нового текста без учета `endToken.value` (после `endOffset`)
+ */
+function saveEmojiDataForUpdate(tokens: Token[], startToken: Token, startOffset: number, endToken: Token, endOffset: number, textBound: number) {
+    // собираем эмоджи из startToken до startOffset
+    const startTokenEmojis: Emoji[] = [];
+    for (let index = 0; index < startToken.emoji?.length || 0; index++) {
+        const emoji = startToken.emoji[index];
+        if (emoji.from < startOffset) {
+            startTokenEmojis.push(emoji);
+        } else {
+            break;
+        }
+    }
+    const startTokenEmojiPayload = createEmojiUpdatePayload(startTokenEmojis, 0, startToken.value);
+
+    // собираем эмоджи из endToken после endOffset
+    const endTokenEmojis: Emoji[] = [];
+    for (let index = (endToken.emoji?.length || 0) - 1; index >= 0; index--) {
+        const emoji = endToken.emoji[index];
+        if (emoji.from >= endOffset) {
+            endTokenEmojis.push(emoji);
+        } else {
+            break;
+        }
+    }
+    // так как updateEmojiData принимает позиции эмоджи относительно всего текста
+    // необходимо учесть длину текста до endToken
+    const tokenEndPos = tokenForPos(tokens, textBound, 'start');
+    const textLengthBeforeEndToken = getText(tokens.slice(0, tokenEndPos.index)).length;
+    const offset = textLengthBeforeEndToken + tokenEndPos.offset - endOffset;
+
+    const endTokenEmojiPayload = createEmojiUpdatePayload(endTokenEmojis, offset, endToken.value);
+
+    return updateEmojiData(tokens, [ ...startTokenEmojiPayload, ...endTokenEmojiPayload ]);
+}
+
+/**
  * Универсальный метод для обновления списка токенов: добавление, удаление и замена
  * текста в списке указанных токенов
  */
@@ -299,7 +390,11 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
 
     if (nextTokens.length) {
         // Вставляем/заменяем фрагмент
-        nextTokens.forEach(t => t.format = startToken.format);
+        nextTokens.forEach((t) => t.format = startToken.format);
+
+        // переносим параметры эмоджи из startToken (до start.offset) и endToken (после end.offset),
+        // так как после parse() эти параметры теряются
+        nextTokens = saveEmojiDataForUpdate(nextTokens, startToken, start.offset, endToken, end.offset, textBound);
 
         // Применяем форматирование из концевых токенов, но только если можем
         // сделать это безопасно: применяем только для текста

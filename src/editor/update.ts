@@ -3,10 +3,10 @@ import parse, { TokenFormat } from '../parser';
 import {
     insertText as plainInsertText, removeText as plainRemoveText, replaceText as plainReplaceText,
     mdInsertText, mdRemoveText, mdReplaceText, mdCutText, mdToText, textToMd,
-    cutText as plainCutText, setFormat as plainSetFormat, setLink, slice,
+    cutText as plainCutText, setFormat as plainSetFormat, setLink, slice, updateEmojiData,
 } from '../formatted-string';
 import type { TokenFormatUpdate, CutText } from '../formatted-string';
-import { isCustomLink, tokenForPos } from '../formatted-string/utils';
+import { createEmojiUpdatePayload, isCustomLink, tokenForPos } from '../formatted-string/utils';
 import type { BaseEditorOptions, TextRange, Model } from './types';
 import { getInputText, isCollapsed, startsWith } from './utils';
 
@@ -118,6 +118,11 @@ export function applyFormatFromFragment(model: Model, fragment: Model, offset = 
 
         if (isCustomLink(token)) {
             model = setLink(model, token.link, offset, len);
+        }
+
+        if (token.emoji?.length) {
+            const payload = createEmojiUpdatePayload(token.emoji, offset, token.value);
+            model = updateEmojiData(model, payload);
         }
 
         offset += len;
