@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editor example</title>
+    
+  <script type="module" crossorigin src="./assets/index.01b1b805.js"></script>
+  <link rel="stylesheet" href="./assets/index.a2a0c9af.css">
+</head>
+<body>
+    <main>
+        <p>Текстовый редактор + overlay (рамки у эмоджи)</p>
+        <div class="editor-wrap">
+            <div id="text-editor-scroller" class="editor-scroller">
+                <div class="editor-overlay"></div>
+                <div id="text-editor" class="editor"></div>
+            </div>
+        </div>
+
+        <!-- <p>Текстовый редактор</p>
+        <div class="editor-wrap">
+            <div id="raw-editor" class="editor" contenteditable>Привет мир 🥺</div>
+        </div> -->
+
+        <p>Markdown редактор</p>
+        <div class="editor-wrap">
+            <div id="md-editor" class="editor editor-scroller"></div>
+        </div>
+
+        <div class="toolbar hidden">
+            <span class="toolbar-btn bold selected" data-format="1">B</span>
+            <span class="toolbar-btn italic" data-format="2">I</span>
+            <span class="toolbar-btn strike" data-format="8">S</span>
+            <span class="toolbar-btn monospace" data-format="16">M</span>
+            <span class="toolbar-sep"></span>
+            <span class="toolbar-btn link">Ссылка</span>
+        </div>
+
+        <ul>
+            <li>⌘B — жирный</li>
+            <li>⌘I — курсив</li>
+            <li>⌘U — перечёркнутый</li>
+            <li>⌘K — моноширинный</li>
+            <li>^L — добавить ссылку (если указать пустое значение, ссылка удалится)</li>
+        </ul>
+    </main>
+    
+</body>
+</html>
