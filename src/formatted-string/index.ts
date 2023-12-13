@@ -4,7 +4,7 @@ import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText, EmojiUpdatePayload } from './types';
 import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
-    sliceToken, toLink, toText, tokenRange, createToken, createEmojiUpdatePayload
+    sliceToken, toLink, toText, tokenRange, createToken, createEmojiUpdatePayload, TokenForPos
 } from './utils';
 import { objectMerge } from '../utils/objectMerge';
 import type { Emoji } from '../parser/types';
@@ -313,8 +313,9 @@ export function updateEmojiData(tokens: Token[], payload: EmojiUpdatePayload[]):
  * @param endToken токен в котором был конец вставки (может быть равен `startToken`)
  * @param endOffset в какую позицию была вставка относительно текста `endToken`
  * @param textBound длина нового текста без учета `endToken.value` (после `endOffset`)
+ * @param tokensOffsetBeforeStart смещение для эмоджи в startToken
  */
-function saveEmojiDataForUpdate(tokens: Token[], startToken: Token, startOffset: number, endToken: Token, endOffset: number, textBound: number) {
+function saveEmojiDataForUpdate(tokens: Token[], startToken: Token, startOffset: number, endToken: Token, endOffset: number, textBound: number, tokensOffsetBeforeStart = 0) {
     // собираем эмоджи из startToken до startOffset
     const startTokenEmojis: Emoji[] = [];
     for (let index = 0; index < startToken.emoji?.length || 0; index++) {
@@ -325,7 +326,7 @@ function saveEmojiDataForUpdate(tokens: Token[], startToken: Token, startOffset:
             break;
         }
     }
-    const startTokenEmojiPayload = createEmojiUpdatePayload(startTokenEmojis, 0, startToken.value);
+    const startTokenEmojiPayload = createEmojiUpdatePayload(startTokenEmojis, tokensOffsetBeforeStart, startToken.value);
 
     // собираем эмоджи из endToken после endOffset
     const endTokenEmojis: Emoji[] = [];
@@ -373,6 +374,12 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
     let nextValue = startToken.value.slice(0, start.offset)
         + value + endToken.value.slice(end.offset);
 
+    // сохраняем startToken, чтобы правильно восстановить данные эмоджи
+    // при пограничном случае с автоссылкой
+    const startForEmoji: TokenForPos = { ...start };
+    const startTokenForEmoji = startToken;
+    let startOffsetForEmoji = 0;
+
     // Разбираем пограничный случай: есть автоссылка `mail.ru`, мы дописали в конец
     // `?` – вопрос останется текстом, так как это знак препинания в конце предложения.
     // Но если продолжим писать текст, например, `foo`, то `mail.ru?foo` должен
@@ -384,6 +391,7 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
         textBound += startToken.value.length;
         start.index--;
         start.offset = 0;
+        startOffsetForEmoji = startToken.value.length;
     }
 
     let nextTokens = parse(nextValue, options);
@@ -394,7 +402,7 @@ function updateTokens(tokens: Token[], value: string, from: number, to: number, 
 
         // переносим параметры эмоджи из startToken (до start.offset) и endToken (после end.offset),
         // так как после parse() эти параметры теряются
-        nextTokens = saveEmojiDataForUpdate(nextTokens, startToken, start.offset, endToken, end.offset, textBound);
+        nextTokens = saveEmojiDataForUpdate(nextTokens, startTokenForEmoji, startForEmoji.offset, endToken, end.offset, textBound, startOffsetForEmoji);
 
         // Применяем форматирование из концевых токенов, но только если можем
         // сделать это безопасно: применяем только для текста
