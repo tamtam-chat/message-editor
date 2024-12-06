@@ -1,8 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { describe, it } from 'node:test'
+import { equal, deepEqual } from 'node:assert/strict';
 import parse, { TokenType } from '../src/parser';
 import type { Token } from '../src/parser';
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname)
 
 function read(file: string): string {
     return fs.readFileSync(path.resolve(__dirname, file), 'utf8');

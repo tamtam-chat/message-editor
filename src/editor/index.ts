@@ -2,7 +2,7 @@ import parse, { getLength, TokenFormat, TokenType } from '../parser';
 import type { Token } from '../parser';
 import render, { dispatch, isEmoji } from '../render';
 import type { BaseEditorOptions, TextRange, Model } from './types';
-import History, { HistoryEntry } from './history';
+import History, { type HistoryEntry } from './history';
 import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
 import {
     cutText,

@@ -1,5 +1,5 @@
 import { slice } from '.';
-import { getText, Token } from '../parser';
+import { getText, type Token } from '../parser';
 import { isWhitespace } from '../parser/utils';
 
 export default function split(rawTokens: Token[], chunkSize: number): Token[][] {

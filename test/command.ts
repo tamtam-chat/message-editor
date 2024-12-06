@@ -1,4 +1,5 @@
-import { deepStrictEqual as deepEqual } from 'assert';
+import { deepEqual } from 'node:assert/strict';
+import { describe, it } from 'node:test'
 import _parse, { TokenType } from '../src/parser';
 import type { Token } from '../src/parser';
 

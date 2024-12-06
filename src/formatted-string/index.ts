@@ -4,7 +4,7 @@ import { mdToText, textToMd } from './markdown';
 import type { TokenFormatUpdate, TextRange, CutText, EmojiUpdatePayload } from './types';
 import {
     tokenForPos, isSolidToken, isCustomLink, isAutoLink, splitToken,
-    sliceToken, toLink, toText, tokenRange, createToken, createEmojiUpdatePayload, TokenForPos
+    sliceToken, toLink, toText, tokenRange, createToken, createEmojiUpdatePayload, type TokenForPos
 } from './utils';
 import { objectMerge } from '../utils/objectMerge';
 import type { Emoji } from '../parser/types';

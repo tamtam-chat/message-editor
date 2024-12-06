@@ -3,7 +3,7 @@
     "target": "ES2015",
     "module": "ESNext",
     "lib": ["ES2016", "DOM", "DOM.Iterable"],
-    "importsNotUsedAsValues": "error",
+    "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "moduleResolution": "node",
     "allowJs": true,
@@ -14,12 +14,5 @@
     "sourceMap": true,
     "declaration": true
   },
-  "ts-node": {
-    "compilerOptions": {
-      "module": "CommonJS"
-    }
-  },
-  "include": [
-    "src/**/*.ts"
-  ]
+  "include": ["src"]
 }

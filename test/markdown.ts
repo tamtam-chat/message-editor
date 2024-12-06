@@ -1,4 +1,5 @@
-import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
+import { describe, it } from 'node:test'
+import { equal, deepEqual } from 'node:assert/strict';
 import _parse, { TokenFormat, TokenType } from '../src/parser';
 import type { Token, ParserOptions } from '../src/parser';
 import { mdInsertText, mdRemoveText, mdSetFormat, mdToText, textToMd } from '../src/formatted-string';

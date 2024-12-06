@@ -1,4 +1,5 @@
-import { Emoji, Token, TokenFormat, TokenMarkdown, TokenText, TokenType, ParserOptions } from './types';
+import type { Emoji, Token, TokenMarkdown, TokenText,  ParserOptions } from './types';
+import { TokenType, TokenFormat } from './types';
 import { isDelimiter, last, codePointAt, Codes } from './utils';
 
 type MatchFn = (ch: number) => boolean;

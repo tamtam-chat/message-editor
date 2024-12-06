@@ -1,4 +1,4 @@
-import { getLength, Token } from '../parser';
+import { getLength, type Token } from '../parser';
 import parse, { TokenFormat } from '../parser';
 import {
     insertText as plainInsertText, removeText as plainRemoveText, replaceText as plainReplaceText,

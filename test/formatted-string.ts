@@ -1,4 +1,5 @@
-import { strictEqual as equal, deepStrictEqual as deepEqual } from 'assert';
+import { describe, it } from 'node:test'
+import { equal, deepEqual } from 'node:assert/strict';
 import { insertText, removeText, setFormat, slice, cutText, setLink, replaceText } from '../src/formatted-string';
 import { createToken as token } from '../src/formatted-string/utils';
 import type { ParserOptions, Token, TokenHashTag, TokenLink, TokenText } from '../src/parser';
