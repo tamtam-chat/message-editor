@@ -3,11 +3,11 @@
   "description": "Компонент поля ввода сообщения для веб-версии TamTam",
   "version": "0.11.0",
   "type": "module",
-  "main": "./dist/editor.es.js",
+  "main": "./dist/editor.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "import": "./dist/editor.es.js",
-    "require": "./dist/editor.cjs.js"
+    "import": "./dist/editor.js",
+    "require": "./dist/editor.cjs"
   },
   "scripts": {
     "test": "node --import tsx --test ./test/*.ts",
