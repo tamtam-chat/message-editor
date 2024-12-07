@@ -7,7 +7,8 @@
   "types": "./dist/index.d.ts",
   "exports": {
     "import": "./dist/editor.js",
-    "require": "./dist/editor.cjs"
+    "require": "./dist/editor.cjs",
+    "types": "./dist/index.d.ts"
   },
   "scripts": {
     "test": "node --import tsx --test ./test/*.ts",
