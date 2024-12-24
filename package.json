@@ -7,8 +7,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     "import": "./dist/editor.js",
-    "require": "./dist/editor.cjs",
-    "types": "./dist/index.d.ts"
+    "require": "./dist/editor.cjs"
   },
   "scripts": {
     "test": "node --import tsx --test ./test/*.ts",
@@ -32,9 +31,6 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   },
   "directories": {
     "test": "test"
